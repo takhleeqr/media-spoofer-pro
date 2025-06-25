@@ -1,0 +1,67 @@
+name: Build Electron Apps
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build_script: npm run build-win
+            artifact_name: windows-installer
+            artifact_pattern: dist/*.exe
+          - os: macos-latest
+            build_script: npm run build-mac
+            artifact_name: macos-installer
+            artifact_pattern: dist/*.dmg
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Download FFmpeg for Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
+        Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg-temp"
+        Move-Item "ffmpeg-temp/ffmpeg-*/bin/ffmpeg.exe" "./ffmpeg.exe"
+        Move-Item "ffmpeg-temp/ffmpeg-*/bin/ffprobe.exe" "./ffprobe.exe"
+        Remove-Item -Recurse -Force "ffmpeg-temp", "ffmpeg.zip"
+
+    - name: Download FFmpeg for macOS
+      if: matrix.os == 'macos-latest'
+      run: |
+        curl -L https://evermeet.cx/ffmpeg/ffmpeg-6.0.zip -o ffmpeg.zip
+        curl -L https://evermeet.cx/ffmpeg/ffprobe-6.0.zip -o ffprobe.zip
+        unzip ffmpeg.zip
+        unzip ffprobe.zip
+        chmod +x ffmpeg ffprobe
+        rm ffmpeg.zip ffprobe.zip
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build Electron app
+      run: ${{ matrix.build_script }}
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: ${{ matrix.artifact_pattern }}
+        retention-days: 30
