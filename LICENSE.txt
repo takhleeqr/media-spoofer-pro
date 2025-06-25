@@ -1,0 +1,31 @@
+MEDIA SPOOFER PRO
+End User License Agreement (EULA)
+
+Copyright (c) 2025 Pony Agency. All rights reserved.
+
+ACCEPTANCE OF TERMS
+By installing and using Media Spoofer Pro, you agree to be bound by the terms of this agreement.
+
+GRANT OF LICENSE
+Pony Agency grants you a non-exclusive license to use Media Spoofer Pro for personal and commercial purposes.
+
+PERMITTED USES
+- Process and transform media files for social media platforms
+- Create multiple variations of images and videos
+- Use for commercial social media management
+
+RESTRICTIONS
+- You may not redistribute or resell this software
+- You may not reverse engineer or modify the software
+- You may not use the software for illegal purposes
+
+DISCLAIMER
+This software is provided "as is" without warranty of any kind.
+
+LIMITATION OF LIABILITY
+In no event shall Pony Agency be liable for any damages arising from the use of this software.
+
+CONTACT
+For support, contact: support@ponyagency.com
+
+By clicking "I Agree", you acknowledge that you have read and understood this agreement.

@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Spoofer Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .app-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            min-height: calc(100vh - 40px);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .app-logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .header p {
+            color: #718096;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+        
+        .powered-by {
+            color: #a0aec0;
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+        
+        /* Overall progress bar for batches */
+        .overall-progress {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            display: none;
+        }
+        
+        .overall-progress.show {
+            display: block;
+        }
+        
+        .overall-progress h4 {
+            color: #4a5568;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .overall-progress-bar {
+            width: 100%;
+            height: 12px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .overall-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .overall-progress-text {
+            text-align: center;
+            color: #718096;
+            font-size: 0.9rem;
+        }
+        
+        /* Rest of your existing CSS stays the same... */
+        /* Mode Selection Screen */
+        .mode-selection {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 60px 0;
+        }
+        
+        .mode-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 3px solid transparent;
+            min-width: 250px;
+        }
+        
+        .mode-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            border-color: #667eea;
+        }
+        
+        .mode-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+        
+        .mode-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+        
+        .mode-description {
+            color: #718096;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+        
+        /* Main App Interface */
+        .main-interface {
+            display: none;
+        }
+        
+        .main-interface.active {
+            display: block;
+        }
+        
+        .mode-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+        
+        .current-mode {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .current-mode-icon {
+            font-size: 2rem;
+        }
+        
+        .current-mode-text h2 {
+            color: #2d3748;
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+        
+        .current-mode-text p {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+        
+        .back-button {
+            padding: 10px 20px;
+            background: #edf2f7;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #4a5568;
+            transition: all 0.3s ease;
+        }
+        
+        .back-button:hover {
+            background: #e2e8f0;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        }
+        
+        .section h3 {
+            color: #2d3748;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .drop-zone {
+            border: 3px dashed #cbd5e0;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #f7fafc;
+            margin-bottom: 20px;
+        }
+        
+        .drop-zone:hover {
+            border-color: #667eea;
+            background: #edf2f7;
+            transform: translateY(-2px);
+        }
+        
+        .drop-zone.dragover {
+            border-color: #667eea;
+            background: #e6fffa;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+        }
+        
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #a0aec0;
+        }
+        
+        .settings-group {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .settings-group h4 {
+            color: #4a5568;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .setting-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .setting-item label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+        
+        .setting-item select,
+        .setting-item input[type="number"],
+        .setting-item input[type="text"] {
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        
+        .setting-item select:focus,
+        .setting-item input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .checkbox-group {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+        
+        .checkbox-item:hover {
+            border-color: #cbd5e0;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #667eea;
+        }
+        
+        .checkbox-item label {
+            font-weight: 500;
+            color: #4a5568;
+            cursor: pointer;
+            margin: 0;
+        }
+        
+        .file-list {
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .file-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+        
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 1.2rem;
+        }
+        
+        .file-icon.image { background: #48bb78; }
+        .file-icon.video { background: #ed8936; }
+        
+        .file-details {
+            flex: 1;
+        }
+        
+        .file-name {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        
+        .file-size {
+            color: #718096;
+            font-size: 0.9rem;
+        }
+        
+        .progress-container {
+            width: 150px;
+            margin-left: 15px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .progress-text {
+            font-size: 0.8rem;
+            color: #718096;
+            text-align: center;
+        }
+        
+        .process-section {
+            grid-column: 1 / -1;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 140px;
+            justify-content: center;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #edf2f7;
+            color: #4a5568;
+        }
+        
+        .btn-secondary:hover:not(:disabled) {
+            background: #e2e8f0;
+        }
+        
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .btn-success:hover:not(:disabled) {
+            background: #38a169;
+            transform: translateY(-1px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .status-panel {
+            background: #1a202c;
+            color: #e2e8f0;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            max-height: 250px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .status-panel.show {
+            display: block;
+        }
+        
+        .status-line {
+            margin: 3px 0;
+            opacity: 0;
+            animation: fadeIn 0.5s ease forwards;
+        }
+        
+        .status-success { color: #68d391; }
+        .status-warning { color: #fbd38d; }
+        .status-error { color: #fc8181; }
+        .status-info { color: #63b3ed; }
+        
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        .stats-grid.show {
+            opacity: 1;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border: 2px solid #e2e8f0;
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #718096;
+            font-size: 0.85rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #718096;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+        
+        .bulk-rename-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f0f4f8;
+            border-radius: 10px;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .bulk-rename-section h4 {
+            color: #4a5568;
+            margin-bottom: 15px;
+        }
+        
+        .pattern-examples {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .pattern-examples h5 {
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+        
+        .pattern-examples ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .pattern-examples li {
+            padding: 4px 0;
+            color: #718096;
+        }
+        
+        .pattern-examples code {
+            background: #f7fafc;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #667eea;
+        }
+        
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .mode-selection {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 200px;
+            }
+        }
+        
+        /* ADD THESE NEW LINES HERE */
+        #imageDuplicatesGroup, #videoDuplicatesGroup {
+            transition: all 0.3s ease;
+        }
+
+        .setting-item.hidden {
+            display: none !important;
+        }
+        
+        /* ADD THESE NEW LINES */
+        .footer {
+            text-align: center;
+            padding: 20px 30px;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 30px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 0 0 20px 20px;
+        }
+
+        .footer-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #718096;
+            font-size: 0.9rem;
+        }
+
+        .footer-logo {
+            height: 24px;
+            width: auto;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .footer-logo.show {
+            display: inline-block;
+        }
+
+        .company-name {
+            font-weight: 600;
+            color: #4a5568;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header">
+            <h1>🎬 Media Spoofer Pro</h1>
+            <p>Professional media transformation for social platforms</p>
+        </div>
+        
+        <!-- Mode Selection Screen -->
+        <div class="mode-selection" id="modeSelection">
+            <div class="mode-card" onclick="selectMode('image')">
+                <div class="mode-icon">📷</div>
+                <div class="mode-title">Process Images</div>
+                <div class="mode-description">Transform photos with visual effects, format conversion, and bulk renaming</div>
+            </div>
+            
+            <div class="mode-card" onclick="selectMode('video')">
+                <div class="mode-icon">🎬</div>
+                <div class="mode-title">Process Videos</div>
+                <div class="mode-description">Split videos, apply effects, convert formats, and bulk rename clips</div>
+            </div>
+        </div>
+        
+        <!-- Image Processing Interface -->
+        <div class="main-interface" id="imageInterface">
+            <div class="mode-header">
+                <div class="current-mode">
+                    <div class="current-mode-icon">📷</div>
+                    <div class="current-mode-text">
+                        <h2>Image Processing</h2>
+                        <p>Upload and transform your images</p>
+                    </div>
+                </div>
+                <button class="back-button" onclick="goBack()">← Back to Mode Selection</button>
+            </div>
+            
+            <div class="main-content">
+                <!-- File Input Section -->
+                <div class="section">
+                    <h3>📁 Upload Images</h3>
+                    <div class="drop-zone" id="imageDropZone">
+                        <div class="upload-icon">📤</div>
+                        <h4>Drop images here or click to browse</h4>
+                        <p>Supports: JPG, JPEG, PNG, HEIC, WebP</p>
+                    </div>
+                    
+                    <div class="buttons">
+                        <button class="btn btn-secondary" id="selectImageBtn">
+                            📂 Select Images
+                        </button>
+                        <button class="btn btn-secondary" id="clearImageBtn">
+                            🗑️ Clear All
+                        </button>
+                    </div>
+                    
+                    <div class="file-list" id="imageFileList">
+                        <div class="empty-state">No images selected</div>
+                    </div>
+                </div>
+                
+                <!-- Image Settings Panel -->
+                <div class="section">
+                    <h3>⚙️ Image Settings</h3>
+                    
+                    <div class="settings-group">
+                        <h4>Processing Mode</h4>
+                        <div class="setting-item">
+                            <label>Processing Type</label>
+                            <select id="imageProcessingMode">
+                                <option value="spoof-only">Apply Visual Effects</option>
+                                <option value="convert-only">Format Convert Only</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item" id="imageIntensityGroup">
+                            <label>Effect Intensity</label>
+                            <select id="imageIntensity">
+                                <option value="light">Light Effects</option>
+                                <option value="medium">Medium Effects</option>
+                                <option value="heavy" selected>Heavy Effects</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item" id="imageDuplicatesGroup">
+                            <label>Duplicates per Image</label>
+                            <input type="number" id="imageDuplicates" value="1" min="1" max="100">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h4>Output Format</h4>
+                        <div class="setting-item">
+                            <label>Image Format</label>
+                            <select id="imageFormat">
+                                <option value="jpg">JPG (Fastest)</option>
+                                <option value="png">PNG (Best Quality)</option>
+                                <option value="webp">WebP (Smallest Size)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="bulk-rename-section">
+                        <h4>🏷️ Bulk Rename</h4>
+                        <div class="setting-item">
+                            <label>Naming Pattern</label>
+                            <input type="text" id="imageNamingPattern" placeholder="e.g., brand_image_001" value="photo_{number}">
+                        </div>
+                        <div class="pattern-examples">
+                            <h5>Examples:</h5>
+                            <ul>
+                                <li><code>brand_{number}</code> → brand_001, brand_002...</li>
+                                <li><code>product_summer_{number}</code> → product_summer_001...</li>
+                                <li><code>{date}_photo_{number}</code> → 2025-06-24_photo_001...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Video Processing Interface -->
+        <div class="main-interface" id="videoInterface">
+            <div class="mode-header">
+                <div class="current-mode">
+                    <div class="current-mode-icon">🎬</div>
+                    <div class="current-mode-text">
+                        <h2>Video Processing</h2>
+                        <p>Upload and transform your videos</p>
+                    </div>
+                </div>
+                <button class="back-button" onclick="goBack()">← Back to Mode Selection</button>
+            </div>
+            
+            <div class="main-content">
+                <!-- File Input Section -->
+                <div class="section">
+                    <h3>📁 Upload Videos</h3>
+                    <div class="drop-zone" id="videoDropZone">
+                        <div class="upload-icon">📤</div>
+                        <h4>Drop videos here or click to browse</h4>
+                        <p>Supports: MP4, MOV, AVI, WebM</p>
+                    </div>
+                    
+                    <div class="buttons">
+                        <button class="btn btn-secondary" id="selectVideoBtn">
+                            📂 Select Videos
+                        </button>
+                        <button class="btn btn-secondary" id="clearVideoBtn">
+                            🗑️ Clear All
+                        </button>
+                    </div>
+                    
+                    <div class="file-list" id="videoFileList">
+                        <div class="empty-state">No videos selected</div>
+                    </div>
+                </div>
+                
+                <!-- Video Settings Panel -->
+                <div class="section">
+                    <h3>⚙️ Video Settings</h3>
+                    
+                    <div class="settings-group">
+                        <h4>Processing Mode</h4>
+                        <div class="setting-item">
+                            <label>Processing Type</label>
+                            <select id="videoProcessingMode">
+                                <option value="spoof-split">Apply Effects + Split Long Videos</option>
+                                <option value="spoof-only" selected>Apply Effects Only</option>
+                                <option value="split-only">Split into Clips Only</option>
+                                <option value="convert-only">Format Convert Only</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item" id="videoIntensityGroup">
+                           <label>Effect Intensity</label>
+                           <select id="videoIntensity">
+                               <option value="light">Light Effects</option>
+                               <option value="medium">Medium Effects</option>
+                               <option value="heavy" selected>Heavy Effects</option>
+                           </select>
+                       </div>
+                       
+                       <div class="setting-item" id="videoDuplicatesGroup">
+                           <label>Duplicates per Video</label>
+                           <input type="number" id="videoDuplicates" value="1" min="1" max="100">
+                       </div>
+                   </div>
+                   
+                   <div class="settings-group">
+                       <h4>Video Options</h4>
+                       <div class="setting-item">
+                           <label>Output Format</label>
+                           <select id="videoFormat">
+                               <option value="mp4">MP4 (Fastest)</option>
+                               <option value="webm">WebM (Smaller Size)</option>
+                               <option value="mov">MOV (Mac Compatible)</option>
+                           </select>
+                       </div>
+                       
+                       <div class="setting-item" id="clipLengthGroup">
+                           <label>Clip Length (seconds)</label>
+                           <select id="clipLength">
+                               <option value="6-8" selected>6-8 seconds (Random)</option>
+                               <option value="8">Exactly 8 seconds</option>
+                               <option value="10">Exactly 10 seconds</option>
+                               <option value="15">Exactly 15 seconds</option>
+                           </select>
+                       </div>
+                       
+                       <div class="checkbox-group">
+                           <div class="checkbox-item">
+                               <input type="checkbox" id="removeAudio">
+                               <label for="removeAudio">Remove Audio from Videos</label>
+                           </div>
+                           <div class="checkbox-item">
+                               <input type="checkbox" id="detectDuplicates" checked>
+                               <label for="detectDuplicates">Skip Duplicate Files</label>
+                           </div>
+                       </div>
+                   </div>
+                   
+                   <div class="bulk-rename-section">
+                       <h4>🏷️ Bulk Rename</h4>
+                       <div class="setting-item">
+                           <label>Naming Pattern</label>
+                           <input type="text" id="videoNamingPattern" placeholder="e.g., brand_video_001" value="clip_{number}">
+                       </div>
+                       <div class="pattern-examples">
+                           <h5>Examples:</h5>
+                           <ul>
+                               <li><code>brand_{number}</code> → brand_001, brand_002...</li>
+                               <li><code>tiktok_clip_{number}</code> → tiktok_clip_001...</li>
+                               <li><code>{date}_video_{number}</code> → 2025-06-24_video_001...</li>
+                           </ul>
+                       </div>
+                   </div>
+               </div>
+           </div>
+       </div>
+       
+<!-- Processing Section (Shared) -->
+<div class="section process-section" id="processSection" style="display: none;">
+    <h3>🚀 Processing</h3>
+    
+    <!-- Overall Progress Bar -->
+    <div class="overall-progress" id="overallProgress">
+        <h4>Overall Progress</h4>
+        <div class="overall-progress-bar">
+            <div class="overall-progress-fill" id="overallProgressFill"></div>
+        </div>
+        <div class="overall-progress-text" id="overallProgressText">Ready to start...</div>
+    </div>
+    
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+            <div class="stat-value" id="totalFiles">0</div>
+            <div class="stat-label">Total Files</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="processedFiles">0</div>
+            <div class="stat-label">Processed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="outputFiles">0</div>
+            <div class="stat-label">Output Files</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="timeElapsed">0s</div>
+            <div class="stat-label">Time Elapsed</div>
+        </div>
+    </div>
+    
+    <div class="buttons">
+        <button class="btn btn-secondary" id="selectOutputBtn">
+            📁 Select Output Folder
+        </button>
+        <button class="btn btn-primary" id="startBtn" disabled>
+            ▶️ Start Processing
+        </button>
+        <button class="btn btn-secondary" id="pauseBtn" disabled>
+            ⏸️ Pause
+        </button>
+        <button class="btn btn-secondary" id="stopBtn" disabled>
+            ⏹️ Stop
+        </button>
+        <button class="btn btn-success" id="openFolderBtn" disabled>
+            📁 Open Output
+        </button>
+    </div>
+    
+    <div class="status-panel" id="statusPanel">
+        <div id="statusContent"></div>
+    </div>
+</div>
+
+<!-- Footer inside app-container -->
+<div class="footer">
+    <div class="footer-content">
+        <span>Powered by</span>
+        <img src="logo.png" alt="Pony Agency" class="footer-logo" id="footerLogo">
+        <span class="company-name">Pony Agency</span>
+    </div>
+</div>
+
+</div> <!-- Closes app-container -->
+
+<script src="renderer.js"></script>
+<script>
+    // Check if logo exists and show it in footer
+    document.addEventListener('DOMContentLoaded', function() {
+        const footerLogo = document.getElementById('footerLogo');
+        
+        // Try multiple possible logo names
+        const logoNames = ['logo.png', 'logo.jpg', 'logo.jpeg', 'icon.png'];
+        
+        function tryNextLogo(index) {
+            if (index >= logoNames.length) {
+                footerLogo.style.display = 'none';
+                return;
+            }
+            
+            const img = new Image();
+            img.onload = function() {
+                footerLogo.src = logoNames[index];
+                footerLogo.classList.add('show');
+            };
+            img.onerror = function() {
+                tryNextLogo(index + 1);
+            };
+            img.src = logoNames[index];
+        }
+        
+        tryNextLogo(0);
+    });
+</script>
+</body>
+</html>
