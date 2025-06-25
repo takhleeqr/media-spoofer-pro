@@ -23,29 +23,50 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.ponyagency.mediaspoofer",
-    "productName": "Media Spoofer Pro",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "**/*",
-      "!node_modules/**/*",
-      "!dist/**/*"
+  "appId": "com.ponyagency.mediaspoofer",
+  "productName": "Media Spoofer Pro",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "**/*",
+    "!node_modules/**/*",
+    "!dist/**/*"
+  ],
+  "publish": null,
+  "win": {
+    "target": "nsis"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      }
     ],
-    "win": {
-      "target": "nsis",
-      "icon": "logo.png"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "logo.png"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "license": "LICENSE.txt"
-    }
+    "category": "public.app-category.photography"
+  },
+  "dmg": {
+    "title": "Media Spoofer Pro",
+    "contents": [
+      {
+        "x": 410,
+        "y": 150,
+        "type": "link",
+        "path": "/Applications"
+      },
+      {
+        "x": 130,
+        "y": 150,
+        "type": "file"
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "license": "LICENSE.txt"
   }
+}
 }
