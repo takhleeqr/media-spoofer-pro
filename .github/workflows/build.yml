@@ -43,7 +43,7 @@ jobs:
         Move-Item "ffmpeg-temp/ffmpeg-*/bin/ffprobe.exe" "./ffprobe.exe"
         Remove-Item -Recurse -Force "ffmpeg-temp", "ffmpeg.zip"
 
-    - - name: Download FFmpeg for macOS
+    - name: Download FFmpeg for macOS
   if: matrix.os == 'macos-latest'
   run: |
     echo "Downloading FFmpeg for macOS..."
