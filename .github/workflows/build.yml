@@ -43,15 +43,25 @@ jobs:
         Move-Item "ffmpeg-temp/ffmpeg-*/bin/ffprobe.exe" "./ffprobe.exe"
         Remove-Item -Recurse -Force "ffmpeg-temp", "ffmpeg.zip"
 
-    - name: Download FFmpeg for macOS
-      if: matrix.os == 'macos-latest'
-      run: |
-        curl -L https://evermeet.cx/ffmpeg/ffmpeg-6.0.zip -o ffmpeg.zip
-        curl -L https://evermeet.cx/ffmpeg/ffprobe-6.0.zip -o ffprobe.zip
-        unzip ffmpeg.zip
-        unzip ffprobe.zip
-        chmod +x ffmpeg ffprobe
-        rm ffmpeg.zip ffprobe.zip
+    - - name: Download FFmpeg for macOS
+  if: matrix.os == 'macos-latest'
+  run: |
+    echo "Downloading FFmpeg for macOS..."
+    curl -L https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip -o ffmpeg.zip
+    curl -L https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip -o ffprobe.zip
+    echo "Extracting FFmpeg..."
+    unzip -o ffmpeg.zip
+    echo "Extracting FFprobe..."
+    unzip -o ffprobe.zip
+    echo "Setting permissions..."
+    chmod +x ffmpeg ffprobe
+    echo "Verifying files..."
+    ls -la ffmpeg ffprobe
+    ./ffmpeg -version
+    ./ffprobe -version
+    echo "Cleaning up..."
+    rm ffmpeg.zip ffprobe.zip
+    echo "FFmpeg and FFprobe setup complete!"
 
     - name: Install dependencies
       run: npm install
