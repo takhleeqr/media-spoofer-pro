@@ -20,9 +20,21 @@ let timerInterval = null;
 let currentProcess = null;
 let outputDirectory = null;
 
-// FFmpeg paths
-const ffmpegPath = path.join(__dirname, 'ffmpeg.exe');
-const ffprobePath = path.join(__dirname, 'ffprobe.exe');
+// Cross-platform FFmpeg paths
+const os = require('os');
+const platform = os.platform();
+
+let ffmpegPath, ffprobePath;
+
+if (platform === 'win32') {
+    // Windows
+    ffmpegPath = path.join(__dirname, 'ffmpeg.exe');
+    ffprobePath = path.join(__dirname, 'ffprobe.exe');
+} else {
+    // Mac and Linux
+    ffmpegPath = path.join(__dirname, 'ffmpeg');
+    ffprobePath = path.join(__dirname, 'ffprobe');
+}
 
 // DOM elements
 const modeSelection = document.getElementById('modeSelection');
