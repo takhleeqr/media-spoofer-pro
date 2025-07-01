@@ -27,18 +27,44 @@ jobs:
       
     - name: Download FFmpeg for macOS
       run: |
-        # Download FFmpeg for macOS
+        # Download FFmpeg for macOS from a reliable source
+        echo "Downloading FFmpeg for macOS..."
         curl -L https://evermeet.cx/ffmpeg/getrelease/zip -o ffmpeg.zip
+        
+        echo "Extracting FFmpeg..."
         unzip ffmpeg.zip
+        
+        echo "Checking extracted files..."
+        ls -la
+        
+        # Check if both files exist
+        if [ ! -f "ffmpeg" ]; then
+            echo "ERROR: ffmpeg file not found!"
+            exit 1
+        fi
+        
+        if [ ! -f "ffprobe" ]; then
+            echo "ERROR: ffprobe file not found!"
+            exit 1
+        fi
+        
+        # Make executable
         chmod +x ffmpeg
         chmod +x ffprobe
         
-        # Verify FFmpeg installation
+        echo "Verifying FFmpeg installation..."
         ./ffmpeg -version
         ./ffprobe -version
         
+        echo "FFmpeg download and setup completed successfully!"
+        
     - name: Build macOS app
-      run: npm run build-mac
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "FFmpeg files:"
+        ls -la ffmpeg*
+        echo "Building macOS app..."
+        npm run build-mac
       env:
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         
@@ -70,19 +96,56 @@ jobs:
         $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
         $ffmpegZip = "ffmpeg-win.zip"
         
-        Invoke-WebRequest -Uri $ffmpegUrl -OutFile $ffmpegZip
+        Write-Host "Downloading FFmpeg from: $ffmpegUrl"
+        try {
+            Invoke-WebRequest -Uri $ffmpegUrl -OutFile $ffmpegZip -UseBasicParsing
+        } catch {
+            Write-Host "Failed to download from primary URL, trying alternative..."
+            $altUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+            Invoke-WebRequest -Uri $altUrl -OutFile $ffmpegZip -UseBasicParsing
+        }
+        
+        Write-Host "Extracting FFmpeg..."
         Expand-Archive -Path $ffmpegZip -DestinationPath "ffmpeg-temp" -Force
         
-        # Copy FFmpeg binaries to app directory
-        Copy-Item "ffmpeg-temp\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe" "ffmpeg.exe"
-        Copy-Item "ffmpeg-temp\ffmpeg-master-latest-win64-gpl\bin\ffprobe.exe" "ffprobe.exe"
+        Write-Host "Looking for FFmpeg binaries..."
+        Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffmpeg.exe"
+        Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffprobe.exe"
         
-        # Verify FFmpeg installation
-        .\ffmpeg.exe -version
-        .\ffprobe.exe -version
+        Write-Host "Copying FFmpeg binaries..."
+        $ffmpegExe = Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffmpeg.exe" | Select-Object -First 1
+        $ffprobeExe = Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffprobe.exe" | Select-Object -First 1
+        
+        if ($ffmpegExe) {
+            Copy-Item "ffmpeg-temp\$ffmpegExe" "ffmpeg.exe"
+        }
+        if ($ffprobeExe) {
+            Copy-Item "ffmpeg-temp\$ffprobeExe" "ffprobe.exe"
+        }
+        
+        Write-Host "Verifying FFmpeg installation..."
+        if (Test-Path "ffmpeg.exe") {
+            .\ffmpeg.exe -version
+        } else {
+            Write-Host "ERROR: ffmpeg.exe not found!"
+            exit 1
+        }
+        if (Test-Path "ffprobe.exe") {
+            .\ffprobe.exe -version
+        } else {
+            Write-Host "ERROR: ffprobe.exe not found!"
+            exit 1
+        }
+        
+        Write-Host "FFmpeg download and setup completed successfully!"
         
     - name: Build Windows app
-      run: npm run build-win
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "FFmpeg files:"
+        dir ffmpeg*
+        echo "Building Windows app..."
+        npm run build-win
       env:
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         

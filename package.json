@@ -50,11 +50,13 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "logo.png"
+      "icon": "logo.png",
+      "publish": null
     },
     "mac": {
       "target": "dmg",
-      "icon": "logo.png"
+      "icon": "logo.png",
+      "publish": null
     },
     "nsis": {
       "oneClick": false,
