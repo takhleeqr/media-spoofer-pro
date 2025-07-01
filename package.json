@@ -8,7 +8,7 @@
     "setup": "node scripts/setup-dev.js",
     "build": "electron-builder",
     "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac"
+    "build-mac": "electron-builder --mac --x64"
   },
   "keywords": [
     "media",
@@ -56,7 +56,9 @@
     "mac": {
       "target": "dmg",
       "icon": "logo.png",
-      "publish": null
+      "publish": null,
+      "defaultArch": "x64",
+      "minimumSystemVersion": "10.15.0"
     },
     "nsis": {
       "oneClick": false,
