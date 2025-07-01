@@ -56,7 +56,8 @@
     "mac": {
       "target": "dmg",
       "icon": "logo.png",
-      "publish": null
+      "publish": null,
+      "arch": ["universal"]
     },
     "nsis": {
       "oneClick": false,

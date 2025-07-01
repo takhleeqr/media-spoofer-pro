@@ -200,12 +200,21 @@ jobs:
         ls -la release-assets/
         
         # Find and rename the actual files for upload
-        for file in release-assets/*.dmg; do
-          if [ -f "$file" ]; then
-            echo "Found macOS DMG: $file"
-            cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg"
-          fi
-        done
+        # Look for universal DMG first, then fallback to any DMG
+        universal_dmg=$(find release-assets -name "*.dmg" -not -name "*arm64*" -not -name "*x64*" | head -1)
+        if [ -n "$universal_dmg" ]; then
+          echo "Found universal macOS DMG: $universal_dmg"
+          cp "$universal_dmg" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg"
+        else
+          # Fallback to any DMG file
+          for file in release-assets/*.dmg; do
+            if [ -f "$file" ]; then
+              echo "Found macOS DMG: $file"
+              cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg"
+              break
+            fi
+          done
+        fi
         
         for file in release-assets/*.exe; do
           if [ -f "$file" ]; then
