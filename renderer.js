@@ -63,6 +63,10 @@ const path = {
             ext: lastDot >= 0 ? filepath.substring(lastDot) : '',
             extension: lastDot >= 0 ? filepath.substring(lastDot + 1) : ''
         };
+    },
+    dirname: (filepath) => {
+        const lastSlash = filepath.lastIndexOf('/');
+        return lastSlash >= 0 ? filepath.substring(0, lastSlash) : '.';
     }
 };
 
@@ -97,16 +101,32 @@ let ffmpegPath, ffprobePath;
 async function initializeFFmpegPaths() {
     const platform = await electronAPI.getPlatform();
     const appPath = await electronAPI.getAppPath();
+    const homeDir = await electronAPI.getHomeDir();
     
-    if (platform === 'win32') {
-        // Windows
-        ffmpegPath = path.join(appPath, 'ffmpeg.exe');
-        ffprobePath = path.join(appPath, 'ffprobe.exe');
+    // Check if we're in development or production
+    const isDev = appPath.includes('node_modules') || appPath.includes('MediaSpooferApp');
+    
+    if (isDev) {
+        // Development: look in app folder
+        if (platform === 'win32') {
+            ffmpegPath = path.join(appPath, 'ffmpeg.exe');
+            ffprobePath = path.join(appPath, 'ffprobe.exe');
+        } else {
+            ffmpegPath = path.join(appPath, 'ffmpeg');
+            ffprobePath = path.join(appPath, 'ffprobe');
+        }
     } else {
-        // Mac and Linux
-        ffmpegPath = path.join(appPath, 'ffmpeg');
-        ffprobePath = path.join(appPath, 'ffprobe');
+        // Production: look in resources folder (where electron-builder puts extraResources)
+        if (platform === 'win32') {
+            ffmpegPath = path.join(appPath, 'resources', 'ffmpeg.exe');
+            ffprobePath = path.join(appPath, 'resources', 'ffprobe.exe');
+        } else {
+            ffmpegPath = path.join(appPath, 'resources', 'ffmpeg');
+            ffprobePath = path.join(appPath, 'resources', 'ffprobe');
+        }
     }
+    
+    console.log('FFmpeg paths initialized:', { ffmpegPath, ffprobePath, isDev, platform });
 }
 
 // DOM elements will be initialized in DOMContentLoaded
@@ -1327,22 +1347,38 @@ async function createOutputDirectory() {
             const firstFile = selectedFiles[0];
             const parentDir = path.dirname(firstFile.path);
             const outDir = path.join(parentDir, 'MediaSpoofer_Output');
-            await electronAPI.mkdir(outDir);
-            outputDirectory = outDir;
-            // Show info
-            document.getElementById('outputFolderInfo').style.display = 'block';
-            document.getElementById('outputFolderText').textContent = `Output folder: ${outDir}`;
+            
+            try {
+                await electronAPI.mkdir(outDir);
+                outputDirectory = outDir;
+                // Show info
+                const outputFolderInfo = document.getElementById('outputFolderInfo');
+                const outputFolderText = document.getElementById('outputFolderText');
+                if (outputFolderInfo) outputFolderInfo.style.display = 'block';
+                if (outputFolderText) outputFolderText.textContent = `Output folder: ${outDir}`;
+            } catch (error) {
+                console.error('Failed to create output directory:', error);
+                addStatusMessage(`Failed to create output directory: ${error.message}`, 'error');
+                throw error;
+            }
         }
     } else {
         // Use manual selection for images
         if (!outputDirectory) {
-            document.getElementById('outputFolderInfo').style.display = 'none';
+            const outputFolderInfo = document.getElementById('outputFolderInfo');
+            if (outputFolderInfo) outputFolderInfo.style.display = 'none';
         }
     }
     
     // Ensure the directory exists
     if (outputDirectory) {
-        await electronAPI.mkdir(outputDirectory);
+        try {
+            await electronAPI.mkdir(outputDirectory);
+        } catch (error) {
+            console.error('Failed to ensure output directory exists:', error);
+            addStatusMessage(`Failed to create output directory: ${error.message}`, 'error');
+            throw error;
+        }
     }
     
     return outputDirectory;

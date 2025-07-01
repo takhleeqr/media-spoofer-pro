@@ -29,8 +29,10 @@ function createWindow() {
        mainWindow.show();
    });
 
-   // Open DevTools in development
-   mainWindow.webContents.openDevTools();
+   // Open DevTools only in development
+   if (process.env.NODE_ENV === 'development') {
+       mainWindow.webContents.openDevTools();
+   }
 
    // Handle window closed
    mainWindow.on('closed', () => {
