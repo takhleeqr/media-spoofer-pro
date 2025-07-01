@@ -189,3 +189,7 @@ ipcMain.handle('get-platform', async () => {
 ipcMain.handle('get-app-path', async () => {
    return app.getAppPath();
 });
+
+ipcMain.handle('get-home-dir', async () => {
+   return require('os').homedir();
+});

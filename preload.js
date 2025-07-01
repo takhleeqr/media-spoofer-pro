@@ -26,5 +26,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // Platform info
     getPlatform: () => ipcRenderer.invoke('get-platform'),
-    getAppPath: () => ipcRenderer.invoke('get-app-path')
+    getAppPath: () => ipcRenderer.invoke('get-app-path'),
+    getHomeDir: () => ipcRenderer.invoke('get-home-dir')
 }); 

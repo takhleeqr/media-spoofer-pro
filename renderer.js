@@ -15,6 +15,16 @@ const path = {
     }
 };
 
+// Helper function to spawn FFmpeg process securely
+async function spawnFFmpeg(command) {
+    try {
+        const result = await electronAPI.spawnProcess(ffmpegPath, command);
+        return result;
+    } catch (error) {
+        throw new Error(`FFmpeg process failed: ${error.message}`);
+    }
+}
+
 // Application state
 let currentMode = null; // 'image' or 'video'
 let selectedFiles = [];
@@ -716,7 +726,7 @@ async function processFile(file, outputDir, batch, index, settings) {
                     await processSplitOnly(file, outputDir, settings, updateProgress);
                 } else {
                     const outputPath = generateOutputPath(file, outputDir, settings, 1);
-                    fs.copyFileSync(file.path, outputPath);
+                    await electronAPI.copyFile(file.path, outputPath);
                     outputCount++;
                     updateProgress(100);
                 }
@@ -788,18 +798,25 @@ async function processConvert(file, outputDir, settings, updateProgress) {
 
 // FFmpeg helper functions
 async function getVideoDuration(videoPath) {
-    return new Promise((resolve, reject) => {
-        const command = `"${ffprobePath}" -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`;
+    try {
+        const command = [
+            '-v', 'quiet',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            videoPath
+        ];
         
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                resolve(90); // Default fallback
-            } else {
-                const duration = parseFloat(stdout.trim());
-                resolve(duration || 90);
-            }
-        });
-    });
+        const result = await electronAPI.spawnProcess(ffprobePath, command);
+        
+        if (result.code === 0) {
+            const duration = parseFloat(result.stdout.trim());
+            return duration || 90;
+        } else {
+            return 90; // Default fallback
+        }
+    } catch (error) {
+        return 90; // Default fallback
+    }
 }
 
 function generateSpoofEffects(intensity) {
@@ -845,23 +862,18 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
             outputPath
         ];
         
-        // REMOVED: Technical command logging
-        
-        currentProcess = spawn(ffmpegPath, command);
-        
-        currentProcess.on('close', (code) => {
+        // Use secure FFmpeg spawning
+        spawnFFmpeg(command).then(result => {
             currentProcess = null;
             updateProgress(90);
-            if (code === 0) {
+            if (result.code === 0) {
                 resolve();
             } else {
                 reject(new Error(`Image processing failed`));
             }
-        });
-        
-        currentProcess.on('error', (error) => {
+        }).catch(error => {
             currentProcess = null;
-            reject(new Error(`Image processing failed`));
+            reject(new Error(`Image processing failed: ${error.message}`));
         });
     });
 }
@@ -897,32 +909,20 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
         
         command.push(outputPath);
         
-        // REMOVED: Technical FFmpeg command logging
-        // addStatusMessage(`🎬 FFmpeg command: ffmpeg ${command.join(' ')}`, 'info');
-        
-        currentProcess = spawn(ffmpegPath, command);
-        
-        let stderrOutput = '';
-        
-        currentProcess.stderr.on('data', (data) => {
-            stderrOutput += data.toString();
-        });
-        
-        currentProcess.on('close', (code) => {
+        // Use secure FFmpeg spawning
+        spawnFFmpeg(command).then(result => {
             currentProcess = null;
             updateProgress(90);
             
-            if (code === 0) {
+            if (result.code === 0) {
                 resolve();
             } else {
                 // Only show user-friendly error, not technical details
                 reject(new Error(`Video processing failed`));
             }
-        });
-        
-        currentProcess.on('error', (error) => {
+        }).catch(error => {
             currentProcess = null;
-            reject(new Error(`Video processing failed`));
+            reject(new Error(`Video processing failed: ${error.message}`));
         });
     });
 }
@@ -937,7 +937,7 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
            await processSpoof(file, outputDir, settings, updateProgress);
        } else {
            const outputPath = generateOutputPath(file, outputDir, settings, 1);
-           fs.copyFileSync(file.path, outputPath);
+           await electronAPI.copyFile(file.path, outputPath);
            outputCount++;
            updateProgress(100);
        }
@@ -1044,22 +1044,17 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
         
         command.push(outputPath);
         
-        // REMOVED: Technical command logging
-        
-        currentProcess = spawn(ffmpegPath, command);
-        
-        currentProcess.on('close', (code) => {
+        // Use secure FFmpeg spawning
+        spawnFFmpeg(command).then(result => {
             currentProcess = null;
-            if (code === 0) {
+            if (result.code === 0) {
                 resolve();
             } else {
                 reject(new Error(`Video clip processing failed`));
             }
-        });
-        
-        currentProcess.on('error', (error) => {
+        }).catch(error => {
             currentProcess = null;
-            reject(new Error(`Video clip processing failed`));
+            reject(new Error(`Video clip processing failed: ${error.message}`));
         });
     });
 }
@@ -1076,18 +1071,15 @@ async function extractVideoClip(inputPath, outputPath, clip) {
            outputPath
        ];
        
-       currentProcess = spawn(ffmpegPath, command);
-       
-       currentProcess.on('close', (code) => {
+       // Use secure FFmpeg spawning
+       spawnFFmpeg(command).then(result => {
            currentProcess = null;
-           if (code === 0) {
+           if (result.code === 0) {
                resolve();
            } else {
-               reject(new Error(`FFmpeg clip extraction failed with code ${code}`));
+               reject(new Error(`FFmpeg clip extraction failed with code ${result.code}`));
            }
-       });
-       
-       currentProcess.on('error', (error) => {
+       }).catch(error => {
            currentProcess = null;
            reject(error);
        });
@@ -1103,18 +1095,15 @@ async function convertImage(inputPath, outputPath, settings) {
            outputPath
        ];
        
-       currentProcess = spawn(ffmpegPath, command);
-       
-       currentProcess.on('close', (code) => {
+       // Use secure FFmpeg spawning
+       spawnFFmpeg(command).then(result => {
            currentProcess = null;
-           if (code === 0) {
+           if (result.code === 0) {
                resolve();
            } else {
-               reject(new Error(`Image conversion failed with code ${code}`));
+               reject(new Error(`Image conversion failed with code ${result.code}`));
            }
-       });
-       
-       currentProcess.on('error', (error) => {
+       }).catch(error => {
            currentProcess = null;
            reject(error);
        });
@@ -1141,29 +1130,17 @@ async function convertVideo(inputPath, outputPath, settings) {
         
         command.push(outputPath);
         
-        // REMOVED: Technical command logging
-        // addStatusMessage(`🎬 FFmpeg convert command: ffmpeg ${command.join(' ')}`, 'info');
-        
-        currentProcess = spawn(ffmpegPath, command);
-        
-        let stderrOutput = '';
-        
-        currentProcess.stderr.on('data', (data) => {
-            stderrOutput += data.toString();
-        });
-        
-        currentProcess.on('close', (code) => {
+        // Use secure FFmpeg spawning
+        spawnFFmpeg(command).then(result => {
             currentProcess = null;
-            if (code === 0) {
+            if (result.code === 0) {
                 resolve();
             } else {
                 reject(new Error(`Video conversion failed`));
             }
-        });
-        
-        currentProcess.on('error', (error) => {
+        }).catch(error => {
             currentProcess = null;
-            reject(new Error(`Video conversion failed`));
+            reject(new Error(`Video conversion failed: ${error.message}`));
         });
     });
 }
@@ -1200,11 +1177,12 @@ function getProcessingSettings() {
 async function createOutputDirectory() {
    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
    const modeText = currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
-   const outputDir = path.join(require('os').homedir(), 'Desktop', `MediaSpoofer_${modeText}_Output_${timestamp}`);
    
-   if (!fs.existsSync(outputDir)) {
-       fs.mkdirSync(outputDir, { recursive: true });
-   }
+   // Use electronAPI to get home directory and create directory
+   const homeDir = await electronAPI.getHomeDir();
+   const outputDir = path.join(homeDir, 'Desktop', `MediaSpoofer_${modeText}_Output_${timestamp}`);
+   
+   await electronAPI.mkdir(outputDir);
    
    return outputDir;
 }
@@ -1272,7 +1250,7 @@ async function openOutputFolder() {
    const openFolderBtn = document.getElementById('openFolderBtn');
    const folderPath = openFolderBtn?.getAttribute('data-path');
    if (folderPath) {
-       await ipcRenderer.invoke('open-output-folder', folderPath);
+       await electronAPI.openOutputFolder(folderPath);
    }
 }
 
@@ -1311,7 +1289,7 @@ async function processFileInBatch(file, outputDir, batch, fileNumber, settings) 
                 if (file.type === 'video') {
                     await processSplitOnly(file, outputDir, settings, updateProgress, fileNumber, batch);
                 } else {
-                    fs.copyFileSync(file.path, outputPath);
+                    await electronAPI.copyFile(file.path, outputPath);
                 }
                 break;
             case 'convert-only':
@@ -1323,9 +1301,10 @@ async function processFileInBatch(file, outputDir, batch, fileNumber, settings) 
         outputCount++;
     } catch (error) {
         // Check if the output file was partially created and remove it
-        if (fs.existsSync(outputPath)) {
+        const outputExists = await electronAPI.exists(outputPath);
+        if (outputExists) {
             try {
-                fs.unlinkSync(outputPath);
+                await electronAPI.unlink(outputPath);
             } catch (cleanupError) {
                 // Ignore cleanup errors
             }
