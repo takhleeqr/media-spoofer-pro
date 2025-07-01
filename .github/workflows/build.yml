@@ -190,13 +190,25 @@ jobs:
         mkdir -p release-assets
         mv MediaSpooferPro-macOS/* release-assets/ || true
         mv MediaSpooferPro-Windows/* release-assets/ || true
+        echo "Release assets created:"
+        ls -la release-assets/
         
-    - name: Upload to release
+    - name: Upload macOS DMG to release
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./release-assets/
-        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}
-        asset_content_type: application/zip 
+        asset_path: ./release-assets/*.dmg
+        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
+        asset_content_type: application/octet-stream
+        
+    - name: Upload Windows EXE to release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./release-assets/*.exe
+        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
+        asset_content_type: application/octet-stream 
