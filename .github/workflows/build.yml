@@ -42,9 +42,15 @@ jobs:
         mkdir -p ffprobe_temp
         unzip ffprobe.zip -d ffprobe_temp/
         
+        echo "Checking contents of temp directories..."
+        echo "ffmpeg_temp contents:"
+        ls -la ffmpeg_temp/
+        echo "ffprobe_temp contents:"
+        ls -la ffprobe_temp/
+        
         echo "Copying files to root directory..."
         cp ffmpeg_temp/ffmpeg ./ffmpeg
-        cp ffprobe_temp/ffprobe ./ffprobe
+        cp ffprobe_temp/ffmpeg ./ffprobe
         
         echo "Cleaning up temp directories..."
         rm -rf ffmpeg_temp ffprobe_temp
