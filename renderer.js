@@ -294,7 +294,26 @@ async function selectFiles(mode) {
 
 function addFiles(filePaths, mode) {
     filePaths = Array.isArray(filePaths) ? filePaths : [filePaths];
-    const newFiles = filePaths.filter(f => !selectedFiles.includes(f));
+    
+    // Convert file paths to file objects if they're just strings
+    const fileObjects = filePaths.map(filePath => {
+        if (typeof filePath === 'string') {
+            // It's a file path string, convert to object
+            const parsed = path.parse(filePath);
+            return {
+                path: filePath,
+                name: parsed.base,
+                type: getFileType(parsed.ext),
+                extension: parsed.ext,
+                size: 0 // Will be updated when file is processed
+            };
+        } else {
+            // It's already a file object
+            return filePath;
+        }
+    });
+    
+    const newFiles = fileObjects.filter(f => !selectedFiles.some(existing => existing.path === f.path));
     selectedFiles = selectedFiles.concat(newFiles);
     updateFileList();
     updateStats();
@@ -481,8 +500,9 @@ async function startProcessing() {
             updateOverallProgress(((batch - 1) / settings.duplicates) * 100, `Processing Batch ${batch} of ${settings.duplicates}`);
             
             const batchDir = path.join(outputDir, `batch_${batch}`);
-            if (!fs.existsSync(batchDir)) {
-                fs.mkdirSync(batchDir, { recursive: true });
+            const batchDirExists = await electronAPI.exists(batchDir);
+            if (!batchDirExists) {
+                await electronAPI.mkdir(batchDir);
             }
             
             // Process each file in the batch - IMPROVED VERSION WITH BETTER PAUSE HANDLING
@@ -1356,7 +1376,20 @@ async function selectFolder(mode) {
             if (mode === 'video') return ['mp4', 'mov', 'avi', 'webm'].includes(ext);
             return false;
         });
-        addFiles(filtered, mode);
+        
+        // Convert file paths to file objects with proper structure
+        const fileObjects = filtered.map(filePath => {
+            const parsed = path.parse(filePath);
+            return {
+                path: filePath,
+                name: parsed.base,
+                type: getFileType(parsed.ext),
+                extension: parsed.ext,
+                size: 0 // Will be updated when file is processed
+            };
+        });
+        
+        addFiles(fileObjects, mode);
     }
 }
 
