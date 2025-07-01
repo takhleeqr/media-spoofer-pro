@@ -1,0 +1,66 @@
+{
+  "name": "media-spoofer-pro",
+  "version": "1.0.0",
+  "description": "Professional media transformation for social platforms",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "setup": "node scripts/setup-dev.js",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win",
+    "build-mac": "electron-builder --mac"
+  },
+  "keywords": [
+    "media",
+    "spoofer",
+    "video",
+    "image",
+    "processing"
+  ],
+  "author": "Pony Agency",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.ponyagency.mediaspoofer",
+    "productName": "Media Spoofer Pro",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "!dist/**/*",
+      "!ffmpeg*",
+      "!ffprobe*"
+    ],
+    "extraResources": [
+      {
+        "from": "ffmpeg*",
+        "to": ".",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "ffprobe*",
+        "to": ".",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "logo.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "logo.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "license": "LICENSE.txt"
+    }
+  }
+}
