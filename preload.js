@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // Output folder selection
     selectOutputFolder: () => ipcRenderer.invoke('select-output-folder'),
+    selectFolder: () => ipcRenderer.invoke('select-folder'),
+    readDirRecursive: (dirPath) => ipcRenderer.invoke('read-dir-recursive', dirPath),
     
     // Open output folder
     openOutputFolder: (folderPath) => ipcRenderer.invoke('open-output-folder', folderPath),

@@ -83,6 +83,41 @@ ipcMain.handle('select-output-folder', async () => {
    return result.filePaths[0];
 });
 
+// Handle folder selection (for bulk folder import)
+ipcMain.handle('select-folder', async () => {
+   const result = await dialog.showOpenDialog(mainWindow, {
+       properties: ['openDirectory'],
+       title: 'Select Folder'
+   });
+   
+   return result.filePaths[0];
+});
+
+// Handle recursive directory reading
+ipcMain.handle('read-dir-recursive', async (event, dirPath) => {
+   const files = [];
+   
+   function readDirRecursive(currentPath) {
+       const items = fs.readdirSync(currentPath);
+       for (const item of items) {
+           const fullPath = path.join(currentPath, item);
+           const stat = fs.statSync(fullPath);
+           if (stat.isDirectory()) {
+               readDirRecursive(fullPath);
+           } else {
+               files.push(fullPath);
+           }
+       }
+   }
+   
+   try {
+       readDirRecursive(dirPath);
+       return files;
+   } catch (error) {
+       throw new Error(`Failed to read directory: ${error.message}`);
+   }
+});
+
 // Handle opening output folder
 ipcMain.handle('open-output-folder', async (event, folderPath) => {
    const { shell } = require('electron');

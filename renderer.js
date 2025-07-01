@@ -197,9 +197,9 @@ function setupVideoInterface() {
     const clipLengthGroup = document.getElementById('clipLengthGroup');
     const videoDuplicatesGroup = document.getElementById('videoDuplicatesGroup');
     
-    videoProcessingMode.addEventListener('change', () => {
+        videoProcessingMode.addEventListener('change', () => {
         const mode = videoProcessingMode.value;
-        // Hide intensity and duplicates settings for convert-only mode
+        
         if (mode === 'convert-only') {
             videoIntensityGroup.style.display = 'none';
             videoDuplicatesGroup.style.display = 'none';
@@ -1142,9 +1142,9 @@ async function createOutputDirectory() {
         // Auto-create output folder in the same folder as the first selected file
         if (selectedFiles.length > 0) {
             const firstFile = selectedFiles[0];
-            const parentDir = await electronAPI.getParentDir(firstFile);
+            const parentDir = path.dirname(firstFile.path);
             const outDir = path.join(parentDir, 'MediaSpoofer_Output');
-            await electronAPI.ensureDir(outDir);
+            await electronAPI.mkdir(outDir);
             outputDirectory = outDir;
             // Show info
             document.getElementById('outputFolderInfo').style.display = 'block';
@@ -1156,17 +1156,25 @@ async function createOutputDirectory() {
             document.getElementById('outputFolderInfo').style.display = 'none';
         }
     }
+    
+    // Ensure the directory exists
+    if (outputDirectory) {
+        await electronAPI.mkdir(outputDirectory);
+    }
+    
+    return outputDirectory;
 }
 
 function generateOutputPath(file, outputDir, settings, fileNumber) {
    const namingPattern = settings.namingPattern || (currentMode === 'image' ? 'photo_{number}' : 'clip_{number}');
    const currentDate = new Date().toISOString().slice(0, 10);
    
-   let filename = namingPattern
-       .replace('{number}', fileNumber.toString().padStart(3, '0'))
+   // Use the new generateNameFromPattern function for better naming
+   let filename = generateNameFromPattern(namingPattern, currentMode === 'image' ? 'photo' : 'clip')
        .replace('{date}', currentDate)
        .replace('{original}', path.parse(file.name).name);
    
+   // If no {number} in pattern, add a sequential number
    if (!namingPattern.includes('{number}')) {
        filename += '_' + fileNumber.toString().padStart(3, '0');
    }
@@ -1289,12 +1297,12 @@ function generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch
     const namingPattern = settings.namingPattern || (currentMode === 'image' ? 'photo_{number}' : 'clip_{number}');
     const currentDate = new Date().toISOString().slice(0, 10);
     
-    // Create unique filename for this file in this batch
-    let filename = namingPattern
-        .replace('{number}', fileNumber.toString().padStart(3, '0'))
+    // Create unique filename for this file in this batch using the new function
+    let filename = generateNameFromPattern(namingPattern, currentMode === 'image' ? 'photo' : 'clip')
         .replace('{date}', currentDate)
         .replace('{original}', path.parse(file.name).name);
     
+    // If no {number} in pattern, add a sequential number
     if (!namingPattern.includes('{number}')) {
         filename += '_' + fileNumber.toString().padStart(3, '0');
     }
