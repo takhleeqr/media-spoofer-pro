@@ -66,9 +66,27 @@ const processSection = document.getElementById('processSection');
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async function() {
-    await initializeFFmpegPaths();
-    checkFFmpegInstallation();
-    setupModeSelection();
+    try {
+        console.log('App initializing...');
+        
+        // Check if electronAPI is available
+        if (!window.electronAPI) {
+            console.error('electronAPI is not available!');
+            alert('Error: electronAPI not available. Please restart the application.');
+            return;
+        }
+        
+        console.log('electronAPI is available:', Object.keys(window.electronAPI));
+        
+        await initializeFFmpegPaths();
+        checkFFmpegInstallation();
+        setupModeSelection();
+        
+        console.log('App initialization complete');
+    } catch (error) {
+        console.error('Error during app initialization:', error);
+        alert('Error initializing app: ' + error.message);
+    }
 });
 
 // Check if FFmpeg is available
@@ -136,9 +154,18 @@ function setupImageInterface() {
     document.getElementById('imageIntensity').value = 'heavy';
 
     // Event listeners
-    selectImageBtn.addEventListener('click', () => selectFiles('image'));
-    selectImageFolderBtn.addEventListener('click', () => selectFolder('image'));
-    clearImageBtn.addEventListener('click', clearFiles);
+    selectImageBtn.addEventListener('click', () => {
+        console.log('Select Image button clicked');
+        selectFiles('image');
+    });
+    selectImageFolderBtn.addEventListener('click', () => {
+        console.log('Select Image Folder button clicked');
+        selectFolder('image');
+    });
+    clearImageBtn.addEventListener('click', () => {
+        console.log('Clear Image button clicked');
+        clearFiles();
+    });
     
     // Drag and drop
     imageDropZone.addEventListener('click', () => selectFiles('image'));
@@ -181,9 +208,18 @@ function setupVideoInterface() {
     document.getElementById('videoIntensity').value = 'heavy';
     
     // Event listeners
-    selectVideoBtn.addEventListener('click', () => selectFiles('video'));
-    selectVideoFolderBtn.addEventListener('click', () => selectFolder('video'));
-    clearVideoBtn.addEventListener('click', clearFiles);
+    selectVideoBtn.addEventListener('click', () => {
+        console.log('Select Video button clicked');
+        selectFiles('video');
+    });
+    selectVideoFolderBtn.addEventListener('click', () => {
+        console.log('Select Video Folder button clicked');
+        selectFolder('video');
+    });
+    clearVideoBtn.addEventListener('click', () => {
+        console.log('Clear Video button clicked');
+        clearFiles();
+    });
     
     // Drag and drop
     videoDropZone.addEventListener('click', () => selectFiles('video'));
@@ -272,6 +308,8 @@ async function selectOutputFolder() {
 // File selection functions
 async function selectFiles(mode) {
     try {
+        console.log('selectFiles called with mode:', mode);
+        
         // Set file filters based on mode
         const filters = mode === 'image' 
             ? [
@@ -283,11 +321,15 @@ async function selectFiles(mode) {
                 { name: 'All Files', extensions: ['*'] }
               ];
         
+        console.log('Calling electronAPI.selectFiles with filters:', filters);
         const filePaths = await electronAPI.selectFiles(filters);
+        console.log('File paths returned:', filePaths);
+        
         if (filePaths && filePaths.length > 0) {
             addFiles(filePaths, mode);
         }
     } catch (error) {
+        console.error('Error in selectFiles:', error);
         addStatusMessage('Error selecting files: ' + error.message, 'error');
     }
 }
