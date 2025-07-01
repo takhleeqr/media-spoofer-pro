@@ -31,14 +31,23 @@ jobs:
         echo "Downloading FFmpeg for macOS..."
         curl -L https://evermeet.cx/ffmpeg/getrelease/zip -o ffmpeg.zip
         
-        echo "Extracting FFmpeg..."
-        unzip ffmpeg.zip
+        echo "Extracting FFmpeg to temp directory..."
+        mkdir -p ffmpeg_temp
+        unzip ffmpeg.zip -d ffmpeg_temp/
         
         echo "Downloading ffprobe for macOS..."
         curl -L https://evermeet.cx/ffprobe/getrelease/zip -o ffprobe.zip
         
-        echo "Extracting ffprobe..."
-        unzip ffprobe.zip
+        echo "Extracting ffprobe to temp directory..."
+        mkdir -p ffprobe_temp
+        unzip ffprobe.zip -d ffprobe_temp/
+        
+        echo "Copying files to root directory..."
+        cp ffmpeg_temp/ffmpeg ./ffmpeg
+        cp ffprobe_temp/ffprobe ./ffprobe
+        
+        echo "Cleaning up temp directories..."
+        rm -rf ffmpeg_temp ffprobe_temp
         
         echo "Checking extracted files..."
         ls -la
