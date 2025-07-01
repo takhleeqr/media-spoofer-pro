@@ -217,22 +217,16 @@ jobs:
         echo "Files ready for upload:"
         ls -la MediaSpooferPro-*
         
-    - name: Upload macOS DMG to release
-      uses: actions/upload-release-asset@v1
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
-        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
-        asset_content_type: application/octet-stream
-        
-    - name: Upload Windows EXE to release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
-        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
-        asset_content_type: application/octet-stream 
+        files: |
+          MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
+          MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
+        tag_name: ${{ github.event.release.tag_name }}
+        name: ${{ github.event.release.name }}
+        body: ${{ github.event.release.body }}
+        draft: false
+        prerelease: false 
