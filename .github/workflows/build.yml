@@ -193,13 +193,31 @@ jobs:
         echo "Release assets created:"
         ls -la release-assets/
         
+        # Find and rename the actual files for upload
+        for file in release-assets/*.dmg; do
+          if [ -f "$file" ]; then
+            echo "Found macOS DMG: $file"
+            cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg"
+          fi
+        done
+        
+        for file in release-assets/*.exe; do
+          if [ -f "$file" ]; then
+            echo "Found Windows EXE: $file"
+            cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe"
+          fi
+        done
+        
+        echo "Files ready for upload:"
+        ls -la MediaSpooferPro-*
+        
     - name: Upload macOS DMG to release
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./release-assets/*.dmg
+        asset_path: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
         asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
         asset_content_type: application/octet-stream
         
@@ -209,6 +227,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./release-assets/*.exe
+        asset_path: MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
         asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
         asset_content_type: application/octet-stream 
