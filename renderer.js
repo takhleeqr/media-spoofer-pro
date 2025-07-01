@@ -1,5 +1,56 @@
-// Use the secure electronAPI exposed through preload script
-const { electronAPI } = window;
+// Global variables for DOM elements (will be initialized after DOM loads)
+let modeSelection, imageInterface, videoInterface, processSection;
+
+// Make functions available globally for HTML onclick handlers immediately
+console.log('Defining selectMode function globally...');
+window.selectMode = function(mode) {
+    console.log('selectMode called with mode:', mode);
+    
+    // Ensure DOM elements are available
+    if (!modeSelection || !imageInterface || !videoInterface || !processSection) {
+        console.error('DOM elements not initialized yet');
+        return;
+    }
+    
+    currentMode = mode;
+    modeSelection.style.display = 'none';
+    
+    if (mode === 'image') {
+        console.log('Setting up image interface');
+        imageInterface.classList.add('active');
+        setupImageInterface();
+    } else if (mode === 'video') {
+        console.log('Setting up video interface');
+        videoInterface.classList.add('active');
+        setupVideoInterface();
+    }
+    
+    processSection.style.display = 'block';
+    resetProcessing();
+};
+
+console.log('Defining goBack function globally...');
+window.goBack = function() {
+    // Ensure DOM elements are available
+    if (!modeSelection || !imageInterface || !videoInterface || !processSection) {
+        console.error('DOM elements not initialized yet');
+        return;
+    }
+    
+    // Hide current interface
+    imageInterface.classList.remove('active');
+    videoInterface.classList.remove('active');
+    processSection.style.display = 'none';
+    
+    // Show mode selection
+    modeSelection.style.display = 'flex';
+    
+    // Reset state
+    currentMode = null;
+    selectedFiles = [];
+    outputDirectory = null;
+    resetProcessing();
+};
 
 // Polyfill for path operations
 const path = {
@@ -58,16 +109,27 @@ async function initializeFFmpegPaths() {
     }
 }
 
-// DOM elements
-const modeSelection = document.getElementById('modeSelection');
-const imageInterface = document.getElementById('imageInterface');
-const videoInterface = document.getElementById('videoInterface');
-const processSection = document.getElementById('processSection');
+// DOM elements will be initialized in DOMContentLoaded
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async function() {
     try {
         console.log('App initializing...');
+        console.log('selectMode available:', typeof window.selectMode === 'function');
+        console.log('goBack available:', typeof window.goBack === 'function');
+        
+        // Initialize DOM elements
+        modeSelection = document.getElementById('modeSelection');
+        imageInterface = document.getElementById('imageInterface');
+        videoInterface = document.getElementById('videoInterface');
+        processSection = document.getElementById('processSection');
+        
+        console.log('DOM elements initialized:', {
+            modeSelection: !!modeSelection,
+            imageInterface: !!imageInterface,
+            videoInterface: !!videoInterface,
+            processSection: !!processSection
+        });
         
         // Check if electronAPI is available
         if (!window.electronAPI) {
@@ -81,6 +143,50 @@ document.addEventListener('DOMContentLoaded', async function() {
         await initializeFFmpegPaths();
         checkFFmpegInstallation();
         setupModeSelection();
+        
+        // Add event listeners for mode selection cards
+        const imageModeCard = document.getElementById('imageModeCard');
+        const videoModeCard = document.getElementById('videoModeCard');
+        
+        if (imageModeCard) {
+            console.log('Adding click listener to imageModeCard');
+            imageModeCard.addEventListener('click', () => {
+                console.log('Image mode card clicked');
+                selectMode('image');
+            });
+        } else {
+            console.error('imageModeCard not found!');
+        }
+        
+        if (videoModeCard) {
+            console.log('Adding click listener to videoModeCard');
+            videoModeCard.addEventListener('click', () => {
+                console.log('Video mode card clicked');
+                selectMode('video');
+            });
+        } else {
+            console.error('videoModeCard not found!');
+        }
+        
+        // Add event listeners for back buttons
+        const imageBackBtn = document.getElementById('imageBackBtn');
+        const videoBackBtn = document.getElementById('videoBackBtn');
+        if (imageBackBtn) {
+            imageBackBtn.addEventListener('click', () => {
+                console.log('Image back button clicked');
+                goBack();
+            });
+        } else {
+            console.error('imageBackBtn not found!');
+        }
+        if (videoBackBtn) {
+            videoBackBtn.addEventListener('click', () => {
+                console.log('Video back button clicked');
+                goBack();
+            });
+        } else {
+            console.error('videoBackBtn not found!');
+        }
         
         console.log('App initialization complete');
     } catch (error) {
@@ -99,40 +205,15 @@ async function checkFFmpegInstallation() {
     }
 }
 
-// Mode selection functions
-function selectMode(mode) {
-    currentMode = mode;
-    modeSelection.style.display = 'none';
-    
-    if (mode === 'image') {
-        imageInterface.classList.add('active');
-        setupImageInterface();
-    } else if (mode === 'video') {
-        videoInterface.classList.add('active');
-        setupVideoInterface();
-    }
-    
-    processSection.style.display = 'block';
-    resetProcessing();
-}
-
-function goBack() {
-    // Hide current interface
-    imageInterface.classList.remove('active');
-    videoInterface.classList.remove('active');
-    processSection.style.display = 'none';
-    
-    // Show mode selection
-    modeSelection.style.display = 'flex';
-    
-    // Reset state
-    currentMode = null;
-    selectedFiles = [];
-    outputDirectory = null;
-    resetProcessing();
-}
+// Mode selection functions (now defined globally above)
 
 function setupModeSelection() {
+    // Ensure DOM elements are available
+    if (!modeSelection || !imageInterface || !videoInterface || !processSection) {
+        console.error('DOM elements not available in setupModeSelection');
+        return;
+    }
+    
     // Mode selection is handled by onclick in HTML
     // Just ensure we start with the right display
     modeSelection.style.display = 'flex';
@@ -143,29 +224,55 @@ function setupModeSelection() {
 
 // Image interface setup
 function setupImageInterface() {
+    console.log('setupImageInterface called');
+    
     const imageDropZone = document.getElementById('imageDropZone');
     const selectImageBtn = document.getElementById('selectImageBtn');
     const selectImageFolderBtn = document.getElementById('selectImageFolderBtn');
     const clearImageBtn = document.getElementById('clearImageBtn');
     const imageFileList = document.getElementById('imageFileList');
     
+    console.log('DOM elements found:', {
+        imageDropZone: !!imageDropZone,
+        selectImageBtn: !!selectImageBtn,
+        selectImageFolderBtn: !!selectImageFolderBtn,
+        clearImageBtn: !!clearImageBtn,
+        imageFileList: !!imageFileList
+    });
+    
     // Set default values
     document.getElementById('imageDuplicates').value = 1;
     document.getElementById('imageIntensity').value = 'heavy';
 
     // Event listeners
-    selectImageBtn.addEventListener('click', () => {
-        console.log('Select Image button clicked');
-        selectFiles('image');
-    });
-    selectImageFolderBtn.addEventListener('click', () => {
-        console.log('Select Image Folder button clicked');
-        selectFolder('image');
-    });
-    clearImageBtn.addEventListener('click', () => {
-        console.log('Clear Image button clicked');
-        clearFiles();
-    });
+    if (selectImageBtn) {
+        console.log('Adding click listener to selectImageBtn');
+        selectImageBtn.addEventListener('click', () => {
+            console.log('Select Image button clicked');
+            selectFiles('image');
+        });
+    } else {
+        console.error('selectImageBtn not found!');
+    }
+    if (selectImageFolderBtn) {
+        console.log('Adding click listener to selectImageFolderBtn');
+        selectImageFolderBtn.addEventListener('click', () => {
+            console.log('Select Image Folder button clicked');
+            selectFolder('image');
+        });
+    } else {
+        console.error('selectImageFolderBtn not found!');
+    }
+    
+    if (clearImageBtn) {
+        console.log('Adding click listener to clearImageBtn');
+        clearImageBtn.addEventListener('click', () => {
+            console.log('Clear Image button clicked');
+            clearFiles();
+        });
+    } else {
+        console.error('clearImageBtn not found!');
+    }
     
     // Drag and drop
     imageDropZone.addEventListener('click', () => selectFiles('image'));
@@ -309,6 +416,20 @@ async function selectOutputFolder() {
 async function selectFiles(mode) {
     try {
         console.log('selectFiles called with mode:', mode);
+        console.log('electronAPI available:', typeof window.electronAPI !== 'undefined');
+        console.log('electronAPI.selectFiles available:', typeof window.electronAPI?.selectFiles === 'function');
+        
+        if (!window.electronAPI) {
+            console.error('electronAPI is not available!');
+            addStatusMessage('Error: electronAPI not available', 'error');
+            return;
+        }
+        
+        if (typeof window.electronAPI.selectFiles !== 'function') {
+            console.error('electronAPI.selectFiles is not a function!');
+            addStatusMessage('Error: selectFiles function not available', 'error');
+            return;
+        }
         
         // Set file filters based on mode
         const filters = mode === 'image' 
@@ -1445,6 +1566,4 @@ function generateNameFromPattern(pattern, word) {
     return name;
 }
 
-// Make functions available globally for HTML onclick handlers
-window.selectMode = selectMode;
-window.goBack = goBack;
+// Functions are already available globally (defined at the top)

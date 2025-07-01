@@ -688,13 +688,13 @@
         
         <!-- Mode Selection Screen -->
         <div class="mode-selection" id="modeSelection">
-            <div class="mode-card" onclick="selectMode('image')">
+            <div class="mode-card" id="imageModeCard">
                 <div class="mode-icon">📷</div>
                 <div class="mode-title">Process Images</div>
                 <div class="mode-description">Transform photos with visual effects, format conversion, and bulk renaming</div>
             </div>
             
-            <div class="mode-card" onclick="selectMode('video')">
+            <div class="mode-card" id="videoModeCard">
                 <div class="mode-icon">🎬</div>
                 <div class="mode-title">Process Videos</div>
                 <div class="mode-description">Split videos, apply effects, convert formats, and bulk rename clips</div>
@@ -711,7 +711,7 @@
                         <p>Upload and transform your images</p>
                     </div>
                 </div>
-                <button class="back-button" onclick="goBack()">← Back to Mode Selection</button>
+                <button class="back-button" id="imageBackBtn">← Back to Mode Selection</button>
             </div>
             
             <div class="main-content">
@@ -814,7 +814,7 @@
                         <p>Upload and transform your videos</p>
                     </div>
                 </div>
-                <button class="back-button" onclick="goBack()">← Back to Mode Selection</button>
+                <button class="back-button" id="videoBackBtn">← Back to Mode Selection</button>
             </div>
             
             <div class="main-content">

@@ -30,7 +30,7 @@ function createWindow() {
    });
 
    // Open DevTools in development
-   // mainWindow.webContents.openDevTools();
+   mainWindow.webContents.openDevTools();
 
    // Handle window closed
    mainWindow.on('closed', () => {
