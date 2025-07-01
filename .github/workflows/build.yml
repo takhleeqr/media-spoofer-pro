@@ -11,6 +11,8 @@ on:
 jobs:
   build-mac:
     runs-on: macos-latest
+    permissions:
+      contents: read
     
     steps:
     - name: Checkout code
@@ -97,6 +99,8 @@ jobs:
         
   build-win:
     runs-on: windows-latest
+    permissions:
+      contents: read
     
     steps:
     - name: Checkout code
@@ -180,6 +184,8 @@ jobs:
     needs: [build-mac, build-win]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
+    permissions:
+      contents: write
     
     steps:
     - name: Download all artifacts
