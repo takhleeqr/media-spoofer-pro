@@ -127,6 +127,7 @@ function setupModeSelection() {
 function setupImageInterface() {
     const imageDropZone = document.getElementById('imageDropZone');
     const selectImageBtn = document.getElementById('selectImageBtn');
+    const selectImageFolderBtn = document.getElementById('selectImageFolderBtn');
     const clearImageBtn = document.getElementById('clearImageBtn');
     const imageFileList = document.getElementById('imageFileList');
     
@@ -136,6 +137,7 @@ function setupImageInterface() {
 
     // Event listeners
     selectImageBtn.addEventListener('click', () => selectFiles('image'));
+    selectImageFolderBtn.addEventListener('click', () => selectFolder('image'));
     clearImageBtn.addEventListener('click', clearFiles);
     
     // Drag and drop
@@ -169,6 +171,7 @@ function setupImageInterface() {
 function setupVideoInterface() {
     const videoDropZone = document.getElementById('videoDropZone');
     const selectVideoBtn = document.getElementById('selectVideoBtn');
+    const selectVideoFolderBtn = document.getElementById('selectVideoFolderBtn');
     const clearVideoBtn = document.getElementById('clearVideoBtn');
     const videoFileList = document.getElementById('videoFileList');
 
@@ -179,6 +182,7 @@ function setupVideoInterface() {
     
     // Event listeners
     selectVideoBtn.addEventListener('click', () => selectFiles('video'));
+    selectVideoFolderBtn.addEventListener('click', () => selectFolder('video'));
     clearVideoBtn.addEventListener('click', clearFiles);
     
     // Drag and drop
@@ -195,21 +199,21 @@ function setupVideoInterface() {
     
     videoProcessingMode.addEventListener('change', () => {
         const mode = videoProcessingMode.value;
-        
         // Hide intensity and duplicates settings for convert-only mode
         if (mode === 'convert-only') {
             videoIntensityGroup.style.display = 'none';
             videoDuplicatesGroup.style.display = 'none';
-        } else {
+            clipLengthGroup.style.display = 'none';
+        } else if (mode === 'spoof-only') {
+            // Hide clip length for effects-only mode
             videoIntensityGroup.style.display = 'block';
             videoDuplicatesGroup.style.display = 'block';
-        }
-        
-        // Show clip length settings for split modes
-        if (mode === 'split-only' || mode === 'spoof-split') {
-            clipLengthGroup.style.display = 'block';
-        } else {
             clipLengthGroup.style.display = 'none';
+        } else {
+            // Show all settings for split modes
+            videoIntensityGroup.style.display = 'block';
+            videoDuplicatesGroup.style.display = 'block';
+            clipLengthGroup.style.display = 'block';
         }
     });
     
@@ -289,60 +293,12 @@ async function selectFiles(mode) {
 }
 
 function addFiles(filePaths, mode) {
-    const newFiles = filePaths.map(filePath => {
-        const stats = fs.statSync(filePath);
-        const name = path.basename(filePath);
-        const ext = path.extname(filePath).toLowerCase();
-        const fileType = getFileType(ext);
-        
-        return {
-            path: filePath,
-            name: name,
-            size: stats.size,
-            type: fileType,
-            extension: ext,
-            status: 'ready',
-            progress: 0
-        };
-    });
-    
-    // Filter files based on mode
-    const filteredFiles = newFiles.filter(file => {
-        if (mode === 'image' && file.type !== 'image') {
-            addStatusMessage(`Skipped ${file.name} - not an image file`, 'warning');
-            return false;
-        }
-        if (mode === 'video' && file.type !== 'video') {
-            addStatusMessage(`Skipped ${file.name} - not a video file`, 'warning');
-            return false;
-        }
-        return true;
-    });
-    
-    // Remove duplicates if enabled
-    const detectDuplicates = currentMode === 'video' ? 
-        document.getElementById('detectDuplicates')?.checked : false;
-    
-    if (detectDuplicates) {
-        const existingPaths = selectedFiles.map(f => f.path);
-        const uniqueFiles = filteredFiles.filter(f => !existingPaths.includes(f.path));
-        selectedFiles = [...selectedFiles, ...uniqueFiles];
-        
-        if (uniqueFiles.length < filteredFiles.length) {
-            addStatusMessage(`Skipped ${filteredFiles.length - uniqueFiles.length} duplicate files`, 'warning');
-        }
-    } else {
-        selectedFiles = [...selectedFiles, ...filteredFiles];
-    }
-    
+    filePaths = Array.isArray(filePaths) ? filePaths : [filePaths];
+    const newFiles = filePaths.filter(f => !selectedFiles.includes(f));
+    selectedFiles = selectedFiles.concat(newFiles);
     updateFileList();
     updateStats();
     updateButtons();
-    
-    if (filteredFiles.length > 0) {
-        showStatus();
-        addStatusMessage(`Added ${filteredFiles.length} files for processing`, 'success');
-    }
 }
 
 function getFileType(extension) {
@@ -454,6 +410,13 @@ function updateButtons() {
     if (stopBtn) stopBtn.disabled = !isProcessing;
     if (clearBtn) clearBtn.disabled = isProcessing;
     if (selectBtn) selectBtn.disabled = isProcessing;
+
+    const selectOutputBtn = document.getElementById('selectOutputBtn');
+    if (currentMode === 'video') {
+        selectOutputBtn.style.display = 'none';
+    } else {
+        selectOutputBtn.style.display = 'inline-block';
+    }
 }
 
 // Overall progress bar functions
@@ -1175,16 +1138,24 @@ function getProcessingSettings() {
 }
 
 async function createOutputDirectory() {
-   const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-   const modeText = currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
-   
-   // Use electronAPI to get home directory and create directory
-   const homeDir = await electronAPI.getHomeDir();
-   const outputDir = path.join(homeDir, 'Desktop', `MediaSpoofer_${modeText}_Output_${timestamp}`);
-   
-   await electronAPI.mkdir(outputDir);
-   
-   return outputDir;
+    if (currentMode === 'video') {
+        // Auto-create output folder in the same folder as the first selected file
+        if (selectedFiles.length > 0) {
+            const firstFile = selectedFiles[0];
+            const parentDir = await electronAPI.getParentDir(firstFile);
+            const outDir = path.join(parentDir, 'MediaSpoofer_Output');
+            await electronAPI.ensureDir(outDir);
+            outputDirectory = outDir;
+            // Show info
+            document.getElementById('outputFolderInfo').style.display = 'block';
+            document.getElementById('outputFolderText').textContent = `Output folder: ${outDir}`;
+        }
+    } else {
+        // Use manual selection for images
+        if (!outputDirectory) {
+            document.getElementById('outputFolderInfo').style.display = 'none';
+        }
+    }
 }
 
 function generateOutputPath(file, outputDir, settings, fileNumber) {
@@ -1363,6 +1334,32 @@ async function processConvertOnly(file, outputDir, settings, updateProgress, fil
     } else {
         await convertVideo(file.path, outputPath, settings);
     }
+}
+
+// Add selectFolder for both image and video
+async function selectFolder(mode) {
+    const folderPath = await electronAPI.selectFolder();
+    if (folderPath) {
+        // Get all files in the folder (images or videos)
+        const files = await electronAPI.readDirRecursive(folderPath);
+        const filtered = files.filter(f => {
+            const ext = f.split('.').pop().toLowerCase();
+            if (mode === 'image') return ['jpg', 'jpeg', 'png', 'heic', 'webp'].includes(ext);
+            if (mode === 'video') return ['mp4', 'mov', 'avi', 'webm'].includes(ext);
+            return false;
+        });
+        addFiles(filtered, mode);
+    }
+}
+
+// Update naming pattern logic
+function generateNameFromPattern(pattern, word) {
+    // Replace {word} with the provided word (default 'photo' or 'clip')
+    const safeWord = word || (currentMode === 'image' ? 'photo' : 'clip');
+    let name = pattern.replace(/{word}/g, safeWord);
+    // Replace {number} with a random 12-digit number
+    name = name.replace(/{number}/g, () => Math.floor(1e11 + Math.random() * 9e11).toString());
+    return name;
 }
 
 // Make functions available globally for HTML onclick handlers

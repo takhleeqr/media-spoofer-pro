@@ -34,6 +34,12 @@ jobs:
         echo "Extracting FFmpeg..."
         unzip ffmpeg.zip
         
+        echo "Downloading ffprobe for macOS..."
+        curl -L https://evermeet.cx/ffprobe/getrelease/zip -o ffprobe.zip
+        
+        echo "Extracting ffprobe..."
+        unzip ffprobe.zip
+        
         echo "Checking extracted files..."
         ls -la
         

@@ -728,6 +728,9 @@
                         <button class="btn btn-secondary" id="selectImageBtn">
                             📂 Select Images
                         </button>
+                        <button class="btn btn-secondary" id="selectImageFolderBtn">
+                            📁 Select Folder
+                        </button>
                         <button class="btn btn-secondary" id="clearImageBtn">
                             🗑️ Clear All
                         </button>
@@ -784,13 +787,16 @@
                         <div class="setting-item">
                             <label>Naming Pattern</label>
                             <input type="text" id="imageNamingPattern" placeholder="e.g., brand_image_001" value="photo_{number}">
+                            <small style="color: #718096; font-size: 0.8rem; margin-top: 4px; display: block;">
+                                Use <code>{word}</code> for editable preset word, <code>{number}</code> for 12-digit random number
+                            </small>
                         </div>
                         <div class="pattern-examples">
                             <h5>Examples:</h5>
                             <ul>
-                                <li><code>brand_{number}</code> → brand_001, brand_002...</li>
-                                <li><code>product_summer_{number}</code> → product_summer_001...</li>
-                                <li><code>{date}_photo_{number}</code> → 2025-06-24_photo_001...</li>
+                                <li><code>photo_{number}</code> → photo_123456789012, photo_987654321098...</li>
+                                <li><code>brand_{word}_{number}</code> → brand_summer_123456789012...</li>
+                                <li><code>{word}_product_{number}</code> → summer_product_123456789012...</li>
                             </ul>
                         </div>
                     </div>
@@ -824,6 +830,9 @@
                     <div class="buttons">
                         <button class="btn btn-secondary" id="selectVideoBtn">
                             📂 Select Videos
+                        </button>
+                        <button class="btn btn-secondary" id="selectVideoFolderBtn">
+                            📁 Select Folder
                         </button>
                         <button class="btn btn-secondary" id="clearVideoBtn">
                             🗑️ Clear All
@@ -901,18 +910,21 @@
                    
                    <div class="bulk-rename-section">
                        <h4>🏷️ Bulk Rename</h4>
-                       <div class="setting-item">
-                           <label>Naming Pattern</label>
-                           <input type="text" id="videoNamingPattern" placeholder="e.g., brand_video_001" value="clip_{number}">
-                       </div>
-                       <div class="pattern-examples">
-                           <h5>Examples:</h5>
-                           <ul>
-                               <li><code>brand_{number}</code> → brand_001, brand_002...</li>
-                               <li><code>tiktok_clip_{number}</code> → tiktok_clip_001...</li>
-                               <li><code>{date}_video_{number}</code> → 2025-06-24_video_001...</li>
-                           </ul>
-                       </div>
+                                               <div class="setting-item">
+                            <label>Naming Pattern</label>
+                            <input type="text" id="videoNamingPattern" placeholder="e.g., brand_video_001" value="clip_{number}">
+                            <small style="color: #718096; font-size: 0.8rem; margin-top: 4px; display: block;">
+                                Use <code>{word}</code> for editable preset word, <code>{number}</code> for 12-digit random number
+                            </small>
+                        </div>
+                                               <div class="pattern-examples">
+                            <h5>Examples:</h5>
+                            <ul>
+                                <li><code>clip_{number}</code> → clip_123456789012, clip_987654321098...</li>
+                                <li><code>brand_{word}_{number}</code> → brand_summer_123456789012...</li>
+                                <li><code>{word}_video_{number}</code> → summer_video_123456789012...</li>
+                            </ul>
+                        </div>
                    </div>
                </div>
            </div>
@@ -966,6 +978,9 @@
         <button class="btn btn-success" id="openFolderBtn" disabled>
             📁 Open Output
         </button>
+    </div>
+    <div id="outputFolderInfo" style="text-align: center; margin-top: 10px; color: #718096; font-size: 0.9rem; display: none;">
+        <span id="outputFolderText"></span>
     </div>
     
     <div class="status-panel" id="statusPanel">
