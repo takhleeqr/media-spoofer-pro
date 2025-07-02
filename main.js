@@ -62,6 +62,8 @@ app.on('window-all-closed', () => {
 
 // Handle file selection dialog
 ipcMain.handle('select-files', async (event, filters) => {
+   console.log('select-files called with filters:', filters);
+   
    const result = await dialog.showOpenDialog(mainWindow, {
        properties: ['openFile', 'multiSelections'],
        filters: filters || [
@@ -71,6 +73,11 @@ ipcMain.handle('select-files', async (event, filters) => {
            { name: 'All Files', extensions: ['*'] }
        ]
    });
+   
+   console.log('Dialog result:', result);
+   console.log('File paths returned:', result.filePaths);
+   console.log('File paths type:', typeof result.filePaths);
+   console.log('File paths is array:', Array.isArray(result.filePaths));
    
    return result.filePaths;
 });
@@ -150,6 +157,20 @@ ipcMain.handle('write-file', async (event, filePath, data) => {
 
 ipcMain.handle('file-exists', async (event, filePath) => {
    return fs.existsSync(filePath);
+});
+
+ipcMain.handle('get-file-stats', async (event, filePath) => {
+   try {
+       const stats = fs.statSync(filePath);
+       return {
+           size: stats.size,
+           isFile: stats.isFile(),
+           isDirectory: stats.isDirectory(),
+           mtime: stats.mtime
+       };
+   } catch (error) {
+       throw new Error(`Failed to get file stats: ${error.message}`);
+   }
 });
 
 ipcMain.handle('mkdir', async (event, dirPath) => {

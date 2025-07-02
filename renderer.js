@@ -67,6 +67,11 @@ const path = {
     dirname: (filepath) => {
         const lastSlash = filepath.lastIndexOf('/');
         return lastSlash >= 0 ? filepath.substring(0, lastSlash) : '.';
+    },
+    normalize: (filePath) => {
+        // Implementation of path.normalize
+        // This is a placeholder and should be replaced with the actual implementation
+        return filePath;
     }
 };
 
@@ -495,9 +500,18 @@ async function selectFiles(mode) {
         console.log('Calling electronAPI.selectFiles with filters:', filters);
         const filePaths = await electronAPI.selectFiles(filters);
         console.log('File paths returned:', filePaths);
+        console.log('File paths type:', typeof filePaths);
+        console.log('File paths is array:', Array.isArray(filePaths));
+        if (filePaths) {
+            console.log('File paths length:', filePaths.length);
+            console.log('First file path:', filePaths[0]);
+            console.log('First file path type:', typeof filePaths[0]);
+        }
         
         if (filePaths && filePaths.length > 0) {
-            addFiles(filePaths, mode);
+            await addFiles(filePaths, mode);
+        } else {
+            console.warn('No file paths returned from electronAPI.selectFiles');
         }
     } catch (error) {
         console.error('Error in selectFiles:', error);
@@ -505,8 +519,10 @@ async function selectFiles(mode) {
     }
 }
 
-function addFiles(filePaths, mode) {
+async function addFiles(filePaths, mode) {
     console.log('addFiles called with:', { filePaths, mode });
+    console.log('filePaths type:', typeof filePaths);
+    console.log('filePaths is array:', Array.isArray(filePaths));
     
     if (!filePaths || filePaths.length === 0) {
         console.warn('No file paths provided to addFiles');
@@ -515,31 +531,60 @@ function addFiles(filePaths, mode) {
     
     filePaths = Array.isArray(filePaths) ? filePaths : [filePaths];
     
+    // Validate and normalize all file paths
+    const validFilePaths = filePaths.filter(filePath => {
+        if (!filePath || typeof filePath !== 'string' || !filePath.trim()) {
+            console.warn('Invalid file path:', filePath);
+            return false;
+        }
+        return true;
+    });
+    
+    if (validFilePaths.length === 0) {
+        console.warn('No valid file paths found');
+        return;
+    }
+    
+    console.log('Processing', validFilePaths.length, 'valid files');
+    
     // Convert file paths to file objects if they're just strings
-    const fileObjects = filePaths.map(filePath => {
+    const fileObjects = await Promise.all(validFilePaths.map(async (filePath) => {
         console.log('Processing file path:', filePath);
         
-        if (typeof filePath === 'string' && filePath.trim()) {
-            // It's a file path string, convert to object
-            const parsed = path.parse(filePath);
-            console.log('Parsed file:', parsed);
-            
-            return {
-                path: filePath,
-                name: parsed.base || 'Unknown',
-                type: getFileType(parsed.ext),
-                extension: parsed.ext,
-                size: 0 // Will be updated when file is processed
-            };
-        } else {
-            console.warn('Invalid file path:', filePath);
-            return null;
+        // Normalize the path
+        const normalizedPath = normalizePath(filePath);
+        
+        // Use cross-platform helper functions
+        const fileName = extractFileName(normalizedPath);
+        const fileExtension = extractFileExtension(normalizedPath);
+        
+        console.log('Extracted filename:', fileName);
+        console.log('Extracted extension:', fileExtension);
+        
+        // Try to get file size
+        let fileSize = 0;
+        try {
+            const stats = await electronAPI.getFileStats(normalizedPath);
+            fileSize = stats.size;
+            console.log('File size:', fileSize);
+        } catch (error) {
+            console.warn('Could not get file size for:', normalizedPath, error);
         }
-    }).filter(Boolean); // Remove null entries
+        
+        return {
+            path: normalizedPath,
+            name: fileName,
+            type: getFileType(fileExtension),
+            extension: fileExtension,
+            size: fileSize
+        };
+    }));
     
-    console.log('Created file objects:', fileObjects);
+    const validFileObjects = fileObjects.filter(Boolean); // Remove null entries
     
-    const newFiles = fileObjects.filter(f => !selectedFiles.some(existing => existing.path === f.path));
+    console.log('Created file objects:', validFileObjects);
+    
+    const newFiles = validFileObjects.filter(f => !selectedFiles.some(existing => existing.path === f.path));
     selectedFiles = selectedFiles.concat(newFiles);
     
     console.log('Updated selectedFiles:', selectedFiles);
@@ -578,13 +623,13 @@ function handleDragLeave(e) {
     e.currentTarget.classList.remove('dragover');
 }
 
-function handleDrop(e, mode) {
+async function handleDrop(e, mode) {
     e.preventDefault();
     e.currentTarget.classList.remove('dragover');
     
     const files = Array.from(e.dataTransfer.files);
     const filePaths = files.map(file => file.path);
-    addFiles(filePaths, mode);
+    await addFiles(filePaths, mode);
 }
 
 // UI update functions
@@ -764,7 +809,7 @@ async function startProcessing() {
                 
                 while (!success && retryCount <= maxRetries && isProcessing) {
                     try {
-                        await processFileInBatch(file, batchDir, batch, i + 1, settings);
+                        await processFileInBatch(file, outputDir, batch, i + 1, settings);
                         success = true;
                         addStatusMessage(`✅ Processed: ${file.name} (Batch ${batch})`, 'success');
                     } catch (error) {
@@ -1454,7 +1499,7 @@ function generateOutputPath(file, outputDir, settings, fileNumber) {
    // Use the new generateNameFromPattern function for better naming
    let filename = generateNameFromPattern(namingPattern, currentMode === 'image' ? 'photo' : 'clip')
        .replace('{date}', currentDate)
-       .replace('{original}', path.parse(file.name).name);
+       .replace('{original}', file.name.replace(file.extension, ''));
    
    // If no {number} in pattern, add a sequential number
    if (!namingPattern.includes('{number}')) {
@@ -1582,7 +1627,7 @@ function generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch
     // Create unique filename for this file in this batch using the new function
     let filename = generateNameFromPattern(namingPattern, currentMode === 'image' ? 'photo' : 'clip')
         .replace('{date}', currentDate)
-        .replace('{original}', path.parse(file.name).name);
+        .replace('{original}', file.name.replace(file.extension, ''));
     
     // If no {number} in pattern, add a sequential number
     if (!namingPattern.includes('{number}')) {
@@ -1633,25 +1678,37 @@ async function selectFolder(mode) {
         // Get all files in the folder (images or videos)
         const files = await electronAPI.readDirRecursive(folderPath);
         const filtered = files.filter(f => {
-            const ext = f.split('.').pop().toLowerCase();
+            const ext = extractFileExtension(f).toLowerCase().replace('.', '');
             if (mode === 'image') return ['jpg', 'jpeg', 'png', 'heic', 'webp'].includes(ext);
             if (mode === 'video') return ['mp4', 'mov', 'avi', 'webm'].includes(ext);
             return false;
         });
         
         // Convert file paths to file objects with proper structure
-        const fileObjects = filtered.map(filePath => {
-            const parsed = path.parse(filePath);
+        const fileObjects = await Promise.all(filtered.map(async (filePath) => {
+            // Use cross-platform helper functions
+            const fileName = extractFileName(filePath);
+            const fileExtension = extractFileExtension(filePath);
+            
+            // Try to get file size
+            let fileSize = 0;
+            try {
+                const stats = await electronAPI.getFileStats(filePath);
+                fileSize = stats.size;
+            } catch (error) {
+                console.warn('Could not get file size for:', filePath, error);
+            }
+            
             return {
                 path: filePath,
-                name: parsed.base,
-                type: getFileType(parsed.ext),
-                extension: parsed.ext,
-                size: 0 // Will be updated when file is processed
+                name: fileName,
+                type: getFileType(fileExtension),
+                extension: fileExtension,
+                size: fileSize
             };
-        });
+        }));
         
-        addFiles(fileObjects, mode);
+        await addFiles(fileObjects, mode);
     }
 }
 
@@ -1663,6 +1720,80 @@ function generateNameFromPattern(pattern, word) {
     // Replace {number} with a random 12-digit number
     name = name.replace(/{number}/g, () => Math.floor(1e11 + Math.random() * 9e11).toString());
     return name;
+}
+
+// Helper function to normalize paths (cross-platform)
+function normalizePath(filePath) {
+    if (!filePath || typeof filePath !== 'string') {
+        return '';
+    }
+    
+    // Use Node.js path.normalize for cross-platform compatibility
+    try {
+        return path.normalize(filePath);
+    } catch (error) {
+        console.warn('path.normalize failed:', error);
+        // Fallback: replace backslashes with forward slashes for consistency
+        return filePath.replace(/\\/g, '/');
+    }
+}
+
+// Helper function to extract filename from path (cross-platform)
+function extractFileName(filePath) {
+    if (!filePath || typeof filePath !== 'string') {
+        return 'Unknown';
+    }
+    
+    // Try path.parse first
+    try {
+        const parsed = path.parse(filePath);
+        if (parsed.base && parsed.base !== '') {
+            return parsed.base;
+        }
+    } catch (error) {
+        console.warn('path.parse failed:', error);
+    }
+    
+    // Fallback: split by path separators (works for both Windows and Unix)
+    const pathParts = filePath.split(/[\\\/]/);
+    const fileName = pathParts[pathParts.length - 1];
+    
+    if (fileName && fileName !== '') {
+        return fileName;
+    }
+    
+    // Last resort: try to extract from the end of the string
+    const lastSlashIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
+    if (lastSlashIndex !== -1 && lastSlashIndex < filePath.length - 1) {
+        return filePath.substring(lastSlashIndex + 1);
+    }
+    
+    return 'Unknown';
+}
+
+// Helper function to extract file extension (cross-platform)
+function extractFileExtension(filePath) {
+    if (!filePath || typeof filePath !== 'string') {
+        return '';
+    }
+    
+    // Try path.parse first
+    try {
+        const parsed = path.parse(filePath);
+        if (parsed.ext && parsed.ext !== '') {
+            return parsed.ext;
+        }
+    } catch (error) {
+        console.warn('path.parse failed for extension:', error);
+    }
+    
+    // Fallback: find the last dot
+    const lastDotIndex = filePath.lastIndexOf('.');
+    if (lastDotIndex !== -1 && lastDotIndex < filePath.length - 1) {
+        return filePath.substring(lastDotIndex);
+    }
+    
+    return '';
 }
 
 // Functions are already available globally (defined at the top)
