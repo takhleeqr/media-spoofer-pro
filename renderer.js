@@ -282,7 +282,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log('App initialization complete');
         
         // Add alert to confirm latest code is running (for debugging)
-        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility');
+        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility\n• Fixed undefined output directory for videos\n• Improved cross-platform path handling');
         
     } catch (error) {
         console.error('Error during app initialization:', error);
@@ -1571,15 +1571,32 @@ async function createOutputDirectory() {
                 throw new Error('Could not determine parent directory for file: ' + firstFile.path);
             }
             
-            // Use the absolute path directly - no need for path.resolve
-            const outDir = parentDir + '/MediaSpoofer_Output';
+            // Use cross-platform path joining for better macOS compatibility
+            const outDir = path.join(parentDir, 'MediaSpoofer_Output');
             console.log('Output directory:', outDir);
+            
+            // Additional debugging for macOS
+            const platform = await electronAPI.getPlatform();
+            if (platform === 'darwin') {
+                console.log('[DEBUG createOutputDirectory] macOS output directory creation:', {
+                    parentDir,
+                    outDir,
+                    platform,
+                    pathExists: await electronAPI.exists(parentDir)
+                });
+            }
             
             try {
                 await electronAPI.mkdir(outDir);
                 outputDirectory = outDir;
                 addStatusMessage(`📂 Output folder created: ${outDir}`, 'info');
                 console.log('Final output directory set to:', outputDirectory);
+                
+                // Verify directory was created successfully (especially important for macOS)
+                const dirExists = await electronAPI.exists(outDir);
+                if (!dirExists) {
+                    throw new Error(`Failed to verify directory creation: ${outDir}`);
+                }
                 
                 // Show info
                 const outputFolderInfo = document.getElementById('outputFolderInfo');
@@ -1626,10 +1643,23 @@ async function createOutputDirectory() {
     }
 }
 
-// Helper function to get parent directory
+// Helper function to get parent directory (enhanced for macOS)
 function getParentDirectory(filePath) {
     const normalizedPath = path.normalize(filePath);
-    return path.dirname(normalizedPath);
+    const parentDir = path.dirname(normalizedPath);
+    
+    // Additional debugging for macOS path handling
+    const platform = electronAPI.getPlatform ? electronAPI.getPlatform() : 'unknown';
+    if (platform === 'darwin') {
+        console.log('[DEBUG getParentDirectory] macOS path handling:', {
+            originalPath: filePath,
+            normalizedPath,
+            parentDir,
+            platform
+        });
+    }
+    
+    return parentDir;
 }
 
 // Helper function to normalize paths
@@ -1817,16 +1847,30 @@ function updateTimer() {
     document.getElementById('timeElapsed').textContent = elapsed + 's';
 }
 
-// Output folder functions
+// Output folder functions (enhanced for macOS)
 async function openOutputFolder() {
     const openFolderBtn = document.getElementById('openFolderBtn');
     const folderPath = openFolderBtn.getAttribute('data-path');
     
     if (folderPath) {
         try {
+            // Verify folder exists before trying to open it (especially important for macOS)
+            const folderExists = await electronAPI.exists(folderPath);
+            if (!folderExists) {
+                addStatusMessage(`❌ Output folder not found: ${folderPath}`, 'error');
+                return;
+            }
+            
             await electronAPI.openOutputFolder(folderPath);
         } catch (error) {
-            addStatusMessage('Error opening output folder: ' + error.message, 'error');
+            // Enhanced error handling for macOS
+            const platform = await electronAPI.getPlatform();
+            if (platform === 'darwin') {
+                console.error('macOS openOutputFolder error:', error);
+                addStatusMessage(`❌ macOS: Could not open output folder. Please check permissions and try opening manually: ${folderPath}`, 'error');
+            } else {
+                addStatusMessage('Error opening output folder: ' + error.message, 'error');
+            }
         }
     }
 }
