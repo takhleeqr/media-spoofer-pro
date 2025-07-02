@@ -1073,7 +1073,7 @@ async function processFile(file, outputDir, batch, index, settings) {
                 if (file.type === 'video') {
                     await processSplitOnly(file, outputDir, settings, updateProgress);
                 } else {
-                    const outputPath = generateOutputPath(file, outputDir, settings, 1);
+                    const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1);
                     await electronAPI.copyFile(file.path, outputPath);
                     outputCount++;
                     updateProgress(100);
@@ -1090,7 +1090,7 @@ async function processFile(file, outputDir, batch, index, settings) {
 
 // Processing mode implementations
 async function processSpoof(file, outputDir, settings, updateProgress) {
-    const outputPath = generateOutputPath(file, outputDir, settings, 1);
+    const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1);
     const effects = generateSpoofEffects(settings.intensity);
     
     updateProgress(30);
@@ -1130,7 +1130,7 @@ async function processSplitOnly(file, outputDir, settings, updateProgress) {
 }
 
 async function processConvert(file, outputDir, settings, updateProgress) {
-    const outputPath = generateOutputPath(file, outputDir, settings, 1);
+    const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1);
     
     updateProgress(30);
     
@@ -1284,7 +1284,7 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
        if (applySpoof) {
            await processSpoof(file, outputDir, settings, updateProgress);
        } else {
-           const outputPath = generateOutputPath(file, outputDir, settings, 1);
+           const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1);
            await electronAPI.copyFile(file.path, outputPath);
            outputCount++;
            updateProgress(100);
@@ -1330,24 +1330,24 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
        startTime = endTime;
    }
    
-   // Process each clip
-   for (let i = 0; i < clips.length; i++) {
-       const clip = clips[i];
-       const clipPath = generateOutputPath(file, outputDir, settings, clip.number);
-       
-       // Update progress based on clip progress
-       const clipProgress = (i / clips.length) * 80 + 10; // 10-90%
-       updateProgress(clipProgress);
-       
-       if (applySpoof) {
-           const effects = generateSpoofEffects(settings.intensity);
-           await processVideoClipWithEffects(file.path, clipPath, clip, effects, settings);
-       } else {
-           await extractVideoClip(file.path, clipPath, clip);
-       }
-       
-       outputCount++;
-   }
+           // Process each clip
+        for (let i = 0; i < clips.length; i++) {
+            const clip = clips[i];
+            const clipPath = generateOutputPathForBatch(file, outputDir, settings, clip.number);
+            
+            // Update progress based on clip progress
+            const clipProgress = (i / clips.length) * 80 + 10; // 10-90%
+            updateProgress(clipProgress);
+            
+            if (applySpoof) {
+                const effects = generateSpoofEffects(settings.intensity);
+                await processVideoClipWithEffects(file.path, clipPath, clip, effects, settings);
+            } else {
+                await extractVideoClip(file.path, clipPath, clip);
+            }
+            
+            outputCount++;
+        }
    
    updateProgress(100);
 }
