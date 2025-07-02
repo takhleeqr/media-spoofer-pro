@@ -169,25 +169,18 @@ async function initializeFFmpegPaths() {
         }
     } else {
         // Production: look in resources folder (where electron-builder puts extraResources)
-        // Fix for Windows production path - remove the extra /resources/ in the path
         if (platform === 'win32') {
-            // Check if appPath already contains 'resources' to avoid double path
-            if (appPath.includes('resources')) {
-                ffmpegPath = appPath + '/ffmpeg.exe';
-                ffprobePath = appPath + '/ffprobe.exe';
-            } else {
-                ffmpegPath = appPath + '/resources/ffmpeg.exe';
-                ffprobePath = appPath + '/resources/ffprobe.exe';
-            }
+            // For Windows production, the appPath points to the app.asar file
+            // We need to go up one level to the app directory, then into resources
+            const appDir = appPath.replace('/app.asar', '').replace('\\app.asar', '');
+            ffmpegPath = appDir + '/resources/ffmpeg.exe';
+            ffprobePath = appDir + '/resources/ffprobe.exe';
         } else {
-            // Fix for macOS production path - remove the extra /resources/ in the path
-            if (appPath.includes('resources')) {
-                ffmpegPath = appPath + '/ffmpeg';
-                ffprobePath = appPath + '/ffprobe';
-            } else {
-                ffmpegPath = appPath + '/resources/ffmpeg';
-                ffprobePath = appPath + '/resources/ffprobe';
-            }
+            // For macOS production, the appPath points to the app bundle
+            // We need to go into Contents/Resources
+            const appDir = appPath.replace('/app.asar', '').replace('\\app.asar', '');
+            ffmpegPath = appDir + '/resources/ffmpeg';
+            ffprobePath = appDir + '/resources/ffprobe';
         }
     }
     
@@ -204,6 +197,48 @@ async function initializeFFmpegPaths() {
             console.log('FFmpeg file stats:', ffmpegStats);
         } else {
             console.error('FFmpeg not found at path:', ffmpegPath);
+            
+            // Try alternative paths for production builds
+            if (!isDev) {
+                console.log('Trying alternative production paths...');
+                const alternativePaths = [];
+                
+                if (platform === 'win32') {
+                    // Try different Windows production paths
+                    const baseDir = appPath.replace('/app.asar', '').replace('\\app.asar', '');
+                    alternativePaths.push(
+                        baseDir + '/ffmpeg.exe',
+                        baseDir + '/ffprobe.exe',
+                        appPath.replace('/app.asar', '/resources/ffmpeg.exe').replace('\\app.asar', '\\resources\\ffmpeg.exe'),
+                        appPath.replace('/app.asar', '/resources/ffprobe.exe').replace('\\app.asar', '\\resources\\ffprobe.exe')
+                    );
+                } else {
+                    // Try different macOS production paths
+                    const baseDir = appPath.replace('/app.asar', '').replace('\\app.asar', '');
+                    alternativePaths.push(
+                        baseDir + '/ffmpeg',
+                        baseDir + '/ffprobe',
+                        baseDir + '/Contents/Resources/ffmpeg',
+                        baseDir + '/Contents/Resources/ffprobe'
+                    );
+                }
+                
+                for (const altPath of alternativePaths) {
+                    try {
+                        const exists = await electronAPI.exists(altPath);
+                        if (exists) {
+                            console.log('Found FFmpeg at alternative path:', altPath);
+                            if (altPath.includes('ffmpeg')) {
+                                ffmpegPath = altPath;
+                            } else if (altPath.includes('ffprobe')) {
+                                ffprobePath = altPath;
+                            }
+                        }
+                    } catch (error) {
+                        console.log('Alternative path check failed:', altPath, error.message);
+                    }
+                }
+            }
             
             // macOS-specific debugging
             if (platform === 'darwin') {
