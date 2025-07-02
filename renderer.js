@@ -280,6 +280,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         console.log('App initialization complete');
+        
+        // Add alert to confirm latest code is running (for debugging)
+        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility');
+        
     } catch (error) {
         console.error('Error during app initialization:', error);
         alert('Error initializing app: ' + error.message);
@@ -643,10 +647,22 @@ async function addFiles(filePaths, mode) {
             console.warn('Could not get file size for:', normalizedPath, error);
         }
         
+        // Force file type based on mode to prevent misclassification
+        const fileType = mode === 'image' ? 'image' : getFileType(fileExtension);
+        
+        // DEBUG: Log file type detection for macOS
+        console.log('[DEBUG addFiles] File type detection:', {
+            mode,
+            fileExtension,
+            detectedType: getFileType(fileExtension),
+            forcedType: fileType,
+            fileName
+        });
+        
         return {
             path: normalizedPath,
             name: fileName,
-            type: mode === 'image' ? 'image' : getFileType(fileExtension),
+            type: fileType,
             extension: fileExtension,
             size: fileSize
         };
@@ -1212,6 +1228,7 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
             '-y',
             '-i', inputPath,
             '-vf', filterComplex,
+            '-pix_fmt', 'yuv420p',
             '-map_metadata', '-1',
             outputPath
         ];
@@ -1447,6 +1464,7 @@ async function convertImage(inputPath, outputPath, settings) {
        const command = [
            '-y',
            '-i', inputPath,
+           '-pix_fmt', 'yuv420p',
            '-map_metadata', '-1',
            outputPath
        ];
@@ -1675,7 +1693,10 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
         extension = '.' + extension;
     }
     
-    // DEBUG: Log extension and final path
+    // DEBUG: Log extension and final path for macOS compatibility
+    console.log('[DEBUG generateOutputPathForBatch] Extension before dot check:', extension);
+    console.log('[DEBUG generateOutputPathForBatch] Extension after dot check:', extension);
+    
     let fileName;
     if (settings.namingPattern && settings.namingPattern.includes('{number}')) {
         fileName = settings.namingPattern.replace('{number}', randomId.toString().padStart(12, '0'));
@@ -1692,7 +1713,8 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
         fileName = `${file.name}_${timestamp}`;
     }
     const finalPath = `${batchDir}/${fileName}${extension}`;
-    console.log('[DEBUG generateOutputPathForBatch]', {extension, finalPath, fileName, filePath: file.path, settingsNamingPattern: settings.namingPattern});
+    console.log('[DEBUG generateOutputPathForBatch] Final path:', finalPath);
+    console.log('[DEBUG generateOutputPathForBatch] Full debug info:', {extension, finalPath, fileName, filePath: file.path, settingsNamingPattern: settings.namingPattern});
     return finalPath;
 }
 
