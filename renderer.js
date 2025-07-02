@@ -156,6 +156,8 @@ async function initializeFFmpegPaths() {
     // Check if we're in development or production
     const isDev = appPath.includes('node_modules') || appPath.includes('MediaSpooferApp');
     
+    console.log('Path detection:', { appPath, isDev, platform });
+    
     if (isDev) {
         // Development: look in app folder
         if (platform === 'win32') {
@@ -167,9 +169,16 @@ async function initializeFFmpegPaths() {
         }
     } else {
         // Production: look in resources folder (where electron-builder puts extraResources)
+        // Fix for Windows production path - remove the extra /resources/ in the path
         if (platform === 'win32') {
-            ffmpegPath = appPath + '/resources/ffmpeg.exe';
-            ffprobePath = appPath + '/resources/ffprobe.exe';
+            // Check if appPath already contains 'resources' to avoid double path
+            if (appPath.includes('resources')) {
+                ffmpegPath = appPath + '/ffmpeg.exe';
+                ffprobePath = appPath + '/ffprobe.exe';
+            } else {
+                ffmpegPath = appPath + '/resources/ffmpeg.exe';
+                ffprobePath = appPath + '/resources/ffprobe.exe';
+            }
         } else {
             ffmpegPath = appPath + '/resources/ffmpeg';
             ffprobePath = appPath + '/resources/ffprobe';
@@ -178,25 +187,26 @@ async function initializeFFmpegPaths() {
     
     console.log('FFmpeg paths initialized:', { ffmpegPath, ffprobePath, isDev, platform });
     
-    // Additional debugging for macOS
-    if (platform === 'darwin') {
-        console.log('macOS detected - checking FFmpeg paths...');
-        try {
-            const ffmpegExists = await electronAPI.exists(ffmpegPath);
-            const ffprobeExists = await electronAPI.exists(ffprobePath);
-            console.log('FFmpeg existence check:', { ffmpegExists, ffprobeExists });
-            
-            if (ffmpegExists) {
-                const ffmpegStats = await electronAPI.getFileStats(ffmpegPath);
-                console.log('FFmpeg file stats:', ffmpegStats);
-            }
-            if (ffprobeExists) {
-                const ffprobeStats = await electronAPI.getFileStats(ffprobePath);
-                console.log('FFprobe file stats:', ffprobeStats);
-            }
-        } catch (error) {
-            console.error('Error checking FFmpeg files on macOS:', error);
+    // Enhanced debugging for all platforms
+    try {
+        const ffmpegExists = await electronAPI.exists(ffmpegPath);
+        const ffprobeExists = await electronAPI.exists(ffprobePath);
+        console.log('FFmpeg existence check:', { ffmpegExists, ffprobeExists, ffmpegPath, ffprobePath });
+        
+        if (ffmpegExists) {
+            const ffmpegStats = await electronAPI.getFileStats(ffmpegPath);
+            console.log('FFmpeg file stats:', ffmpegStats);
+        } else {
+            console.error('FFmpeg not found at path:', ffmpegPath);
         }
+        if (ffprobeExists) {
+            const ffprobeStats = await electronAPI.getFileStats(ffprobePath);
+            console.log('FFprobe file stats:', ffprobeStats);
+        } else {
+            console.error('FFprobe not found at path:', ffprobePath);
+        }
+    } catch (error) {
+        console.error('Error checking FFmpeg files:', error);
     }
 }
 
@@ -282,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log('App initialization complete');
         
         // Add alert to confirm latest code is running (for debugging)
-        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility\n• Fixed undefined output directory for videos\n• Improved cross-platform path handling');
+        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility\n• Fixed undefined output directory for videos\n• Improved cross-platform path handling\n• Fixed FFmpeg path detection for production builds');
         
     } catch (error) {
         console.error('Error during app initialization:', error);
