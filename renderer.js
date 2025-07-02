@@ -809,7 +809,7 @@ async function startProcessing() {
                 
                 while (!success && retryCount <= maxRetries && isProcessing) {
                     try {
-                        await processFileInBatch(file, outputDir, batch, i + 1, settings);
+                        await processFileInBatch(file, batchDir, batch, i + 1, settings);
                         success = true;
                         addStatusMessage(`✅ Processed: ${file.name} (Batch ${batch})`, 'success');
                     } catch (error) {
@@ -1445,8 +1445,12 @@ async function createOutputDirectory() {
                 throw new Error('Invalid file object - missing path');
             }
             
-            const parentDir = path.dirname(firstFile.path);
+            const parentDir = getParentDirectory(firstFile.path);
             console.log('Parent directory:', parentDir);
+            
+            if (!parentDir) {
+                throw new Error('Could not determine parent directory for file: ' + firstFile.path);
+            }
             
             // Use absolute path to avoid permission issues
             const outDir = path.join(parentDir, 'MediaSpoofer_Output');
@@ -1576,8 +1580,17 @@ function sleep(ms) {
 
 // New function to handle individual file processing in batches
 async function processFileInBatch(file, outputDir, batch, fileNumber, settings) {
+    console.log(`processFileInBatch called with:`, {
+        fileName: file.name,
+        outputDir: outputDir,
+        batch: batch,
+        fileNumber: fileNumber,
+        mode: settings.mode
+    });
+    
     // Generate unique output path for this file in this batch
     const outputPath = generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch);
+    console.log('Generated output path:', outputPath);
     
     const updateProgress = (percent) => {
         // Progress is handled at the batch level now
@@ -1621,6 +1634,13 @@ async function processFileInBatch(file, outputDir, batch, fileNumber, settings) 
 
 // Updated function to generate unique output paths for batches
 function generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch) {
+    console.log('generateOutputPathForBatch called with:', {
+        fileName: file.name,
+        outputDir: outputDir,
+        fileNumber: fileNumber,
+        batch: batch
+    });
+    
     const namingPattern = settings.namingPattern || (currentMode === 'image' ? 'photo_{number}' : 'clip_{number}');
     const currentDate = new Date().toISOString().slice(0, 10);
     
@@ -1646,7 +1666,10 @@ function generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch
         ext = '.' + settings.videoFormat;
     }
     
-    return path.join(outputDir, filename + ext);
+    const finalPath = path.join(outputDir, filename + ext);
+    console.log('Final output path:', finalPath);
+    
+    return finalPath;
 }
 
 // Updated spoof processing functions
@@ -1791,6 +1814,28 @@ function extractFileExtension(filePath) {
     const lastDotIndex = filePath.lastIndexOf('.');
     if (lastDotIndex !== -1 && lastDotIndex < filePath.length - 1) {
         return filePath.substring(lastDotIndex);
+    }
+    
+    return '';
+}
+
+// Helper function to extract parent directory (cross-platform)
+function getParentDirectory(filePath) {
+    if (!filePath || typeof filePath !== 'string') {
+        return '';
+    }
+    
+    // Try path.dirname first
+    try {
+        return path.dirname(filePath);
+    } catch (error) {
+        console.warn('path.dirname failed:', error);
+    }
+    
+    // Fallback: find the last path separator
+    const lastSlashIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
+    if (lastSlashIndex !== -1) {
+        return filePath.substring(0, lastSlashIndex);
     }
     
     return '';
