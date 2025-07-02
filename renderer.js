@@ -827,6 +827,13 @@ async function startProcessing() {
     showStatus();
     updateFileList();
     
+    // Ensure status panel is visible
+    const statusPanel = document.getElementById('statusPanel');
+    if (statusPanel) {
+        statusPanel.style.display = 'block';
+        console.log('Status panel made visible');
+    }
+    
     // Get settings based on current mode
     const settings = getProcessingSettings();
     totalBatches = settings.duplicates;
@@ -1704,9 +1711,20 @@ async function processFileInBatch(file, batchDir, batch, index, settings) {
 
 // Status message functions
 function addStatusMessage(message, type = 'info') {
+    console.log('addStatusMessage called:', message, type);
+    
     const statusPanel = document.getElementById('statusPanel');
     const statusContent = document.getElementById('statusContent');
-    if (!statusPanel || !statusContent) return;
+    
+    console.log('Status elements found:', {
+        statusPanel: !!statusPanel,
+        statusContent: !!statusContent
+    });
+    
+    if (!statusPanel || !statusContent) {
+        console.error('Status panel elements not found!');
+        return;
+    }
     
     const messageElement = document.createElement('div');
     messageElement.className = `status-message ${type}`;
@@ -1717,6 +1735,8 @@ function addStatusMessage(message, type = 'info') {
     
     // Show the status panel
     statusPanel.style.display = 'block';
+    
+    console.log('Status message added successfully');
 }
 
 function showStatus() {
