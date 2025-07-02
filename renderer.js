@@ -56,7 +56,8 @@ window.goBack = function() {
 const path = {
     join: (...parts) => parts.join('/').replace(/\/+/g, '/'),
     parse: (filepath) => {
-        const lastSlash = filepath.lastIndexOf('/');
+        // Handle both forward slashes and backslashes
+        const lastSlash = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\'));
         const lastDot = filepath.lastIndexOf('.');
         return {
             name: lastSlash >= 0 ? filepath.substring(lastSlash + 1, lastDot >= 0 ? lastDot : undefined) : filepath,
@@ -65,7 +66,8 @@ const path = {
         };
     },
     dirname: (filepath) => {
-        const lastSlash = filepath.lastIndexOf('/');
+        // Handle both forward slashes and backslashes
+        const lastSlash = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\'));
         return lastSlash >= 0 ? filepath.substring(0, lastSlash) : '.';
     },
     normalize: (filePath) => {
@@ -1658,6 +1660,13 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
     const randomId = Math.floor(Math.random() * 1000000000000);
     const extension = file.extension || path.parse(file.path).extension;
     
+    console.log('generateOutputPathForBatch debug:', {
+        fileExtension: file.extension,
+        parsedExtension: path.parse(file.path).extension,
+        finalExtension: extension,
+        filePath: file.path
+    });
+    
     let fileName;
     if (settings.namingPattern === 'random') {
         fileName = `clip_${randomId}`;
@@ -1669,7 +1678,16 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
     
     // Ensure extension has a dot prefix
     const extensionWithDot = extension.startsWith('.') ? extension : '.' + extension;
-    return `${batchDir}/${fileName}${extensionWithDot}`;
+    const finalPath = `${batchDir}/${fileName}${extensionWithDot}`;
+    
+    console.log('generateOutputPathForBatch result:', {
+        fileName,
+        extension,
+        extensionWithDot,
+        finalPath
+    });
+    
+    return finalPath;
 }
 
 // Helper function to process file in batch
