@@ -69,23 +69,57 @@ const path = {
         return lastSlash >= 0 ? filepath.substring(0, lastSlash) : '.';
     },
     normalize: (filePath) => {
-        // Implementation of path.normalize
-        // This is a placeholder and should be replaced with the actual implementation
-        return filePath;
+        // Cross-platform path normalization
+        if (!filePath || typeof filePath !== 'string') {
+            return '';
+        }
+        // Replace backslashes with forward slashes and remove duplicate slashes
+        return filePath.replace(/\\/g, '/').replace(/\/+/g, '/');
     },
     resolve: (...paths) => {
-        // Implementation of path.resolve
-        // This is a placeholder and should be replaced with the actual implementation
-        return paths.join('/').replace(/\/+/g, '/');
+        // Cross-platform path resolution
+        if (paths.length === 0) return '';
+        
+        // Join all paths and normalize
+        const joined = paths.join('/').replace(/\/+/g, '/');
+        
+        // Handle absolute paths
+        if (joined.startsWith('/')) {
+            return joined;
+        }
+        
+        // Handle Windows absolute paths
+        if (joined.match(/^[A-Za-z]:/)) {
+            return joined.replace(/\//g, '\\');
+        }
+        
+        return joined;
     }
 };
 
 // Helper function to spawn FFmpeg process securely
 async function spawnFFmpeg(command) {
     try {
+        console.log('Spawning FFmpeg with command:', command);
+        console.log('FFmpeg path:', ffmpegPath);
+        
         const result = await electronAPI.spawnProcess(ffmpegPath, command);
+        console.log('FFmpeg process completed successfully');
         return result;
     } catch (error) {
+        console.error('FFmpeg process failed:', error);
+        
+        // Additional debugging for macOS
+        const platform = await electronAPI.getPlatform();
+        if (platform === 'darwin') {
+            console.error('macOS FFmpeg error details:', {
+                ffmpegPath,
+                command,
+                errorMessage: error.message,
+                errorStack: error.stack
+            });
+        }
+        
         throw new Error(`FFmpeg process failed: ${error.message}`);
     }
 }
@@ -115,30 +149,53 @@ async function initializeFFmpegPaths() {
     const appPath = await electronAPI.getAppPath();
     const homeDir = await electronAPI.getHomeDir();
     
+    console.log('Platform info:', { platform, appPath, homeDir });
+    
     // Check if we're in development or production
     const isDev = appPath.includes('node_modules') || appPath.includes('MediaSpooferApp');
     
     if (isDev) {
         // Development: look in app folder
         if (platform === 'win32') {
-            ffmpegPath = path.join(appPath, 'ffmpeg.exe');
-            ffprobePath = path.join(appPath, 'ffprobe.exe');
+            ffmpegPath = appPath + '/ffmpeg.exe';
+            ffprobePath = appPath + '/ffprobe.exe';
         } else {
-            ffmpegPath = path.join(appPath, 'ffmpeg');
-            ffprobePath = path.join(appPath, 'ffprobe');
+            ffmpegPath = appPath + '/ffmpeg';
+            ffprobePath = appPath + '/ffprobe';
         }
     } else {
         // Production: look in resources folder (where electron-builder puts extraResources)
         if (platform === 'win32') {
-            ffmpegPath = path.join(appPath, 'resources', 'ffmpeg.exe');
-            ffprobePath = path.join(appPath, 'resources', 'ffprobe.exe');
+            ffmpegPath = appPath + '/resources/ffmpeg.exe';
+            ffprobePath = appPath + '/resources/ffprobe.exe';
         } else {
-            ffmpegPath = path.join(appPath, 'resources', 'ffmpeg');
-            ffprobePath = path.join(appPath, 'resources', 'ffprobe');
+            ffmpegPath = appPath + '/resources/ffmpeg';
+            ffprobePath = appPath + '/resources/ffprobe';
         }
     }
     
     console.log('FFmpeg paths initialized:', { ffmpegPath, ffprobePath, isDev, platform });
+    
+    // Additional debugging for macOS
+    if (platform === 'darwin') {
+        console.log('macOS detected - checking FFmpeg paths...');
+        try {
+            const ffmpegExists = await electronAPI.exists(ffmpegPath);
+            const ffprobeExists = await electronAPI.exists(ffprobePath);
+            console.log('FFmpeg existence check:', { ffmpegExists, ffprobeExists });
+            
+            if (ffmpegExists) {
+                const ffmpegStats = await electronAPI.getFileStats(ffmpegPath);
+                console.log('FFmpeg file stats:', ffmpegStats);
+            }
+            if (ffprobeExists) {
+                const ffprobeStats = await electronAPI.getFileStats(ffprobePath);
+                console.log('FFprobe file stats:', ffprobeStats);
+            }
+        } catch (error) {
+            console.error('Error checking FFmpeg files on macOS:', error);
+        }
+    }
 }
 
 // DOM elements will be initialized in DOMContentLoaded
@@ -783,10 +840,13 @@ async function startProcessing() {
             if (!isProcessing) break;
             
             currentBatch = batch;
-            addStatusMessage(`\n📁 Processing Batch ${batch} of ${settings.duplicates}...`, 'info');
+            
+            // Create unique batch directory with timestamp
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            addStatusMessage(`\n📁 Processing Batch ${batch} of ${settings.duplicates} (${timestamp})...`, 'info');
             updateOverallProgress(((batch - 1) / settings.duplicates) * 100, `Processing Batch ${batch} of ${settings.duplicates}`);
             
-            const batchDir = outputDir + '/batch_' + batch;
+            const batchDir = outputDir + '/batch_' + timestamp;
             console.log('Created batch directory path:', batchDir);
             const batchDirExists = await electronAPI.exists(batchDir);
             if (!batchDirExists) {
@@ -827,7 +887,7 @@ async function startProcessing() {
                         console.log('Processing file in batch directory:', batchDir);
                         await processFileInBatch(file, batchDir, batch, i + 1, settings);
                         success = true;
-                        addStatusMessage(`✅ Processed: ${file.name} (Batch ${batch})`, 'success');
+                        addStatusMessage(`✅ Processed: ${file.name} (Batch ${batch} - ${timestamp})`, 'success');
                     } catch (error) {
                         retryCount++;
                         
@@ -1485,7 +1545,26 @@ async function createOutputDirectory() {
                 if (outputFolderText) outputFolderText.textContent = `Output folder: ${outDir}`;
             } catch (error) {
                 console.error('Failed to create output directory:', error);
-                addStatusMessage(`Failed to create output directory: ${error.message}`, 'error');
+                
+                // Additional debugging for macOS permission issues
+                const platform = await electronAPI.getPlatform();
+                if (platform === 'darwin') {
+                    console.error('macOS directory creation error:', {
+                        parentDir,
+                        outDir,
+                        errorMessage: error.message,
+                        errorStack: error.stack
+                    });
+                    
+                    // Try to provide more helpful error message for macOS
+                    if (error.message.includes('permission') || error.message.includes('denied')) {
+                        addStatusMessage(`macOS permission error: Please ensure you have write access to the folder containing your files. Try running the app with appropriate permissions.`, 'error');
+                    } else {
+                        addStatusMessage(`Failed to create output directory: ${error.message}`, 'error');
+                    }
+                } else {
+                    addStatusMessage(`Failed to create output directory: ${error.message}`, 'error');
+                }
                 throw error;
             }
         } else {

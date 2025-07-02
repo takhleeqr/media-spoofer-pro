@@ -50,7 +50,11 @@
       "icon": "logo.png",
       "publish": null,
       "defaultArch": "x64",
-      "minimumSystemVersion": "10.15.0"
+      "minimumSystemVersion": "10.15.0",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": null,
+      "entitlementsInherit": null
     },
     "nsis": {
       "oneClick": false,

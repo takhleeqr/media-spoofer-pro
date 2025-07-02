@@ -109,7 +109,8 @@ ipcMain.handle('read-dir-recursive', async (event, dirPath) => {
    function readDirRecursive(currentPath) {
        const items = fs.readdirSync(currentPath);
        for (const item of items) {
-           const fullPath = path.join(currentPath, item);
+           // Use cross-platform path joining
+           const fullPath = currentPath + '/' + item;
            const stat = fs.statSync(fullPath);
            if (stat.isDirectory()) {
                readDirRecursive(fullPath);
@@ -120,9 +121,12 @@ ipcMain.handle('read-dir-recursive', async (event, dirPath) => {
    }
    
    try {
-       readDirRecursive(dirPath);
+       // Ensure cross-platform path handling
+       const normalizedPath = dirPath.replace(/\\/g, '/');
+       readDirRecursive(normalizedPath);
        return files;
    } catch (error) {
+       console.error('read-dir-recursive error:', error);
        throw new Error(`Failed to read directory: ${error.message}`);
    }
 });
@@ -131,7 +135,9 @@ ipcMain.handle('read-dir-recursive', async (event, dirPath) => {
 ipcMain.handle('open-output-folder', async (event, folderPath) => {
    const { shell } = require('electron');
    try {
-       await shell.openPath(folderPath);
+       // Ensure cross-platform path handling
+       const normalizedPath = folderPath.replace(/\\/g, '/');
+       await shell.openPath(normalizedPath);
    } catch (error) {
        console.error('Error opening folder:', error);
    }
@@ -140,28 +146,43 @@ ipcMain.handle('open-output-folder', async (event, folderPath) => {
 // File system operations
 ipcMain.handle('read-file', async (event, filePath) => {
    try {
-       return fs.readFileSync(filePath, 'utf8');
+       // Ensure cross-platform path handling
+       const normalizedPath = filePath.replace(/\\/g, '/');
+       return fs.readFileSync(normalizedPath, 'utf8');
    } catch (error) {
+       console.error('read-file error:', error);
        throw new Error(`Failed to read file: ${error.message}`);
    }
 });
 
 ipcMain.handle('write-file', async (event, filePath, data) => {
    try {
-       fs.writeFileSync(filePath, data);
+       // Ensure cross-platform path handling
+       const normalizedPath = filePath.replace(/\\/g, '/');
+       fs.writeFileSync(normalizedPath, data);
        return true;
    } catch (error) {
+       console.error('write-file error:', error);
        throw new Error(`Failed to write file: ${error.message}`);
    }
 });
 
 ipcMain.handle('file-exists', async (event, filePath) => {
-   return fs.existsSync(filePath);
+   try {
+       // Ensure cross-platform path handling
+       const normalizedPath = filePath.replace(/\\/g, '/');
+       return fs.existsSync(normalizedPath);
+   } catch (error) {
+       console.error('file-exists error:', error);
+       return false;
+   }
 });
 
 ipcMain.handle('get-file-stats', async (event, filePath) => {
    try {
-       const stats = fs.statSync(filePath);
+       // Ensure cross-platform path handling
+       const normalizedPath = filePath.replace(/\\/g, '/');
+       const stats = fs.statSync(normalizedPath);
        return {
            size: stats.size,
            isFile: stats.isFile(),
@@ -169,33 +190,44 @@ ipcMain.handle('get-file-stats', async (event, filePath) => {
            mtime: stats.mtime
        };
    } catch (error) {
+       console.error('get-file-stats error:', error);
        throw new Error(`Failed to get file stats: ${error.message}`);
    }
 });
 
 ipcMain.handle('mkdir', async (event, dirPath) => {
    try {
-       fs.mkdirSync(dirPath, { recursive: true });
+       // Ensure cross-platform path handling
+       const normalizedPath = dirPath.replace(/\\/g, '/');
+       fs.mkdirSync(normalizedPath, { recursive: true });
        return true;
    } catch (error) {
+       console.error('mkdir error:', error);
        throw new Error(`Failed to create directory: ${error.message}`);
    }
 });
 
 ipcMain.handle('copy-file', async (event, src, dest) => {
    try {
-       fs.copyFileSync(src, dest);
+       // Ensure cross-platform path handling
+       const normalizedSrc = src.replace(/\\/g, '/');
+       const normalizedDest = dest.replace(/\\/g, '/');
+       fs.copyFileSync(normalizedSrc, normalizedDest);
        return true;
    } catch (error) {
+       console.error('copy-file error:', error);
        throw new Error(`Failed to copy file: ${error.message}`);
    }
 });
 
 ipcMain.handle('unlink', async (event, filePath) => {
    try {
-       fs.unlinkSync(filePath);
+       // Ensure cross-platform path handling
+       const normalizedPath = filePath.replace(/\\/g, '/');
+       fs.unlinkSync(normalizedPath);
        return true;
    } catch (error) {
+       console.error('unlink error:', error);
        throw new Error(`Failed to delete file: ${error.message}`);
    }
 });
@@ -204,7 +236,18 @@ ipcMain.handle('unlink', async (event, filePath) => {
 ipcMain.handle('spawn-process', async (event, command, args) => {
    const { spawn } = require('child_process');
    return new Promise((resolve, reject) => {
-       const process = spawn(command, args);
+       // Ensure command is executable on macOS
+       const options = {
+           stdio: ['pipe', 'pipe', 'pipe']
+       };
+       
+       // On macOS, we might need to handle shell execution differently
+       if (process.platform === 'darwin') {
+           // For macOS, ensure the command path is properly resolved
+           console.log('Spawning process on macOS:', command, args);
+       }
+       
+       const process = spawn(command, args, options);
        let stdout = '';
        let stderr = '';
        
@@ -217,6 +260,7 @@ ipcMain.handle('spawn-process', async (event, command, args) => {
        });
        
        process.on('close', (code) => {
+           console.log('Process closed with code:', code);
            if (code === 0) {
                resolve({ stdout, stderr, code });
            } else {
@@ -225,6 +269,7 @@ ipcMain.handle('spawn-process', async (event, command, args) => {
        });
        
        process.on('error', (error) => {
+           console.error('Process error:', error);
            reject(error);
        });
    });
