@@ -1095,11 +1095,15 @@ async function processSpoof(file, outputDir, settings, updateProgress) {
     const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1);
     const effects = generateSpoofEffects(settings.intensity);
     
+    console.log('processSpoof called with file type:', file.type, 'file path:', file.path);
+    
     updateProgress(30);
     
     if (file.type === 'image') {
+        console.log('Processing as IMAGE');
         await processImageSpoof(file.path, outputPath, effects, settings, updateProgress);
     } else {
+        console.log('Processing as VIDEO');
         await processVideoSpoof(file.path, outputPath, effects, settings, updateProgress);
     }
     
@@ -1209,9 +1213,10 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
             '-i', inputPath,
             '-vf', filterComplex,
             '-map_metadata', '-1',
-            '-pix_fmt', 'yuv420p',
             outputPath
         ];
+        
+        console.log('Image processing command:', command);
         
         // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
@@ -1443,9 +1448,10 @@ async function convertImage(inputPath, outputPath, settings) {
            '-y',
            '-i', inputPath,
            '-map_metadata', '-1',
-           '-pix_fmt', 'yuv420p',
            outputPath
        ];
+       
+       console.log('Image conversion command:', command);
        
        // Use secure FFmpeg spawning
        spawnFFmpeg(command).then(result => {
