@@ -1586,6 +1586,9 @@ async function createOutputDirectory() {
                 const outputFolderText = document.getElementById('outputFolderText');
                 if (outputFolderInfo) outputFolderInfo.style.display = 'block';
                 if (outputFolderText) outputFolderText.textContent = `Output folder: ${outDir}`;
+                
+                // Return the output directory path
+                return outDir;
             } catch (error) {
                 console.error('Failed to create output directory:', error);
                 
