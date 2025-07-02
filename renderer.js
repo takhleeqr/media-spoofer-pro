@@ -93,6 +93,8 @@ let totalBatches = 0;
 let timerInterval = null;
 let currentProcess = null;
 let outputDirectory = null;
+let imageInterfaceSetup = false;
+let videoInterfaceSetup = false;
 
 // Cross-platform FFmpeg paths
 let ffmpegPath, ffprobePath;
@@ -244,7 +246,12 @@ function setupModeSelection() {
 
 // Image interface setup
 function setupImageInterface() {
-    console.log('setupImageInterface called');
+    console.log('setupImageInterface called, already setup:', imageInterfaceSetup);
+    
+    if (imageInterfaceSetup) {
+        console.log('Image interface already setup, skipping');
+        return;
+    }
     
     const imageDropZone = document.getElementById('imageDropZone');
     const selectImageBtn = document.getElementById('selectImageBtn');
@@ -295,34 +302,46 @@ function setupImageInterface() {
     }
     
     // Drag and drop
-    imageDropZone.addEventListener('click', () => selectFiles('image'));
-    imageDropZone.addEventListener('dragover', handleDragOver);
-    imageDropZone.addEventListener('dragleave', handleDragLeave);
-    imageDropZone.addEventListener('drop', (e) => handleDrop(e, 'image'));
+    if (imageDropZone) {
+        imageDropZone.addEventListener('click', () => selectFiles('image'));
+        imageDropZone.addEventListener('dragover', handleDragOver);
+        imageDropZone.addEventListener('dragleave', handleDragLeave);
+        imageDropZone.addEventListener('drop', (e) => handleDrop(e, 'image'));
+    }
     
     // Settings change handlers
     const imageProcessingMode = document.getElementById('imageProcessingMode');
     const imageIntensityGroup = document.getElementById('imageIntensityGroup');
     const imageDuplicatesGroup = document.getElementById('imageDuplicatesGroup');
     
-    imageProcessingMode.addEventListener('change', () => {
-        const mode = imageProcessingMode.value;
-        
-        // Hide intensity and duplicates settings for convert-only mode
-        if (mode === 'convert-only') {
-            imageIntensityGroup.style.display = 'none';
-            imageDuplicatesGroup.style.display = 'none';
-        } else {
-            imageIntensityGroup.style.display = 'block';
-            imageDuplicatesGroup.style.display = 'block';
-        }
-    });
+    if (imageProcessingMode) {
+        imageProcessingMode.addEventListener('change', () => {
+            const mode = imageProcessingMode.value;
+            
+            // Hide intensity and duplicates settings for convert-only mode
+            if (mode === 'convert-only') {
+                imageIntensityGroup.style.display = 'none';
+                imageDuplicatesGroup.style.display = 'none';
+            } else {
+                imageIntensityGroup.style.display = 'block';
+                imageDuplicatesGroup.style.display = 'block';
+            }
+        });
+    }
     
     setupProcessingControls();
+    imageInterfaceSetup = true;
 }
 
 // Video interface setup
 function setupVideoInterface() {
+    console.log('setupVideoInterface called, already setup:', videoInterfaceSetup);
+    
+    if (videoInterfaceSetup) {
+        console.log('Video interface already setup, skipping');
+        return;
+    }
+    
     const videoDropZone = document.getElementById('videoDropZone');
     const selectVideoBtn = document.getElementById('selectVideoBtn');
     const selectVideoFolderBtn = document.getElementById('selectVideoFolderBtn');
@@ -335,24 +354,32 @@ function setupVideoInterface() {
     document.getElementById('videoIntensity').value = 'heavy';
     
     // Event listeners
-    selectVideoBtn.addEventListener('click', () => {
-        console.log('Select Video button clicked');
-        selectFiles('video');
-    });
-    selectVideoFolderBtn.addEventListener('click', () => {
-        console.log('Select Video Folder button clicked');
-        selectFolder('video');
-    });
-    clearVideoBtn.addEventListener('click', () => {
-        console.log('Clear Video button clicked');
-        clearFiles();
-    });
+    if (selectVideoBtn) {
+        selectVideoBtn.addEventListener('click', () => {
+            console.log('Select Video button clicked');
+            selectFiles('video');
+        });
+    }
+    if (selectVideoFolderBtn) {
+        selectVideoFolderBtn.addEventListener('click', () => {
+            console.log('Select Video Folder button clicked');
+            selectFolder('video');
+        });
+    }
+    if (clearVideoBtn) {
+        clearVideoBtn.addEventListener('click', () => {
+            console.log('Clear Video button clicked');
+            clearFiles();
+        });
+    }
     
     // Drag and drop
-    videoDropZone.addEventListener('click', () => selectFiles('video'));
-    videoDropZone.addEventListener('dragover', handleDragOver);
-    videoDropZone.addEventListener('dragleave', handleDragLeave);
-    videoDropZone.addEventListener('drop', (e) => handleDrop(e, 'video'));
+    if (videoDropZone) {
+        videoDropZone.addEventListener('click', () => selectFiles('video'));
+        videoDropZone.addEventListener('dragover', handleDragOver);
+        videoDropZone.addEventListener('dragleave', handleDragLeave);
+        videoDropZone.addEventListener('drop', (e) => handleDrop(e, 'video'));
+    }
     
     // Settings change handlers
     const videoProcessingMode = document.getElementById('videoProcessingMode');
@@ -360,27 +387,30 @@ function setupVideoInterface() {
     const clipLengthGroup = document.getElementById('clipLengthGroup');
     const videoDuplicatesGroup = document.getElementById('videoDuplicatesGroup');
     
+    if (videoProcessingMode) {
         videoProcessingMode.addEventListener('change', () => {
-        const mode = videoProcessingMode.value;
-        
-        if (mode === 'convert-only') {
-            videoIntensityGroup.style.display = 'none';
-            videoDuplicatesGroup.style.display = 'none';
-            clipLengthGroup.style.display = 'none';
-        } else if (mode === 'spoof-only') {
-            // Hide clip length for effects-only mode
-            videoIntensityGroup.style.display = 'block';
-            videoDuplicatesGroup.style.display = 'block';
-            clipLengthGroup.style.display = 'none';
-        } else {
-            // Show all settings for split modes
-            videoIntensityGroup.style.display = 'block';
-            videoDuplicatesGroup.style.display = 'block';
-            clipLengthGroup.style.display = 'block';
-        }
-    });
+            const mode = videoProcessingMode.value;
+            
+            if (mode === 'convert-only') {
+                videoIntensityGroup.style.display = 'none';
+                videoDuplicatesGroup.style.display = 'none';
+                clipLengthGroup.style.display = 'none';
+            } else if (mode === 'spoof-only') {
+                // Hide clip length for effects-only mode
+                videoIntensityGroup.style.display = 'block';
+                videoDuplicatesGroup.style.display = 'block';
+                clipLengthGroup.style.display = 'none';
+            } else {
+                // Show all settings for split modes
+                videoIntensityGroup.style.display = 'block';
+                videoDuplicatesGroup.style.display = 'block';
+                clipLengthGroup.style.display = 'block';
+            }
+        });
+    }
     
     setupProcessingControls();
+    videoInterfaceSetup = true;
 }
 
 function setupProcessingControls() {
@@ -476,28 +506,44 @@ async function selectFiles(mode) {
 }
 
 function addFiles(filePaths, mode) {
+    console.log('addFiles called with:', { filePaths, mode });
+    
+    if (!filePaths || filePaths.length === 0) {
+        console.warn('No file paths provided to addFiles');
+        return;
+    }
+    
     filePaths = Array.isArray(filePaths) ? filePaths : [filePaths];
     
     // Convert file paths to file objects if they're just strings
     const fileObjects = filePaths.map(filePath => {
-        if (typeof filePath === 'string') {
+        console.log('Processing file path:', filePath);
+        
+        if (typeof filePath === 'string' && filePath.trim()) {
             // It's a file path string, convert to object
             const parsed = path.parse(filePath);
+            console.log('Parsed file:', parsed);
+            
             return {
                 path: filePath,
-                name: parsed.base,
+                name: parsed.base || 'Unknown',
                 type: getFileType(parsed.ext),
                 extension: parsed.ext,
                 size: 0 // Will be updated when file is processed
             };
         } else {
-            // It's already a file object
-            return filePath;
+            console.warn('Invalid file path:', filePath);
+            return null;
         }
-    });
+    }).filter(Boolean); // Remove null entries
+    
+    console.log('Created file objects:', fileObjects);
     
     const newFiles = fileObjects.filter(f => !selectedFiles.some(existing => existing.path === f.path));
     selectedFiles = selectedFiles.concat(newFiles);
+    
+    console.log('Updated selectedFiles:', selectedFiles);
+    
     updateFileList();
     updateStats();
     updateButtons();
@@ -1341,16 +1387,31 @@ function getProcessingSettings() {
 }
 
 async function createOutputDirectory() {
+    console.log('createOutputDirectory called, currentMode:', currentMode);
+    console.log('selectedFiles:', selectedFiles);
+    
     if (currentMode === 'video') {
         // Auto-create output folder in the same folder as the first selected file
         if (selectedFiles.length > 0) {
             const firstFile = selectedFiles[0];
+            console.log('First file:', firstFile);
+            
+            if (!firstFile || !firstFile.path) {
+                throw new Error('Invalid file object - missing path');
+            }
+            
             const parentDir = path.dirname(firstFile.path);
+            console.log('Parent directory:', parentDir);
+            
+            // Use absolute path to avoid permission issues
             const outDir = path.join(parentDir, 'MediaSpoofer_Output');
+            console.log('Output directory:', outDir);
             
             try {
                 await electronAPI.mkdir(outDir);
                 outputDirectory = outDir;
+                addStatusMessage(`📂 Output folder created: ${outDir}`, 'info');
+                
                 // Show info
                 const outputFolderInfo = document.getElementById('outputFolderInfo');
                 const outputFolderText = document.getElementById('outputFolderText');
@@ -1361,6 +1422,8 @@ async function createOutputDirectory() {
                 addStatusMessage(`Failed to create output directory: ${error.message}`, 'error');
                 throw error;
             }
+        } else {
+            throw new Error('No files selected for video processing');
         }
     } else {
         // Use manual selection for images
