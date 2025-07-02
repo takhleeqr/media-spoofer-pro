@@ -646,7 +646,7 @@ async function addFiles(filePaths, mode) {
         return {
             path: normalizedPath,
             name: fileName,
-            type: getFileType(fileExtension),
+            type: mode === 'image' ? 'image' : getFileType(fileExtension),
             extension: fileExtension,
             size: fileSize
         };
