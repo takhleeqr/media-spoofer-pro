@@ -72,6 +72,11 @@ const path = {
         // Implementation of path.normalize
         // This is a placeholder and should be replaced with the actual implementation
         return filePath;
+    },
+    resolve: (...paths) => {
+        // Implementation of path.resolve
+        // This is a placeholder and should be replaced with the actual implementation
+        return paths.join('/').replace(/\/+/g, '/');
     }
 };
 
@@ -773,10 +778,12 @@ async function startProcessing() {
             addStatusMessage(`\n📁 Processing Batch ${batch} of ${settings.duplicates}...`, 'info');
             updateOverallProgress(((batch - 1) / settings.duplicates) * 100, `Processing Batch ${batch} of ${settings.duplicates}`);
             
-            const batchDir = path.join(outputDir, `batch_${batch}`);
+            const batchDir = outputDir + '/batch_' + batch;
+            console.log('Created batch directory path:', batchDir);
             const batchDirExists = await electronAPI.exists(batchDir);
             if (!batchDirExists) {
                 await electronAPI.mkdir(batchDir);
+                console.log('Created batch directory:', batchDir);
             }
             
             // Process each file in the batch - IMPROVED VERSION WITH BETTER PAUSE HANDLING
@@ -809,6 +816,7 @@ async function startProcessing() {
                 
                 while (!success && retryCount <= maxRetries && isProcessing) {
                     try {
+                        console.log('Processing file in batch directory:', batchDir);
                         await processFileInBatch(file, batchDir, batch, i + 1, settings);
                         success = true;
                         addStatusMessage(`✅ Processed: ${file.name} (Batch ${batch})`, 'success');
@@ -1452,14 +1460,15 @@ async function createOutputDirectory() {
                 throw new Error('Could not determine parent directory for file: ' + firstFile.path);
             }
             
-            // Use absolute path to avoid permission issues
-            const outDir = path.join(parentDir, 'MediaSpoofer_Output');
+            // Use the absolute path directly - no need for path.resolve
+            const outDir = parentDir + '/MediaSpoofer_Output';
             console.log('Output directory:', outDir);
             
             try {
                 await electronAPI.mkdir(outDir);
                 outputDirectory = outDir;
                 addStatusMessage(`📂 Output folder created: ${outDir}`, 'info');
+                console.log('Final output directory set to:', outputDirectory);
                 
                 // Show info
                 const outputFolderInfo = document.getElementById('outputFolderInfo');
@@ -1517,7 +1526,7 @@ function generateOutputPath(file, outputDir, settings, fileNumber) {
        ext = '.' + settings.videoFormat;
    }
    
-   return path.join(outputDir, filename + ext);
+   return outputDir + '/' + filename + ext;
 }
 
 function addStatusMessage(message, type = 'info') {
@@ -1666,7 +1675,7 @@ function generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch
         ext = '.' + settings.videoFormat;
     }
     
-    const finalPath = path.join(outputDir, filename + ext);
+    const finalPath = outputDir + '/' + filename + ext;
     console.log('Final output path:', finalPath);
     
     return finalPath;
@@ -1825,20 +1834,60 @@ function getParentDirectory(filePath) {
         return '';
     }
     
-    // Try path.dirname first
-    try {
-        return path.dirname(filePath);
-    } catch (error) {
-        console.warn('path.dirname failed:', error);
+    console.log('Getting parent directory for:', filePath);
+    
+    // Handle Windows paths (with drive letter)
+    if (filePath.includes(':\\')) {
+        // Find the last backslash or forward slash
+        const lastSlashIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
+        if (lastSlashIndex > 2) { // > 2 to ensure we don't remove the drive letter
+            const parentDir = filePath.substring(0, lastSlashIndex);
+            console.log('Windows parent directory:', parentDir);
+            return parentDir;
+        }
     }
     
-    // Fallback: find the last path separator
+    // Handle Unix paths (starting with /)
+    if (filePath.startsWith('/')) {
+        const lastSlashIndex = filePath.lastIndexOf('/');
+        if (lastSlashIndex > 0) {
+            const parentDir = filePath.substring(0, lastSlashIndex);
+            console.log('Unix parent directory:', parentDir);
+            return parentDir;
+        }
+    }
+    
+    // Handle relative paths
     const lastSlashIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
     if (lastSlashIndex !== -1) {
-        return filePath.substring(0, lastSlashIndex);
+        const parentDir = filePath.substring(0, lastSlashIndex);
+        console.log('Relative parent directory:', parentDir);
+        return parentDir;
     }
     
+    console.log('No parent directory found, returning empty string');
     return '';
 }
 
+// Helper function to get absolute path (cross-platform)
+function getAbsolutePath(filePath) {
+    if (!filePath || typeof filePath !== 'string') {
+        return '';
+    }
+    
+    // If it's already an absolute path (Windows with drive letter or Unix starting with /)
+    if (filePath.includes(':\\') || filePath.startsWith('/')) {
+        return filePath;
+    }
+    
+    // For relative paths, try to resolve them
+    try {
+        return path.resolve(filePath);
+    } catch (error) {
+        console.warn('path.resolve failed:', error);
+        return filePath;
+    }
+}
+
+// Functions are already available globally (defined at the top)
 // Functions are already available globally (defined at the top)
