@@ -301,12 +301,18 @@ async function initializeFFmpegPaths() {
     }
 }
 
-// DOM elements will be initialized in DOMContentLoaded
-
 // Initialize app
 document.addEventListener('DOMContentLoaded', async function() {
     try {
         console.log('App initializing...');
+        
+        // Get platform info for debugging
+        const platform = await electronAPI.getPlatform();
+        console.log('Platform detected:', platform);
+        
+        // Store platform globally for use in event listeners
+        window.currentPlatform = platform;
+        
         console.log('selectMode available:', typeof window.selectMode === 'function');
         console.log('goBack available:', typeof window.goBack === 'function');
         
@@ -323,6 +329,32 @@ document.addEventListener('DOMContentLoaded', async function() {
             processSection: !!processSection
         });
         
+        // macOS-specific DOM element verification
+        if (platform === 'darwin') {
+            console.log('macOS: Verifying DOM elements...');
+            if (!modeSelection) {
+                console.error('macOS: modeSelection element not found!');
+                alert('macOS Error: Mode selection element not found. Please restart the application.');
+                return;
+            }
+            if (!imageInterface) {
+                console.error('macOS: imageInterface element not found!');
+                alert('macOS Error: Image interface element not found. Please restart the application.');
+                return;
+            }
+            if (!videoInterface) {
+                console.error('macOS: videoInterface element not found!');
+                alert('macOS Error: Video interface element not found. Please restart the application.');
+                return;
+            }
+            if (!processSection) {
+                console.error('macOS: processSection element not found!');
+                alert('macOS Error: Process section element not found. Please restart the application.');
+                return;
+            }
+            console.log('macOS: All DOM elements verified successfully');
+        }
+        
         // Check if electronAPI is available
         if (!window.electronAPI) {
             console.error('electronAPI is not available!');
@@ -336,26 +368,54 @@ document.addEventListener('DOMContentLoaded', async function() {
         checkFFmpegInstallation();
         setupModeSelection();
         
-        // Add event listeners for mode selection cards
+        // Add event listeners for mode selection cards with macOS-specific handling
         const imageModeCard = document.getElementById('imageModeCard');
         const videoModeCard = document.getElementById('videoModeCard');
         
         if (imageModeCard) {
             console.log('Adding click listener to imageModeCard');
-            imageModeCard.addEventListener('click', () => {
-                console.log('Image mode card clicked');
-                selectMode('image');
-            });
+            // macOS-specific: Add both click and mousedown events for better compatibility
+            if (window.currentPlatform === 'darwin') {
+                imageModeCard.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    console.log('Image mode card mousedown (macOS)');
+                    selectMode('image');
+                });
+                imageModeCard.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log('Image mode card clicked (macOS)');
+                    selectMode('image');
+                });
+            } else {
+                imageModeCard.addEventListener('click', () => {
+                    console.log('Image mode card clicked');
+                    selectMode('image');
+                });
+            }
         } else {
             console.error('imageModeCard not found!');
         }
         
         if (videoModeCard) {
             console.log('Adding click listener to videoModeCard');
-            videoModeCard.addEventListener('click', () => {
-                console.log('Video mode card clicked');
-                selectMode('video');
-            });
+            // macOS-specific: Add both click and mousedown events for better compatibility
+            if (window.currentPlatform === 'darwin') {
+                videoModeCard.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    console.log('Video mode card mousedown (macOS)');
+                    selectMode('video');
+                });
+                videoModeCard.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log('Video mode card clicked (macOS)');
+                    selectMode('video');
+                });
+            } else {
+                videoModeCard.addEventListener('click', () => {
+                    console.log('Video mode card clicked');
+                    selectMode('video');
+                });
+            }
         } else {
             console.error('videoModeCard not found!');
         }
@@ -382,8 +442,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         console.log('App initialization complete');
         
+        // macOS-specific success message
+        if (window.currentPlatform === 'darwin') {
+            console.log('macOS: App initialization completed successfully');
+        }
+        
         // Add alert to confirm latest code is running (for debugging)
-        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility\n• Fixed undefined output directory for videos\n• Improved cross-platform path handling\n• Fixed FFmpeg path detection for production builds\n• Added macOS fallback path detection');
+        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility\n• Fixed undefined output directory for videos\n• Improved cross-platform path handling\n• Fixed FFmpeg path detection for production builds\n• Added macOS fallback path detection\n• Fixed macOS click event handling');
         
     } catch (error) {
         console.error('Error during app initialization:', error);
