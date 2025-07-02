@@ -398,9 +398,8 @@ function setupVideoInterface() {
     const videoDuplicatesGroup = document.getElementById('videoDuplicatesGroup');
     
     if (videoProcessingMode) {
-        videoProcessingMode.addEventListener('change', () => {
-            const mode = videoProcessingMode.value;
-            
+        // Function to update UI visibility based on mode
+        const updateUIVisibility = (mode) => {
             if (mode === 'convert-only') {
                 videoIntensityGroup.style.display = 'none';
                 videoDuplicatesGroup.style.display = 'none';
@@ -416,7 +415,16 @@ function setupVideoInterface() {
                 videoDuplicatesGroup.style.display = 'block';
                 clipLengthGroup.style.display = 'block';
             }
+        };
+        
+        // Set up change event listener
+        videoProcessingMode.addEventListener('change', () => {
+            const mode = videoProcessingMode.value;
+            updateUIVisibility(mode);
         });
+        
+        // Initialize UI visibility for default mode
+        updateUIVisibility('spoof-only');
     }
     
     setupProcessingControls();
