@@ -247,19 +247,19 @@ ipcMain.handle('spawn-process', async (event, command, args) => {
            console.log('Spawning process on macOS:', command, args);
        }
        
-       const process = spawn(command, args, options);
+       const childProcess = spawn(command, args, options);
        let stdout = '';
        let stderr = '';
        
-       process.stdout.on('data', (data) => {
+       childProcess.stdout.on('data', (data) => {
            stdout += data.toString();
        });
        
-       process.stderr.on('data', (data) => {
+       childProcess.stderr.on('data', (data) => {
            stderr += data.toString();
        });
        
-       process.on('close', (code) => {
+       childProcess.on('close', (code) => {
            console.log('Process closed with code:', code);
            if (code === 0) {
                resolve({ stdout, stderr, code });
@@ -268,7 +268,7 @@ ipcMain.handle('spawn-process', async (event, command, args) => {
            }
        });
        
-       process.on('error', (error) => {
+       childProcess.on('error', (error) => {
            console.error('Process error:', error);
            reject(error);
        });
