@@ -1640,7 +1640,9 @@ function generateOutputPath(file, outputDir, settings, index = 1) {
         fileName = `${file.name}_${timestamp}`;
     }
     
-    return `${outputDir}/${fileName}${extension}`;
+    // Ensure extension has a dot prefix
+    const extensionWithDot = extension.startsWith('.') ? extension : '.' + extension;
+    return `${outputDir}/${fileName}${extensionWithDot}`;
 }
 
 // Helper function to generate output path for batch processing
@@ -1658,7 +1660,9 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
         fileName = `${file.name}_${timestamp}`;
     }
     
-    return `${batchDir}/${fileName}${extension}`;
+    // Ensure extension has a dot prefix
+    const extensionWithDot = extension.startsWith('.') ? extension : '.' + extension;
+    return `${batchDir}/${fileName}${extensionWithDot}`;
 }
 
 // Helper function to process file in batch
@@ -1700,25 +1704,29 @@ async function processFileInBatch(file, batchDir, batch, index, settings) {
 
 // Status message functions
 function addStatusMessage(message, type = 'info') {
-    const statusContainer = document.getElementById('statusContainer');
-    if (!statusContainer) return;
+    const statusPanel = document.getElementById('statusPanel');
+    const statusContent = document.getElementById('statusContent');
+    if (!statusPanel || !statusContent) return;
     
     const messageElement = document.createElement('div');
     messageElement.className = `status-message ${type}`;
     messageElement.textContent = message;
     
-    statusContainer.appendChild(messageElement);
-    statusContainer.scrollTop = statusContainer.scrollHeight;
+    statusContent.appendChild(messageElement);
+    statusContent.scrollTop = statusContent.scrollHeight;
+    
+    // Show the status panel
+    statusPanel.style.display = 'block';
 }
 
 function showStatus() {
-    const statusContainer = document.getElementById('statusContainer');
-    if (statusContainer) statusContainer.style.display = 'block';
+    const statusPanel = document.getElementById('statusPanel');
+    if (statusPanel) statusPanel.style.display = 'block';
 }
 
 function hideStatus() {
-    const statusContainer = document.getElementById('statusContainer');
-    if (statusContainer) statusContainer.style.display = 'none';
+    const statusPanel = document.getElementById('statusPanel');
+    if (statusPanel) statusPanel.style.display = 'none';
 }
 
 // Timer functions

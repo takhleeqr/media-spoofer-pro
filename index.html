@@ -593,7 +593,39 @@
         
         .pattern-examples h5 {
             color: #4a5568;
+            margin-bottom: 10px;
+        }
+        
+        /* Status message styles */
+        .status-message {
             margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+        
+        .status-message.info {
+            background: #ebf8ff;
+            border-left-color: #3182ce;
+            color: #2c5282;
+        }
+        
+        .status-message.success {
+            background: #f0fff4;
+            border-left-color: #38a169;
+            color: #22543d;
+        }
+        
+        .status-message.warning {
+            background: #fffbeb;
+            border-left-color: #d69e2e;
+            color: #744210;
+        }
+        
+        .status-message.error {
+            background: #fed7d7;
+            border-left-color: #e53e3e;
+            color: #742a2a;
         }
         
         .pattern-examples ul {
@@ -983,8 +1015,9 @@
         <span id="outputFolderText"></span>
     </div>
     
-    <div class="status-panel" id="statusPanel">
-        <div id="statusContent"></div>
+    <div class="status-panel" id="statusPanel" style="display: none;">
+        <h4>📋 Processing Log</h4>
+        <div id="statusContent" style="max-height: 200px; overflow-y: auto; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; font-family: monospace; font-size: 0.9rem;"></div>
     </div>
 </div>
 
