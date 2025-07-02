@@ -1671,15 +1671,29 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
         fileExtension: file.extension,
         parsedExtension: path.parse(file.path).extension,
         finalExtension: extension,
-        filePath: file.path
+        filePath: file.path,
+        namingPattern: settings.namingPattern
     });
     
     let fileName;
-    if (settings.namingPattern === 'random') {
+    
+    // Handle template-based naming pattern
+    if (settings.namingPattern && settings.namingPattern.includes('{number}')) {
+        // Replace {number} with 12-digit random number
+        fileName = settings.namingPattern.replace('{number}', randomId.toString().padStart(12, '0'));
+        
+        // Replace {word} with a random word (you can customize this)
+        if (fileName.includes('{word}')) {
+            const words = ['summer', 'winter', 'spring', 'autumn', 'brand', 'product', 'item', 'media'];
+            const randomWord = words[Math.floor(Math.random() * words.length)];
+            fileName = fileName.replace('{word}', randomWord);
+        }
+    } else if (settings.namingPattern === 'random') {
         fileName = `clip_${randomId}`;
     } else if (settings.namingPattern === 'timestamp') {
         fileName = `clip_${timestamp}`;
     } else {
+        // Fallback to original filename with timestamp
         fileName = `${file.name}_${timestamp}`;
     }
     
@@ -1688,7 +1702,8 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
     console.log('generateOutputPathForBatch result:', {
         fileName,
         extension,
-        finalPath
+        finalPath,
+        namingPattern: settings.namingPattern
     });
     
     return finalPath;
