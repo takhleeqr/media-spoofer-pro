@@ -802,6 +802,14 @@ function hideOverallProgress() {
 async function startProcessing() {
     if (isProcessing) return;
     
+    // Prevent image processing if outputDirectory is not set
+    if (currentMode === 'image' && !outputDirectory) {
+        addStatusMessage('❌ Please select an output folder before starting image processing.', 'error');
+        isProcessing = false;
+        updateButtons();
+        return;
+    }
+    
     isProcessing = true;
     isPaused = false;
     processedCount = 0;
@@ -1565,416 +1573,209 @@ async function createOutputDirectory() {
                 } else {
                     addStatusMessage(`Failed to create output directory: ${error.message}`, 'error');
                 }
+                
                 throw error;
             }
         } else {
             throw new Error('No files selected for video processing');
         }
     } else {
-        // Use manual selection for images
+        // For images, outputDirectory should be set by user
         if (!outputDirectory) {
-            const outputFolderInfo = document.getElementById('outputFolderInfo');
-            if (outputFolderInfo) outputFolderInfo.style.display = 'none';
+            throw new Error('Output directory not set for image processing');
         }
+        return outputDirectory;
     }
-    
-    // Ensure the directory exists
-    if (outputDirectory) {
-        try {
-            await electronAPI.mkdir(outputDirectory);
-        } catch (error) {
-            console.error('Failed to ensure output directory exists:', error);
-            addStatusMessage(`Failed to create output directory: ${error.message}`, 'error');
-            throw error;
-        }
-    }
-    
-    return outputDirectory;
 }
 
-function generateOutputPath(file, outputDir, settings, fileNumber) {
-   const namingPattern = settings.namingPattern || (currentMode === 'image' ? 'photo_{number}' : 'clip_{number}');
-   const currentDate = new Date().toISOString().slice(0, 10);
-   
-   // Use the new generateNameFromPattern function for better naming
-   let filename = generateNameFromPattern(namingPattern, currentMode === 'image' ? 'photo' : 'clip')
-       .replace('{date}', currentDate)
-       .replace('{original}', file.name.replace(file.extension, ''));
-   
-   // If no {number} in pattern, add a sequential number
-   if (!namingPattern.includes('{number}')) {
-       filename += '_' + fileNumber.toString().padStart(3, '0');
-   }
-   
-   let ext = file.extension;
-   if (file.type === 'image' && settings.imageFormat) {
-       ext = '.' + settings.imageFormat;
-   } else if (file.type === 'video' && settings.videoFormat) {
-       ext = '.' + settings.videoFormat;
-   }
-   
-   return outputDir + '/' + filename + ext;
+// Helper function to get parent directory
+function getParentDirectory(filePath) {
+    const normalizedPath = path.normalize(filePath);
+    return path.dirname(normalizedPath);
 }
 
+// Helper function to normalize paths
+function normalizePath(filePath) {
+    return path.normalize(filePath);
+}
+
+// Helper function to extract filename
+function extractFileName(filePath) {
+    const parsed = path.parse(filePath);
+    return parsed.name || 'unknown';
+}
+
+// Helper function to extract file extension
+function extractFileExtension(filePath) {
+    const parsed = path.parse(filePath);
+    return parsed.extension || '';
+}
+
+// Helper function to format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Helper function to sleep
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper function to generate output path
+function generateOutputPath(file, outputDir, settings, index = 1) {
+    const timestamp = Date.now();
+    const randomId = Math.floor(Math.random() * 1000000000000);
+    const extension = file.extension || path.parse(file.path).extension;
+    
+    let fileName;
+    if (settings.namingPattern === 'random') {
+        fileName = `clip_${randomId}`;
+    } else if (settings.namingPattern === 'timestamp') {
+        fileName = `clip_${timestamp}`;
+    } else {
+        fileName = `${file.name}_${timestamp}`;
+    }
+    
+    return `${outputDir}/${fileName}${extension}`;
+}
+
+// Helper function to generate output path for batch processing
+function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
+    const timestamp = Date.now();
+    const randomId = Math.floor(Math.random() * 1000000000000);
+    const extension = file.extension || path.parse(file.path).extension;
+    
+    let fileName;
+    if (settings.namingPattern === 'random') {
+        fileName = `clip_${randomId}`;
+    } else if (settings.namingPattern === 'timestamp') {
+        fileName = `clip_${timestamp}`;
+    } else {
+        fileName = `${file.name}_${timestamp}`;
+    }
+    
+    return `${batchDir}/${fileName}${extension}`;
+}
+
+// Helper function to process file in batch
+async function processFileInBatch(file, batchDir, batch, index, settings) {
+    const outputPath = generateOutputPathForBatch(file, batchDir, settings, index);
+    
+    switch (settings.mode) {
+        case 'spoof-split':
+            await processSpoofAndSplit(file, batchDir, settings, (percent) => {
+                file.progress = percent;
+                updateFileList();
+            });
+            break;
+        case 'spoof-only':
+            await processSpoof(file, batchDir, settings, (percent) => {
+                file.progress = percent;
+                updateFileList();
+            });
+            break;
+        case 'split-only':
+            if (file.type === 'video') {
+                await processSplitOnly(file, batchDir, settings, (percent) => {
+                    file.progress = percent;
+                    updateFileList();
+                });
+            } else {
+                await electronAPI.copyFile(file.path, outputPath);
+                outputCount++;
+            }
+            break;
+        case 'convert-only':
+            await processConvert(file, batchDir, settings, (percent) => {
+                file.progress = percent;
+                updateFileList();
+            });
+            break;
+    }
+}
+
+// Status message functions
 function addStatusMessage(message, type = 'info') {
-   const statusContent = document.getElementById('statusContent');
-   if (!statusContent) return;
-   
-   const statusLine = document.createElement('div');
-   statusLine.className = `status-line status-${type}`;
-   statusLine.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-   statusContent.appendChild(statusLine);
-   statusContent.scrollTop = statusContent.scrollHeight;
+    const statusContainer = document.getElementById('statusContainer');
+    if (!statusContainer) return;
+    
+    const messageElement = document.createElement('div');
+    messageElement.className = `status-message ${type}`;
+    messageElement.textContent = message;
+    
+    statusContainer.appendChild(messageElement);
+    statusContainer.scrollTop = statusContainer.scrollHeight;
 }
 
 function showStatus() {
-   const statusPanel = document.getElementById('statusPanel');
-   if (statusPanel) statusPanel.classList.add('show');
+    const statusContainer = document.getElementById('statusContainer');
+    if (statusContainer) statusContainer.style.display = 'block';
 }
 
 function hideStatus() {
-   const statusPanel = document.getElementById('statusPanel');
-   if (statusPanel) statusPanel.classList.remove('show');
+    const statusContainer = document.getElementById('statusContainer');
+    if (statusContainer) statusContainer.style.display = 'none';
 }
 
+// Timer functions
 function startTimer() {
-   timerInterval = setInterval(() => {
-       const elapsed = Math.floor((Date.now() - startTime) / 1000);
-       const timeElement = document.getElementById('timeElapsed');
-       if (timeElement) timeElement.textContent = `${elapsed}s`;
-   }, 1000);
+    if (timerInterval) clearInterval(timerInterval);
+    startTime = Date.now();
+    timerInterval = setInterval(updateTimer, 1000);
 }
 
 function stopTimer() {
-   if (timerInterval) {
-       clearInterval(timerInterval);
-       timerInterval = null;
-   }
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
 }
 
+function updateTimer() {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    document.getElementById('timeElapsed').textContent = elapsed + 's';
+}
+
+// Output folder functions
 async function openOutputFolder() {
-   const openFolderBtn = document.getElementById('openFolderBtn');
-   const folderPath = openFolderBtn?.getAttribute('data-path');
-   if (folderPath) {
-       await electronAPI.openOutputFolder(folderPath);
-   }
-}
-
-function formatFileSize(bytes) {
-   if (bytes === 0) return '0 Bytes';
-   const k = 1024;
-   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-   const i = Math.floor(Math.log(bytes) / Math.log(k));
-   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-function sleep(ms) {
-   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Add these new functions before the last lines of renderer.js
-
-// New function to handle individual file processing in batches
-async function processFileInBatch(file, outputDir, batch, fileNumber, settings) {
-    console.log(`processFileInBatch called with:`, {
-        fileName: file.name,
-        outputDir: outputDir,
-        batch: batch,
-        fileNumber: fileNumber,
-        mode: settings.mode
-    });
+    const openFolderBtn = document.getElementById('openFolderBtn');
+    const folderPath = openFolderBtn.getAttribute('data-path');
     
-    // Generate unique output path for this file in this batch
-    const outputPath = generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch);
-    console.log('Generated output path:', outputPath);
-    
-    const updateProgress = (percent) => {
-        // Progress is handled at the batch level now
-    };
-    
-    try {
-        switch (settings.mode) {
-            case 'spoof-split':
-                await processSpoofAndSplit(file, outputDir, settings, updateProgress, fileNumber, batch);
-                break;
-            case 'spoof-only':
-                await processSpoofOnly(file, outputDir, settings, updateProgress, fileNumber, batch);
-                break;
-            case 'split-only':
-                if (file.type === 'video') {
-                    await processSplitOnly(file, outputDir, settings, updateProgress, fileNumber, batch);
-                } else {
-                    await electronAPI.copyFile(file.path, outputPath);
-                }
-                break;
-            case 'convert-only':
-                await processConvertOnly(file, outputDir, settings, updateProgress, fileNumber, batch);
-                break;
-        }
-        
-        // Only increment outputCount if we reach here without error
-        outputCount++;
-    } catch (error) {
-        // Check if the output file was partially created and remove it
-        const outputExists = await electronAPI.exists(outputPath);
-        if (outputExists) {
-            try {
-                await electronAPI.unlink(outputPath);
-            } catch (cleanupError) {
-                // Ignore cleanup errors
-            }
-        }
-        throw error;
-    }
-}
-
-// Updated function to generate unique output paths for batches
-function generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch) {
-    console.log('generateOutputPathForBatch called with:', {
-        fileName: file.name,
-        outputDir: outputDir,
-        fileNumber: fileNumber,
-        batch: batch
-    });
-    
-    const namingPattern = settings.namingPattern || (currentMode === 'image' ? 'photo_{number}' : 'clip_{number}');
-    const currentDate = new Date().toISOString().slice(0, 10);
-    
-    // Create unique filename for this file in this batch using the new function
-    let filename = generateNameFromPattern(namingPattern, currentMode === 'image' ? 'photo' : 'clip')
-        .replace('{date}', currentDate)
-        .replace('{original}', file.name.replace(file.extension, ''));
-    
-    // If no {number} in pattern, add a sequential number
-    if (!namingPattern.includes('{number}')) {
-        filename += '_' + fileNumber.toString().padStart(3, '0');
-    }
-    
-    // Add batch info if multiple batches
-    if (settings.duplicates > 1) {
-        filename += `_batch${batch}`;
-    }
-    
-    let ext = file.extension;
-    if (file.type === 'image' && settings.imageFormat) {
-        ext = '.' + settings.imageFormat;
-    } else if (file.type === 'video' && settings.videoFormat) {
-        ext = '.' + settings.videoFormat;
-    }
-    
-    const finalPath = outputDir + '/' + filename + ext;
-    console.log('Final output path:', finalPath);
-    
-    return finalPath;
-}
-
-// Updated spoof processing functions
-async function processSpoofOnly(file, outputDir, settings, updateProgress, fileNumber, batch) {
-    const outputPath = generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch);
-    const effects = generateSpoofEffects(settings.intensity);
-    
-    if (file.type === 'image') {
-        await processImageSpoof(file.path, outputPath, effects, settings, updateProgress);
-    } else {
-        await processVideoSpoof(file.path, outputPath, effects, settings, updateProgress);
-    }
-}
-
-async function processConvertOnly(file, outputDir, settings, updateProgress, fileNumber, batch) {
-    const outputPath = generateOutputPathForBatch(file, outputDir, settings, fileNumber, batch);
-    
-    if (file.type === 'image') {
-        await convertImage(file.path, outputPath, settings);
-    } else {
-        await convertVideo(file.path, outputPath, settings);
-    }
-}
-
-// Add selectFolder for both image and video
-async function selectFolder(mode) {
-    const folderPath = await electronAPI.selectFolder();
     if (folderPath) {
-        // Get all files in the folder (images or videos)
-        const files = await electronAPI.readDirRecursive(folderPath);
-        const filtered = files.filter(f => {
-            const ext = extractFileExtension(f).toLowerCase().replace('.', '');
-            if (mode === 'image') return ['jpg', 'jpeg', 'png', 'heic', 'webp'].includes(ext);
-            if (mode === 'video') return ['mp4', 'mov', 'avi', 'webm'].includes(ext);
-            return false;
-        });
-        
-        // Convert file paths to file objects with proper structure
-        const fileObjects = await Promise.all(filtered.map(async (filePath) => {
-            // Use cross-platform helper functions
-            const fileName = extractFileName(filePath);
-            const fileExtension = extractFileExtension(filePath);
+        try {
+            await electronAPI.openOutputFolder(folderPath);
+        } catch (error) {
+            addStatusMessage('Error opening output folder: ' + error.message, 'error');
+        }
+    }
+}
+
+// Folder selection
+async function selectFolder(mode) {
+    try {
+        const folderPath = await electronAPI.selectFolder();
+        if (folderPath) {
+            const files = await electronAPI.readDirRecursive(folderPath);
+            const filteredFiles = files.filter(file => {
+                const ext = path.parse(file).extension.toLowerCase();
+                if (mode === 'image') {
+                    return ['.jpg', '.jpeg', '.png', '.heic', '.webp'].includes(ext);
+                } else {
+                    return ['.mp4', '.mov', '.avi', '.webm'].includes(ext);
+                }
+            });
             
-            // Try to get file size
-            let fileSize = 0;
-            try {
-                const stats = await electronAPI.getFileStats(filePath);
-                fileSize = stats.size;
-            } catch (error) {
-                console.warn('Could not get file size for:', filePath, error);
+            if (filteredFiles.length > 0) {
+                await addFiles(filteredFiles, mode);
+            } else {
+                addStatusMessage(`No ${mode} files found in selected folder`, 'warning');
             }
-            
-            return {
-                path: filePath,
-                name: fileName,
-                type: getFileType(fileExtension),
-                extension: fileExtension,
-                size: fileSize
-            };
-        }));
-        
-        await addFiles(fileObjects, mode);
-    }
-}
-
-// Update naming pattern logic
-function generateNameFromPattern(pattern, word) {
-    // Replace {word} with the provided word (default 'photo' or 'clip')
-    const safeWord = word || (currentMode === 'image' ? 'photo' : 'clip');
-    let name = pattern.replace(/{word}/g, safeWord);
-    // Replace {number} with a random 12-digit number
-    name = name.replace(/{number}/g, () => Math.floor(1e11 + Math.random() * 9e11).toString());
-    return name;
-}
-
-// Helper function to normalize paths (cross-platform)
-function normalizePath(filePath) {
-    if (!filePath || typeof filePath !== 'string') {
-        return '';
-    }
-    
-    // Use Node.js path.normalize for cross-platform compatibility
-    try {
-        return path.normalize(filePath);
-    } catch (error) {
-        console.warn('path.normalize failed:', error);
-        // Fallback: replace backslashes with forward slashes for consistency
-        return filePath.replace(/\\/g, '/');
-    }
-}
-
-// Helper function to extract filename from path (cross-platform)
-function extractFileName(filePath) {
-    if (!filePath || typeof filePath !== 'string') {
-        return 'Unknown';
-    }
-    
-    // Try path.parse first
-    try {
-        const parsed = path.parse(filePath);
-        if (parsed.base && parsed.base !== '') {
-            return parsed.base;
         }
     } catch (error) {
-        console.warn('path.parse failed:', error);
-    }
-    
-    // Fallback: split by path separators (works for both Windows and Unix)
-    const pathParts = filePath.split(/[\\\/]/);
-    const fileName = pathParts[pathParts.length - 1];
-    
-    if (fileName && fileName !== '') {
-        return fileName;
-    }
-    
-    // Last resort: try to extract from the end of the string
-    const lastSlashIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
-    if (lastSlashIndex !== -1 && lastSlashIndex < filePath.length - 1) {
-        return filePath.substring(lastSlashIndex + 1);
-    }
-    
-    return 'Unknown';
-}
-
-// Helper function to extract file extension (cross-platform)
-function extractFileExtension(filePath) {
-    if (!filePath || typeof filePath !== 'string') {
-        return '';
-    }
-    
-    // Try path.parse first
-    try {
-        const parsed = path.parse(filePath);
-        if (parsed.ext && parsed.ext !== '') {
-            return parsed.ext;
-        }
-    } catch (error) {
-        console.warn('path.parse failed for extension:', error);
-    }
-    
-    // Fallback: find the last dot
-    const lastDotIndex = filePath.lastIndexOf('.');
-    if (lastDotIndex !== -1 && lastDotIndex < filePath.length - 1) {
-        return filePath.substring(lastDotIndex);
-    }
-    
-    return '';
-}
-
-// Helper function to extract parent directory (cross-platform)
-function getParentDirectory(filePath) {
-    if (!filePath || typeof filePath !== 'string') {
-        return '';
-    }
-    
-    console.log('Getting parent directory for:', filePath);
-    
-    // Handle Windows paths (with drive letter)
-    if (filePath.includes(':\\')) {
-        // Find the last backslash or forward slash
-        const lastSlashIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
-        if (lastSlashIndex > 2) { // > 2 to ensure we don't remove the drive letter
-            const parentDir = filePath.substring(0, lastSlashIndex);
-            console.log('Windows parent directory:', parentDir);
-            return parentDir;
-        }
-    }
-    
-    // Handle Unix paths (starting with /)
-    if (filePath.startsWith('/')) {
-        const lastSlashIndex = filePath.lastIndexOf('/');
-        if (lastSlashIndex > 0) {
-            const parentDir = filePath.substring(0, lastSlashIndex);
-            console.log('Unix parent directory:', parentDir);
-            return parentDir;
-        }
-    }
-    
-    // Handle relative paths
-    const lastSlashIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
-    if (lastSlashIndex !== -1) {
-        const parentDir = filePath.substring(0, lastSlashIndex);
-        console.log('Relative parent directory:', parentDir);
-        return parentDir;
-    }
-    
-    console.log('No parent directory found, returning empty string');
-    return '';
-}
-
-// Helper function to get absolute path (cross-platform)
-function getAbsolutePath(filePath) {
-    if (!filePath || typeof filePath !== 'string') {
-        return '';
-    }
-    
-    // If it's already an absolute path (Windows with drive letter or Unix starting with /)
-    if (filePath.includes(':\\') || filePath.startsWith('/')) {
-        return filePath;
-    }
-    
-    // For relative paths, try to resolve them
-    try {
-        return path.resolve(filePath);
-    } catch (error) {
-        console.warn('path.resolve failed:', error);
-        return filePath;
+        addStatusMessage('Error selecting folder: ' + error.message, 'error');
     }
 }
-
-// Functions are already available globally (defined at the top)
-// Functions are already available globally (defined at the top)
