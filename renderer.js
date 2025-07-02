@@ -180,8 +180,14 @@ async function initializeFFmpegPaths() {
                 ffprobePath = appPath + '/resources/ffprobe.exe';
             }
         } else {
-            ffmpegPath = appPath + '/resources/ffmpeg';
-            ffprobePath = appPath + '/resources/ffprobe';
+            // Fix for macOS production path - remove the extra /resources/ in the path
+            if (appPath.includes('resources')) {
+                ffmpegPath = appPath + '/ffmpeg';
+                ffprobePath = appPath + '/ffprobe';
+            } else {
+                ffmpegPath = appPath + '/resources/ffmpeg';
+                ffprobePath = appPath + '/resources/ffprobe';
+            }
         }
     }
     
@@ -198,15 +204,58 @@ async function initializeFFmpegPaths() {
             console.log('FFmpeg file stats:', ffmpegStats);
         } else {
             console.error('FFmpeg not found at path:', ffmpegPath);
+            
+            // macOS-specific debugging
+            if (platform === 'darwin') {
+                console.error('macOS FFmpeg path issue detected. Common macOS paths:');
+                console.error('- /Applications/Media Spoofer Pro.app/Contents/Resources/ffmpeg');
+                console.error('- /Applications/Media Spoofer Pro.app/Contents/Resources/resources/ffmpeg');
+            }
         }
         if (ffprobeExists) {
             const ffprobeStats = await electronAPI.getFileStats(ffprobePath);
             console.log('FFprobe file stats:', ffprobeStats);
         } else {
             console.error('FFprobe not found at path:', ffprobePath);
+            
+            // macOS-specific debugging
+            if (platform === 'darwin') {
+                console.error('macOS FFprobe path issue detected. Common macOS paths:');
+                console.error('- /Applications/Media Spoofer Pro.app/Contents/Resources/ffprobe');
+                console.error('- /Applications/Media Spoofer Pro.app/Contents/Resources/resources/ffprobe');
+            }
         }
     } catch (error) {
         console.error('Error checking FFmpeg files:', error);
+    }
+    
+    // macOS fallback path checking
+    if (platform === 'darwin' && (!ffmpegExists || !ffprobeExists)) {
+        console.log('Attempting macOS fallback path detection...');
+        
+        // Try alternative macOS paths
+        const alternativePaths = [
+            appPath + '/ffmpeg',
+            appPath + '/ffprobe',
+            appPath.replace('/resources', '') + '/ffmpeg',
+            appPath.replace('/resources', '') + '/ffprobe'
+        ];
+        
+        for (const altPath of alternativePaths) {
+            try {
+                const exists = await electronAPI.exists(altPath);
+                if (exists) {
+                    console.log('Found FFmpeg at alternative path:', altPath);
+                    if (altPath.includes('ffmpeg')) {
+                        ffmpegPath = altPath;
+                    } else if (altPath.includes('ffprobe')) {
+                        ffprobePath = altPath;
+                    }
+                }
+            } catch (error) {
+                console.log('Alternative path check failed:', altPath, error.message);
+            }
+        }
     }
 }
 
@@ -292,7 +341,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log('App initialization complete');
         
         // Add alert to confirm latest code is running (for debugging)
-        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility\n• Fixed undefined output directory for videos\n• Improved cross-platform path handling\n• Fixed FFmpeg path detection for production builds');
+        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility\n• Fixed undefined output directory for videos\n• Improved cross-platform path handling\n• Fixed FFmpeg path detection for production builds\n• Added macOS fallback path detection');
         
     } catch (error) {
         console.error('Error during app initialization:', error);
