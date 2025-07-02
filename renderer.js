@@ -187,9 +187,12 @@ async function initializeFFmpegPaths() {
     console.log('FFmpeg paths initialized:', { ffmpegPath, ffprobePath, isDev, platform });
     
     // Enhanced debugging for all platforms
+    let ffmpegExists = false;
+    let ffprobeExists = false;
+    
     try {
-        const ffmpegExists = await electronAPI.exists(ffmpegPath);
-        const ffprobeExists = await electronAPI.exists(ffprobePath);
+        ffmpegExists = await electronAPI.exists(ffmpegPath);
+        ffprobeExists = await electronAPI.exists(ffprobePath);
         console.log('FFmpeg existence check:', { ffmpegExists, ffprobeExists, ffmpegPath, ffprobePath });
         
         if (ffmpegExists) {
@@ -230,8 +233,10 @@ async function initializeFFmpegPaths() {
                             console.log('Found FFmpeg at alternative path:', altPath);
                             if (altPath.includes('ffmpeg')) {
                                 ffmpegPath = altPath;
+                                ffmpegExists = true;
                             } else if (altPath.includes('ffprobe')) {
                                 ffprobePath = altPath;
+                                ffprobeExists = true;
                             }
                         }
                     } catch (error) {
@@ -283,8 +288,10 @@ async function initializeFFmpegPaths() {
                     console.log('Found FFmpeg at alternative path:', altPath);
                     if (altPath.includes('ffmpeg')) {
                         ffmpegPath = altPath;
+                        ffmpegExists = true;
                     } else if (altPath.includes('ffprobe')) {
                         ffprobePath = altPath;
+                        ffprobeExists = true;
                     }
                 }
             } catch (error) {
