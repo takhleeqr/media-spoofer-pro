@@ -1658,7 +1658,14 @@ function generateOutputPath(file, outputDir, settings, index = 1) {
 function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
     const timestamp = Date.now();
     const randomId = Math.floor(Math.random() * 1000000000000);
-    const extension = file.extension || path.parse(file.path).extension;
+    
+    // Get extension from file object or parse from path
+    let extension = file.extension || path.parse(file.path).extension;
+    
+    // Force ensure extension has a dot prefix - more robust approach
+    if (!extension.startsWith('.')) {
+        extension = '.' + extension;
+    }
     
     console.log('generateOutputPathForBatch debug:', {
         fileExtension: file.extension,
@@ -1676,14 +1683,11 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
         fileName = `${file.name}_${timestamp}`;
     }
     
-    // Ensure extension has a dot prefix
-    const extensionWithDot = extension.startsWith('.') ? extension : '.' + extension;
-    const finalPath = `${batchDir}/${fileName}${extensionWithDot}`;
+    const finalPath = `${batchDir}/${fileName}${extension}`;
     
     console.log('generateOutputPathForBatch result:', {
         fileName,
         extension,
-        extensionWithDot,
         finalPath
     });
     
