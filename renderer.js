@@ -1209,6 +1209,7 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
             '-i', inputPath,
             '-vf', filterComplex,
             '-map_metadata', '-1',
+            '-pix_fmt', 'yuv420p',
             outputPath
         ];
         
@@ -1442,6 +1443,7 @@ async function convertImage(inputPath, outputPath, settings) {
            '-y',
            '-i', inputPath,
            '-map_metadata', '-1',
+           '-pix_fmt', 'yuv420p',
            outputPath
        ];
        
@@ -1667,22 +1669,10 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
         extension = '.' + extension;
     }
     
-    console.log('generateOutputPathForBatch debug:', {
-        fileExtension: file.extension,
-        parsedExtension: path.parse(file.path).extension,
-        finalExtension: extension,
-        filePath: file.path,
-        namingPattern: settings.namingPattern
-    });
-    
+    // DEBUG: Log extension and final path
     let fileName;
-    
-    // Handle template-based naming pattern
     if (settings.namingPattern && settings.namingPattern.includes('{number}')) {
-        // Replace {number} with 12-digit random number
         fileName = settings.namingPattern.replace('{number}', randomId.toString().padStart(12, '0'));
-        
-        // Replace {word} with a random word (you can customize this)
         if (fileName.includes('{word}')) {
             const words = ['summer', 'winter', 'spring', 'autumn', 'brand', 'product', 'item', 'media'];
             const randomWord = words[Math.floor(Math.random() * words.length)];
@@ -1693,19 +1683,10 @@ function generateOutputPathForBatch(file, batchDir, settings, index = 1) {
     } else if (settings.namingPattern === 'timestamp') {
         fileName = `clip_${timestamp}`;
     } else {
-        // Fallback to original filename with timestamp
         fileName = `${file.name}_${timestamp}`;
     }
-    
     const finalPath = `${batchDir}/${fileName}${extension}`;
-    
-    console.log('generateOutputPathForBatch result:', {
-        fileName,
-        extension,
-        finalPath,
-        namingPattern: settings.namingPattern
-    });
-    
+    console.log('[DEBUG generateOutputPathForBatch]', {extension, finalPath, fileName, filePath: file.path, settingsNamingPattern: settings.namingPattern});
     return finalPath;
 }
 
