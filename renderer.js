@@ -447,9 +447,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('macOS: App initialization completed successfully');
         }
         
-        // Add alert to confirm latest code is running (for debugging)
-        alert('✅ Media Spoofer Pro loaded successfully!\n\nLatest version with all fixes applied:\n• Fixed file extension handling\n• Fixed image processing\n• Fixed file type detection\n• Added proper pixel format for images\n• Enhanced macOS compatibility\n• Fixed undefined output directory for videos\n• Improved cross-platform path handling\n• Fixed FFmpeg path detection for production builds\n• Added macOS fallback path detection\n• Fixed macOS click event handling');
-        
     } catch (error) {
         console.error('Error during app initialization:', error);
         alert('Error initializing app: ' + error.message);
