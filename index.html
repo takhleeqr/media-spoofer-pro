@@ -597,6 +597,37 @@
         }
         
         /* Status message styles */
+        .slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e2e8f0;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+        
         .status-message {
             margin-bottom: 8px;
             padding: 8px 12px;
@@ -832,6 +863,73 @@
                             </ul>
                         </div>
                     </div>
+                    
+                    <!-- Watermark Section -->
+                    <div class="settings-group">
+                        <h4>💧 Watermark</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="imageWatermarkEnabled">
+                                <label for="imageWatermarkEnabled">Add Text Watermark</label>
+                            </div>
+                        </div>
+                        
+                        <div id="imageWatermarkSettings" style="display: none; margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <div class="setting-item">
+                                <label>Watermark Text</label>
+                                <input type="text" id="imageWatermarkText" placeholder="Your Brand Name" value="Your Brand">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Font</label>
+                                <select id="imageWatermarkFont">
+                                    <option value="Arial">Arial</option>
+                                    <option value="Times New Roman">Times New Roman</option>
+                                    <option value="Helvetica">Helvetica</option>
+                                    <option value="Verdana">Verdana</option>
+                                    <option value="Georgia">Georgia</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Size (% of image)</label>
+                                <input type="range" id="imageWatermarkSize" min="5" max="50" value="15" class="slider">
+                                <span id="imageWatermarkSizeValue">15%</span>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Position</label>
+                                <select id="imageWatermarkPosition">
+                                    <option value="top-left">Top Left</option>
+                                    <option value="top-center">Top Center</option>
+                                    <option value="top-right">Top Right</option>
+                                    <option value="middle-left">Middle Left</option>
+                                    <option value="center" selected>Center</option>
+                                    <option value="middle-right">Middle Right</option>
+                                    <option value="bottom-left">Bottom Left</option>
+                                    <option value="bottom-center">Bottom Center</option>
+                                    <option value="bottom-right">Bottom Right</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Rotation (degrees)</label>
+                                <input type="range" id="imageWatermarkRotation" min="-180" max="180" value="0" class="slider">
+                                <span id="imageWatermarkRotationValue">0°</span>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Color</label>
+                                <input type="color" id="imageWatermarkColor" value="#ffffff">
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Opacity (%)</label>
+                                <input type="range" id="imageWatermarkOpacity" min="10" max="100" value="80" class="slider">
+                                <span id="imageWatermarkOpacityValue">80%</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -957,6 +1055,73 @@
                                 <li><code>{word}_video_{number}</code> → summer_video_123456789012...</li>
                             </ul>
                         </div>
+                   </div>
+                   
+                   <!-- Watermark Section -->
+                   <div class="settings-group">
+                       <h4>💧 Watermark</h4>
+                       <div class="checkbox-group">
+                           <div class="checkbox-item">
+                               <input type="checkbox" id="videoWatermarkEnabled">
+                               <label for="videoWatermarkEnabled">Add Text Watermark</label>
+                           </div>
+                       </div>
+                       
+                       <div id="videoWatermarkSettings" style="display: none; margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e2e8f0;">
+                           <div class="setting-item">
+                               <label>Watermark Text</label>
+                               <input type="text" id="videoWatermarkText" placeholder="Your Brand Name" value="Your Brand">
+                           </div>
+                           
+                           <div class="setting-item">
+                               <label>Font</label>
+                               <select id="videoWatermarkFont">
+                                   <option value="Arial">Arial</option>
+                                   <option value="Times New Roman">Times New Roman</option>
+                                   <option value="Helvetica">Helvetica</option>
+                                   <option value="Verdana">Verdana</option>
+                                   <option value="Georgia">Georgia</option>
+                               </select>
+                           </div>
+                           
+                           <div class="setting-item">
+                               <label>Size (% of video)</label>
+                               <input type="range" id="videoWatermarkSize" min="5" max="50" value="15" class="slider">
+                               <span id="videoWatermarkSizeValue">15%</span>
+                           </div>
+                           
+                           <div class="setting-item">
+                               <label>Position</label>
+                               <select id="videoWatermarkPosition">
+                                   <option value="top-left">Top Left</option>
+                                   <option value="top-center">Top Center</option>
+                                   <option value="top-right">Top Right</option>
+                                   <option value="middle-left">Middle Left</option>
+                                   <option value="center" selected>Center</option>
+                                   <option value="middle-right">Middle Right</option>
+                                   <option value="bottom-left">Bottom Left</option>
+                                   <option value="bottom-center">Bottom Center</option>
+                                   <option value="bottom-right">Bottom Right</option>
+                               </select>
+                           </div>
+                           
+                           <div class="setting-item">
+                               <label>Rotation (degrees)</label>
+                               <input type="range" id="videoWatermarkRotation" min="-180" max="180" value="0" class="slider">
+                               <span id="videoWatermarkRotationValue">0°</span>
+                           </div>
+                           
+                           <div class="setting-item">
+                               <label>Color</label>
+                               <input type="color" id="videoWatermarkColor" value="#ffffff">
+                           </div>
+                           
+                           <div class="setting-item">
+                               <label>Opacity (%)</label>
+                               <input type="range" id="videoWatermarkOpacity" min="10" max="100" value="80" class="slider">
+                               <span id="videoWatermarkOpacityValue">80%</span>
+                           </div>
+                       </div>
                    </div>
                </div>
            </div>

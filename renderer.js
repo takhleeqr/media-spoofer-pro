@@ -568,6 +568,9 @@ function setupImageInterface() {
         });
     }
     
+    // Watermark UI handlers
+    setupWatermarkUI('image');
+    
     setupProcessingControls();
     imageInterfaceSetup = true;
 }
@@ -656,8 +659,54 @@ function setupVideoInterface() {
         updateUIVisibility('spoof-only');
     }
     
+    // Watermark UI handlers
+    setupWatermarkUI('video');
+    
     setupProcessingControls();
     videoInterfaceSetup = true;
+}
+
+// Watermark UI setup function
+function setupWatermarkUI(mode) {
+    const prefix = mode === 'image' ? 'image' : 'video';
+    const watermarkEnabled = document.getElementById(`${prefix}WatermarkEnabled`);
+    const watermarkSettings = document.getElementById(`${prefix}WatermarkSettings`);
+    const watermarkSize = document.getElementById(`${prefix}WatermarkSize`);
+    const watermarkSizeValue = document.getElementById(`${prefix}WatermarkSizeValue`);
+    const watermarkRotation = document.getElementById(`${prefix}WatermarkRotation`);
+    const watermarkRotationValue = document.getElementById(`${prefix}WatermarkRotationValue`);
+    const watermarkOpacity = document.getElementById(`${prefix}WatermarkOpacity`);
+    const watermarkOpacityValue = document.getElementById(`${prefix}WatermarkOpacityValue`);
+    
+    // Toggle watermark settings visibility
+    if (watermarkEnabled) {
+        watermarkEnabled.addEventListener('change', () => {
+            if (watermarkSettings) {
+                watermarkSettings.style.display = watermarkEnabled.checked ? 'block' : 'none';
+            }
+        });
+    }
+    
+    // Update size value display
+    if (watermarkSize && watermarkSizeValue) {
+        watermarkSize.addEventListener('input', () => {
+            watermarkSizeValue.textContent = `${watermarkSize.value}%`;
+        });
+    }
+    
+    // Update rotation value display
+    if (watermarkRotation && watermarkRotationValue) {
+        watermarkRotation.addEventListener('input', () => {
+            watermarkRotationValue.textContent = `${watermarkRotation.value}°`;
+        });
+    }
+    
+    // Update opacity value display
+    if (watermarkOpacity && watermarkOpacityValue) {
+        watermarkOpacity.addEventListener('input', () => {
+            watermarkOpacityValue.textContent = `${watermarkOpacity.value}%`;
+        });
+    }
 }
 
 function setupProcessingControls() {
@@ -1376,6 +1425,62 @@ function generateSpoofEffects(intensity) {
     };
 }
 
+// Generate watermark filter for FFmpeg
+function generateWatermarkFilter(watermarkSettings) {
+    if (!watermarkSettings || !watermarkSettings.enabled || !watermarkSettings.text) {
+        return '';
+    }
+    
+    const {
+        text, font, size, position, rotation, color, opacity
+    } = watermarkSettings;
+    
+    // Escape special characters in text
+    const escapedText = text.replace(/'/g, "\\'").replace(/:/g, "\\:");
+    
+    // Convert color from hex to RGB
+    const hexToRgb = (hex) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 255, g: 255, b: 255 };
+    };
+    
+    const rgb = hexToRgb(color);
+    const colorString = `0x${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
+    
+    // Calculate font size based on percentage
+    const fontSize = Math.max(12, Math.floor(size * 2)); // Convert percentage to reasonable font size
+    
+    // Position mapping
+    const positionMap = {
+        'top-left': 'x=10:y=10',
+        'top-center': 'x=(w-text_w)/2:y=10',
+        'top-right': 'x=w-text_w-10:y=10',
+        'middle-left': 'x=10:y=(h-text_h)/2',
+        'center': 'x=(w-text_w)/2:y=(h-text_h)/2',
+        'middle-right': 'x=w-text_w-10:y=(h-text_h)/2',
+        'bottom-left': 'x=10:y=h-text_h-10',
+        'bottom-center': 'x=(w-text_w)/2:y=h-text_h-10',
+        'bottom-right': 'x=w-text_w-10:y=h-text_h-10'
+    };
+    
+    const positionString = positionMap[position] || positionMap['center'];
+    const opacityDecimal = opacity / 100;
+    
+    // Build the drawtext filter
+    const filter = `drawtext=text='${escapedText}':fontsize=${fontSize}:fontcolor=${colorString}:alpha=${opacityDecimal}:${positionString}`;
+    
+    // Add rotation if not 0
+    if (rotation !== 0) {
+        return `${filter}:rotation=${rotation}*PI/180`;
+    }
+    
+    return filter;
+}
+
 async function processImageSpoof(inputPath, outputPath, effects, settings, updateProgress) {
     if (!effects) {
         return convertImage(inputPath, outputPath, settings);
@@ -1388,7 +1493,13 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
         const contrastDecimal = effects.contrast / 100;
         const saturationDecimal = effects.saturation / 100;
         
-        const filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+        let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+        
+        // Add watermark if enabled
+        const watermarkFilter = generateWatermarkFilter(settings.watermark);
+        if (watermarkFilter) {
+            filterComplex += `,${watermarkFilter}`;
+        }
         
         const command = [
             '-y',
@@ -1429,7 +1540,13 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
         const contrastDecimal = effects.contrast / 100;
         const saturationDecimal = effects.saturation / 100;
         
-        const filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+        let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+        
+        // Add watermark if enabled
+        const watermarkFilter = generateWatermarkFilter(settings.watermark);
+        if (watermarkFilter) {
+            filterComplex += `,${watermarkFilter}`;
+        }
         
         const command = [
             '-y',
@@ -1552,7 +1669,13 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
             const contrastDecimal = effects.contrast / 100;
             const saturationDecimal = effects.saturation / 100;
             
-            const filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+            let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+            
+            // Add watermark if enabled
+            const watermarkFilter = generateWatermarkFilter(settings.watermark);
+            if (watermarkFilter) {
+                filterComplex += `,${watermarkFilter}`;
+            }
             
             command = [
                 '-y',
@@ -1565,19 +1688,34 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                 '-map_metadata', '-1'
             ];
         } else {
-            command = [
-                '-y',
-                '-ss', clip.start.toString(),
-                '-i', inputPath,
-                '-t', clip.duration.toString(),
-                '-c', 'copy',
-                '-map_metadata', '-1'
-            ];
+            // For no effects, we need to handle watermark separately since we can't use -c copy with -vf
+            const watermarkFilter = generateWatermarkFilter(settings.watermark);
+            if (watermarkFilter) {
+                command = [
+                    '-y',
+                    '-ss', clip.start.toString(),
+                    '-i', inputPath,
+                    '-t', clip.duration.toString(),
+                    '-vf', watermarkFilter,
+                    '-c:v', 'libx264',
+                    '-preset', 'fast',
+                    '-map_metadata', '-1'
+                ];
+            } else {
+                command = [
+                    '-y',
+                    '-ss', clip.start.toString(),
+                    '-i', inputPath,
+                    '-t', clip.duration.toString(),
+                    '-c', 'copy',
+                    '-map_metadata', '-1'
+                ];
+            }
         }
         
         if (settings.removeAudio) {
             command.push('-an');
-        } else if (effects) {
+        } else if (effects || (settings.watermark && settings.watermark.enabled)) {
             command.push('-c:a', 'aac', '-b:a', '128k');
         }
         
@@ -1627,13 +1765,20 @@ async function extractVideoClip(inputPath, outputPath, clip) {
 
 async function convertImage(inputPath, outputPath, settings) {
    return new Promise((resolve, reject) => {
-       const command = [
+       let command = [
            '-y',
            '-i', inputPath,
            '-pix_fmt', 'yuv420p',
-           '-map_metadata', '-1',
-           outputPath
+           '-map_metadata', '-1'
        ];
+       
+       // Add watermark if enabled
+       const watermarkFilter = generateWatermarkFilter(settings.watermark);
+       if (watermarkFilter) {
+           command.push('-vf', watermarkFilter);
+       }
+       
+       command.push(outputPath);
        
        console.log('Image conversion command:', command);
        
@@ -1654,7 +1799,7 @@ async function convertImage(inputPath, outputPath, settings) {
 
 async function convertVideo(inputPath, outputPath, settings) {
     return new Promise((resolve, reject) => {
-        const command = [
+        let command = [
             '-y',
             '-i', inputPath,
             '-c:v', 'libx264',
@@ -1663,6 +1808,12 @@ async function convertVideo(inputPath, outputPath, settings) {
             '-movflags', '+faststart',
             '-map_metadata', '-1'
         ];
+        
+        // Add watermark if enabled
+        const watermarkFilter = generateWatermarkFilter(settings.watermark);
+        if (watermarkFilter) {
+            command.push('-vf', watermarkFilter);
+        }
         
         if (settings.removeAudio) {
             command.push('-an');
@@ -1703,6 +1854,18 @@ function getProcessingSettings() {
        settings.duplicates = settings.mode === 'convert-only' ? 1 : parseInt(document.getElementById('imageDuplicates').value);
        settings.imageFormat = document.getElementById('imageFormat').value;
        settings.namingPattern = document.getElementById('imageNamingPattern').value;
+       
+       // Watermark settings for images
+       settings.watermark = {
+           enabled: document.getElementById('imageWatermarkEnabled').checked,
+           text: document.getElementById('imageWatermarkText').value,
+           font: document.getElementById('imageWatermarkFont').value,
+           size: parseInt(document.getElementById('imageWatermarkSize').value),
+           position: document.getElementById('imageWatermarkPosition').value,
+           rotation: parseInt(document.getElementById('imageWatermarkRotation').value),
+           color: document.getElementById('imageWatermarkColor').value,
+           opacity: parseInt(document.getElementById('imageWatermarkOpacity').value)
+       };
    } else if (currentMode === 'video') {
        settings.mode = document.getElementById('videoProcessingMode').value;
        settings.intensity = document.getElementById('videoIntensity').value;
@@ -1711,6 +1874,18 @@ function getProcessingSettings() {
        settings.removeAudio = document.getElementById('removeAudio').checked;
        settings.clipLength = document.getElementById('clipLength').value;
        settings.namingPattern = document.getElementById('videoNamingPattern').value;
+       
+       // Watermark settings for videos
+       settings.watermark = {
+           enabled: document.getElementById('videoWatermarkEnabled').checked,
+           text: document.getElementById('videoWatermarkText').value,
+           font: document.getElementById('videoWatermarkFont').value,
+           size: parseInt(document.getElementById('videoWatermarkSize').value),
+           position: document.getElementById('videoWatermarkPosition').value,
+           rotation: parseInt(document.getElementById('videoWatermarkRotation').value),
+           color: document.getElementById('videoWatermarkColor').value,
+           opacity: parseInt(document.getElementById('videoWatermarkOpacity').value)
+       };
    }
    
    return settings;
