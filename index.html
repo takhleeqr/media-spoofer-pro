@@ -799,6 +799,17 @@
                         </button>
                     </div>
                     
+                    <!-- Preview Section -->
+                    <div class="section" id="imagePreviewSection" style="display: none;">
+                        <h3>👁️ Preview</h3>
+                        <div class="preview-container" style="display: flex; justify-content: center; align-items: center; margin: 20px 0;">
+                            <div class="preview-wrapper" style="position: relative; width: 320px; height: 480px; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.2);">
+                                <img id="image-preview" style="display: none; width: 100%; height: 100%; object-fit: contain;" />
+                                <div id="image-text-watermark" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="file-list" id="imageFileList">
                         <div class="empty-state">No images selected</div>
                     </div>
@@ -912,11 +923,7 @@
                                 </select>
                             </div>
                             
-                            <div class="setting-item">
-                                <label>Rotation (degrees)</label>
-                                <input type="range" id="imageWatermarkRotation" min="-180" max="180" value="0" class="slider">
-                                <span id="imageWatermarkRotationValue">0°</span>
-                            </div>
+
                             
                             <div class="setting-item">
                                 <label>Color</label>
@@ -967,6 +974,17 @@
                         <button class="btn btn-secondary" id="clearVideoBtn">
                             🗑️ Clear All
                         </button>
+                    </div>
+                    
+                    <!-- Preview Section -->
+                    <div class="section" id="videoPreviewSection" style="display: none;">
+                        <h3>👁️ Preview</h3>
+                        <div class="preview-container" style="display: flex; justify-content: center; align-items: center; margin: 20px 0;">
+                            <div class="preview-wrapper" style="position: relative; width: 320px; height: 480px; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.2);">
+                                <video id="video-preview" style="display: none; width: 100%; height: 100%; object-fit: contain;" controls></video>
+                                <div id="video-text-watermark" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;"></div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="file-list" id="videoFileList">
@@ -1105,11 +1123,7 @@
                                </select>
                            </div>
                            
-                           <div class="setting-item">
-                               <label>Rotation (degrees)</label>
-                               <input type="range" id="videoWatermarkRotation" min="-180" max="180" value="0" class="slider">
-                               <span id="videoWatermarkRotationValue">0°</span>
-                           </div>
+
                            
                            <div class="setting-item">
                                <label>Color</label>

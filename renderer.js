@@ -670,10 +670,14 @@ function setupWatermarkUI(mode) {
     const watermarkSettings = document.getElementById(`${prefix}WatermarkSettings`);
     const watermarkSize = document.getElementById(`${prefix}WatermarkSize`);
     const watermarkSizeValue = document.getElementById(`${prefix}WatermarkSizeValue`);
-    const watermarkRotation = document.getElementById(`${prefix}WatermarkRotation`);
-    const watermarkRotationValue = document.getElementById(`${prefix}WatermarkRotationValue`);
     const watermarkOpacity = document.getElementById(`${prefix}WatermarkOpacity`);
     const watermarkOpacityValue = document.getElementById(`${prefix}WatermarkOpacityValue`);
+    const watermarkText = document.getElementById(`${prefix}WatermarkText`);
+    const watermarkColor = document.getElementById(`${prefix}WatermarkColor`);
+    const watermarkPosition = document.getElementById(`${prefix}WatermarkPosition`);
+    const watermarkFont = document.getElementById(`${prefix}WatermarkFont`);
+    
+
     
     // Toggle watermark settings visibility
     if (watermarkEnabled) {
@@ -681,6 +685,7 @@ function setupWatermarkUI(mode) {
             if (watermarkSettings) {
                 watermarkSettings.style.display = watermarkEnabled.checked ? 'block' : 'none';
             }
+            updatePreviewWatermark(mode);
         });
     }
     
@@ -688,20 +693,45 @@ function setupWatermarkUI(mode) {
     if (watermarkSize && watermarkSizeValue) {
         watermarkSize.addEventListener('input', () => {
             watermarkSizeValue.textContent = `${watermarkSize.value}%`;
+            updatePreviewWatermark(mode);
         });
     }
     
-    // Update rotation value display
-    if (watermarkRotation && watermarkRotationValue) {
-        watermarkRotation.addEventListener('input', () => {
-            watermarkRotationValue.textContent = `${watermarkRotation.value}°`;
-        });
-    }
+
     
     // Update opacity value display
     if (watermarkOpacity && watermarkOpacityValue) {
         watermarkOpacity.addEventListener('input', () => {
             watermarkOpacityValue.textContent = `${watermarkOpacity.value}%`;
+            updatePreviewWatermark(mode);
+        });
+    }
+    
+    // Update text watermark
+    if (watermarkText) {
+        watermarkText.addEventListener('input', () => {
+            updatePreviewWatermark(mode);
+        });
+    }
+    
+    // Update color watermark
+    if (watermarkColor) {
+        watermarkColor.addEventListener('input', () => {
+            updatePreviewWatermark(mode);
+        });
+    }
+    
+    // Update position watermark
+    if (watermarkPosition) {
+        watermarkPosition.addEventListener('change', () => {
+            updatePreviewWatermark(mode);
+        });
+    }
+    
+    // Update font watermark
+    if (watermarkFont) {
+        watermarkFont.addEventListener('change', () => {
+            updatePreviewWatermark(mode);
         });
     }
 }
@@ -892,6 +922,10 @@ async function addFiles(filePaths, mode) {
     updateFileList();
     updateStats();
     updateButtons();
+    // Show preview for the first file
+    if (selectedFiles.length > 0) {
+        showPreview(selectedFiles[0].path, currentMode);
+    }
 }
 
 function getFileType(extension) {
@@ -1432,6 +1466,8 @@ function generateWatermarkFilter(watermarkSettings) {
         text, font, size, position, rotation, color, opacity
     } = watermarkSettings;
     
+
+    
     // Escape special characters in text
     const escapedText = text.replace(/'/g, "\\'").replace(/:/g, "\\:");
     
@@ -1448,8 +1484,9 @@ function generateWatermarkFilter(watermarkSettings) {
     const rgb = hexToRgb(color);
     const colorString = `0x${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
     
-    // Calculate font size based on percentage
-    const fontSize = Math.max(12, Math.floor(size * 2)); // Convert percentage to reasonable font size
+    // Calculate font size to match preview exactly
+    // Use the same calculation as the preview: size * 1.2
+    const fontSize = Math.max(12, Math.floor(size * 1.2));
     
     // Position mapping
     const positionMap = {
@@ -1470,13 +1507,10 @@ function generateWatermarkFilter(watermarkSettings) {
     // Build the drawtext filter
     const filter = `drawtext=text='${escapedText}':fontsize=${fontSize}:fontcolor=${colorString}:alpha=${opacityDecimal}:${positionString}`;
     
-    // Add rotation if not 0
-    if (rotation !== 0) {
-        return `${filter}:rotation=${rotation}*PI/180`;
-    }
-    
     return filter;
 }
+
+
 
 async function processImageSpoof(inputPath, outputPath, effects, settings, updateProgress) {
     if (!effects) {
@@ -1494,11 +1528,12 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
         
         // Add watermark if enabled
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
+        let command;
+        
         if (watermarkFilter) {
             filterComplex += `,${watermarkFilter}`;
         }
-        
-        const command = [
+        command = [
             '-y',
             '-i', inputPath,
             '-vf', filterComplex,
@@ -1541,11 +1576,12 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
         
         // Add watermark if enabled
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
+        let command;
+        
         if (watermarkFilter) {
             filterComplex += `,${watermarkFilter}`;
         }
-        
-        const command = [
+        command = [
             '-y',
             '-i', inputPath,
             '-vf', filterComplex,
@@ -1670,10 +1706,10 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
             
             // Add watermark if enabled
             const watermarkFilter = generateWatermarkFilter(settings.watermark);
+            
             if (watermarkFilter) {
                 filterComplex += `,${watermarkFilter}`;
             }
-            
             command = [
                 '-y',
                 '-ss', clip.start.toString(),
@@ -1771,9 +1807,9 @@ async function convertImage(inputPath, outputPath, settings) {
        
        // Add watermark if enabled
        const watermarkFilter = generateWatermarkFilter(settings.watermark);
-       if (watermarkFilter) {
-           command.push('-vf', watermarkFilter);
-       }
+               if (watermarkFilter) {
+            command.push('-vf', watermarkFilter);
+        }
        
        command.push(outputPath);
        
@@ -1859,7 +1895,7 @@ function getProcessingSettings() {
            font: document.getElementById('imageWatermarkFont').value,
            size: parseInt(document.getElementById('imageWatermarkSize').value),
            position: document.getElementById('imageWatermarkPosition').value,
-           rotation: parseInt(document.getElementById('imageWatermarkRotation').value),
+   
            color: document.getElementById('imageWatermarkColor').value,
            opacity: parseInt(document.getElementById('imageWatermarkOpacity').value)
        };
@@ -1879,7 +1915,7 @@ function getProcessingSettings() {
            font: document.getElementById('videoWatermarkFont').value,
            size: parseInt(document.getElementById('videoWatermarkSize').value),
            position: document.getElementById('videoWatermarkPosition').value,
-           rotation: parseInt(document.getElementById('videoWatermarkRotation').value),
+   
            color: document.getElementById('videoWatermarkColor').value,
            opacity: parseInt(document.getElementById('videoWatermarkOpacity').value)
        };
@@ -2230,11 +2266,163 @@ async function selectFolder(mode) {
             
             if (filteredFiles.length > 0) {
                 await addFiles(filteredFiles, mode);
+                // Show preview for the first file
+                showPreview(filteredFiles[0], mode);
             } else {
                 addStatusMessage(`No ${mode} files found in selected folder`, 'warning');
             }
         }
     } catch (error) {
         addStatusMessage('Error selecting folder: ' + error.message, 'error');
+    }
+}
+
+// Platform detection for watermark rotation controls
+const isMac = navigator.platform.toLowerCase().includes('mac');
+const isWindows = navigator.platform.toLowerCase().includes('win');
+
+// Enhanced macOS font compatibility
+const getSystemFont = () => {
+    if (isMac) {
+        // Use macOS system fonts that are guaranteed to be available
+        return '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    }
+    return 'Arial, sans-serif';
+};
+
+// Preview logic
+function showPreview(filePath, mode) {
+    const previewSection = document.getElementById(`${mode}PreviewSection`);
+    const previewElement = document.getElementById(`${mode}-preview`);
+    const textWatermark = document.getElementById(`${mode}-text-watermark`);
+    
+    if (!previewSection || !previewElement || !textWatermark) {
+        console.warn('Preview elements not found');
+        return;
+    }
+    
+    const ext = filePath.split('.').pop().toLowerCase();
+    const isImage = ["jpg", "jpeg", "png", "heic", "webp"].includes(ext);
+    const isVideo = ["mp4", "mov", "avi", "webm", "mkv"].includes(ext);
+    
+    if (isImage || isVideo) {
+        previewElement.src = filePath;
+        previewElement.style.display = 'block';
+        previewSection.style.display = 'block';
+        
+        // Update watermark in preview
+        updatePreviewWatermark(mode);
+    } else {
+        previewSection.style.display = 'none';
+    }
+}
+
+// Update watermark in preview based on settings
+function updatePreviewWatermark(mode) {
+    const textWatermark = document.getElementById(`${mode}-text-watermark`);
+    const watermarkEnabled = document.getElementById(`${mode}WatermarkEnabled`);
+    const watermarkText = document.getElementById(`${mode}WatermarkText`);
+    const watermarkOpacity = document.getElementById(`${mode}WatermarkOpacity`);
+    const watermarkColor = document.getElementById(`${mode}WatermarkColor`);
+    const watermarkSize = document.getElementById(`${mode}WatermarkSize`);
+    const watermarkPosition = document.getElementById(`${mode}WatermarkPosition`);
+    const watermarkFont = document.getElementById(`${mode}WatermarkFont`);
+    
+    if (!textWatermark || !watermarkEnabled || !watermarkText) {
+        return;
+    }
+    
+    if (watermarkEnabled.checked && watermarkText.value.trim()) {
+        textWatermark.textContent = watermarkText.value;
+        textWatermark.style.display = 'block';
+        
+        // Apply opacity
+        const opacity = watermarkOpacity ? watermarkOpacity.value : 80;
+        textWatermark.style.opacity = opacity / 100;
+        
+        // Apply color
+        const color = watermarkColor ? watermarkColor.value : '#ffffff';
+        textWatermark.style.color = color;
+        
+        // Apply font with enhanced macOS compatibility
+        const font = watermarkFont ? watermarkFont.value : getSystemFont();
+        textWatermark.style.fontFamily = font;
+        
+        // Apply size
+        const size = watermarkSize ? watermarkSize.value : 15;
+        const fontSize = Math.max(12, Math.floor(size * 1.2)); // Convert percentage to font size
+        textWatermark.style.fontSize = `${fontSize}px`;
+        
+        // Apply position
+        const position = watermarkPosition ? watermarkPosition.value : 'center';
+        applyWatermarkPosition(textWatermark, position);
+        
+
+    } else {
+        textWatermark.style.display = 'none';
+    }
+}
+
+// Apply watermark position based on selected position
+function applyWatermarkPosition(textWatermark, position) {
+    // Reset any existing positioning
+    textWatermark.style.top = '';
+    textWatermark.style.bottom = '';
+    textWatermark.style.left = '';
+    textWatermark.style.right = '';
+    textWatermark.style.transform = '';
+    
+    switch (position) {
+        case 'top-left':
+            textWatermark.style.top = '10px';
+            textWatermark.style.left = '10px';
+            textWatermark.style.transform = 'none';
+            break;
+        case 'top-center':
+            textWatermark.style.top = '10px';
+            textWatermark.style.left = '50%';
+            textWatermark.style.transform = 'translateX(-50%)';
+            break;
+        case 'top-right':
+            textWatermark.style.top = '10px';
+            textWatermark.style.right = '10px';
+            textWatermark.style.transform = 'none';
+            break;
+        case 'middle-left':
+            textWatermark.style.top = '50%';
+            textWatermark.style.left = '10px';
+            textWatermark.style.transform = 'translateY(-50%)';
+            break;
+        case 'center':
+            textWatermark.style.top = '50%';
+            textWatermark.style.left = '50%';
+            textWatermark.style.transform = 'translate(-50%, -50%)';
+            break;
+        case 'middle-right':
+            textWatermark.style.top = '50%';
+            textWatermark.style.right = '10px';
+            textWatermark.style.transform = 'translateY(-50%)';
+            break;
+        case 'bottom-left':
+            textWatermark.style.bottom = '10px';
+            textWatermark.style.left = '10px';
+            textWatermark.style.transform = 'none';
+            break;
+        case 'bottom-center':
+            textWatermark.style.bottom = '10px';
+            textWatermark.style.left = '50%';
+            textWatermark.style.transform = 'translateX(-50%)';
+            break;
+        case 'bottom-right':
+            textWatermark.style.bottom = '10px';
+            textWatermark.style.right = '10px';
+            textWatermark.style.transform = 'none';
+            break;
+        default:
+            // Default to center
+            textWatermark.style.top = '50%';
+            textWatermark.style.left = '50%';
+            textWatermark.style.transform = 'translate(-50%, -50%)';
+            break;
     }
 }
