@@ -59,10 +59,21 @@ const path = {
         // Handle both forward slashes and backslashes
         const lastSlash = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\'));
         const lastDot = filepath.lastIndexOf('.');
+        
+        // Ensure we're getting the actual file extension (last dot in the filename part)
+        let filename = lastSlash >= 0 ? filepath.substring(lastSlash + 1) : filepath;
+        let extension = '';
+        let name = filename;
+        
+        if (lastDot > lastSlash) {
+            extension = filepath.substring(lastDot);
+            name = filepath.substring(lastSlash + 1, lastDot);
+        }
+        
         return {
-            name: lastSlash >= 0 ? filepath.substring(lastSlash + 1, lastDot >= 0 ? lastDot : undefined) : filepath,
-            ext: lastDot >= 0 ? filepath.substring(lastDot) : '',
-            extension: lastDot >= 0 ? filepath.substring(lastDot + 1) : ''
+            name: name,
+            ext: extension,
+            extension: extension.substring(1) // Remove the dot
         };
     },
     dirname: (filepath) => {
@@ -111,16 +122,14 @@ async function spawnFFmpeg(command) {
     } catch (error) {
         console.error('FFmpeg process failed:', error);
         
-        // Additional debugging for macOS
+        // Enhanced debugging for all platforms
         const platform = await electronAPI.getPlatform();
-        if (platform === 'darwin') {
-            console.error('macOS FFmpeg error details:', {
-                ffmpegPath,
-                command,
-                errorMessage: error.message,
-                errorStack: error.stack
-            });
-        }
+        console.error(`${platform} FFmpeg error details:`, {
+            ffmpegPath,
+            command,
+            errorMessage: error.message,
+            errorStack: error.stack
+        });
         
         throw new Error(`FFmpeg process failed: ${error.message}`);
     }
@@ -161,8 +170,8 @@ async function initializeFFmpegPaths() {
     if (isDev) {
         // Development: look in app folder
         if (platform === 'win32') {
-            ffmpegPath = appPath + '/ffmpeg.exe';
-            ffprobePath = appPath + '/ffprobe.exe';
+            ffmpegPath = appPath + '\\ffmpeg.exe';
+            ffprobePath = appPath + '\\ffprobe.exe';
         } else {
             ffmpegPath = appPath + '/ffmpeg';
             ffprobePath = appPath + '/ffprobe';
@@ -173,8 +182,8 @@ async function initializeFFmpegPaths() {
             // For Windows production, the appPath points to the app.asar file
             // We need to go up one level to the app directory, then into resources
             const appDir = appPath.replace('/app.asar', '').replace('\\app.asar', '');
-            ffmpegPath = appDir + '/resources/ffmpeg.exe';
-            ffprobePath = appDir + '/resources/ffprobe.exe';
+            ffmpegPath = appDir + '\\resources\\ffmpeg.exe';
+            ffprobePath = appDir + '\\resources\\ffprobe.exe';
         } else {
             // For macOS production, the appPath points to the app bundle
             // We need to go into Contents/Resources
@@ -638,8 +647,18 @@ function setupVideoInterface() {
                 videoIntensityGroup.style.display = 'block';
                 videoDuplicatesGroup.style.display = 'block';
                 clipLengthGroup.style.display = 'none';
+            } else if (mode === 'split-only') {
+                // Hide intensity for split-only mode, but show duplicates
+                videoIntensityGroup.style.display = 'none';
+                videoDuplicatesGroup.style.display = 'block';
+                clipLengthGroup.style.display = 'block';
+            } else if (mode === 'split-and-spoof') {
+                // Show all settings for split-and-spoof mode
+                videoIntensityGroup.style.display = 'block';
+                videoDuplicatesGroup.style.display = 'block';
+                clipLengthGroup.style.display = 'block';
             } else {
-                // Show all settings for split modes
+                // Show all settings for spoof-split mode
                 videoIntensityGroup.style.display = 'block';
                 videoDuplicatesGroup.style.display = 'block';
                 clipLengthGroup.style.display = 'block';
@@ -807,11 +826,11 @@ async function selectFiles(mode) {
         // Set file filters based on mode
         const filters = mode === 'image' 
             ? [
-                { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'heic', 'webp'] },
+                { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'heic', 'webp', 'bmp', 'gif', 'tiff', 'tif', 'svg', 'ico', 'jfif', 'avif', 'jxl', 'raw', 'cr2', 'nef', 'arw', 'dng'] },
                 { name: 'All Files', extensions: ['*'] }
               ]
             : [
-                { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'webm'] },
+                { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'webm', 'ts', 'mkv', 'flv', 'wmv', 'm4v', '3gp', 'ogv', 'mts', 'm2ts', 'vob', 'asf', 'rm', 'rmvb', 'divx', 'xvid', 'mpg', 'mpeg', 'mxf', 'f4v'] },
                 { name: 'All Files', extensions: ['*'] }
               ];
         
@@ -865,19 +884,19 @@ async function addFiles(filePaths, mode) {
     
     console.log('Processing', validFilePaths.length, 'valid files');
     
-    // Convert file paths to file objects if they're just strings
-    const fileObjects = await Promise.all(validFilePaths.map(async (filePath) => {
-        console.log('Processing file path:', filePath);
-        
-        // Normalize the path
-        const normalizedPath = normalizePath(filePath);
-        
-        // Use cross-platform helper functions
-        const fileName = extractFileName(normalizedPath);
-        const fileExtension = extractFileExtension(normalizedPath);
-        
-        console.log('Extracted filename:', fileName);
-        console.log('Extracted extension:', fileExtension);
+            // Convert file paths to file objects if they're just strings
+        const fileObjects = await Promise.all(validFilePaths.map(async (filePath) => {
+            console.log('Processing file path:', filePath);
+            
+            // Normalize the path
+            const normalizedPath = normalizePath(filePath);
+            
+            // Use cross-platform helper functions
+            const fileName = extractFileName(normalizedPath);
+            const fileExtension = extractFileExtension(normalizedPath);
+            
+            console.log('Extracted filename:', fileName);
+            console.log('Extracted extension:', fileExtension);
         
         // Try to get file size
         let fileSize = 0;
@@ -890,7 +909,17 @@ async function addFiles(filePaths, mode) {
         }
         
         // Force file type based on mode to prevent misclassification
-        const fileType = mode === 'image' ? 'image' : getFileType(fileExtension);
+        let fileType = mode === 'image' ? 'image' : getFileType(fileExtension);
+        
+        // Special handling for files that might have incorrect extensions
+        if (fileType === 'unknown' && mode === 'video') {
+            // Check if the original filename contains video extensions
+            const originalName = filePath.toLowerCase();
+            if (originalName.includes('.ts') || originalName.includes('.mp4') || originalName.includes('.mov') || 
+                originalName.includes('.avi') || originalName.includes('.mkv') || originalName.includes('.webm')) {
+                fileType = 'video';
+            }
+        }
         
         // DEBUG: Log file type detection for macOS
         console.log('[DEBUG addFiles] File type detection:', {
@@ -929,8 +958,31 @@ async function addFiles(filePaths, mode) {
 }
 
 function getFileType(extension) {
-    const imageExts = ['.jpg', '.jpeg', '.png', '.heic', '.webp'];
-    const videoExts = ['.mp4', '.mov', '.avi', '.webm'];
+    const imageExts = [
+        '.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.gif', '.tiff', '.tif', 
+        '.svg', '.ico', '.jfif', '.pjpeg', '.pjp', '.avif', '.jxl', '.raw', '.cr2', 
+        '.nef', '.arw', '.dng', '.orf', '.rw2', '.pef', '.srw', '.raf', '.mrw', 
+        '.kdc', '.dcr', '.x3f', '.mef', '.iiq', '.3fr', '.erf', '.mdc', '.mos', 
+        '.mrw', '.nrw', '.rwz', '.srw', '.arw', '.bay', '.crw', '.cs1', '.dc2', 
+        '.dcr', '.dng', '.erf', '.fff', '.hdr', '.k25', '.kdc', '.mdc', '.mos', 
+        '.mrw', '.nef', '.nrw', '.orf', '.pef', '.raf', '.raw', '.rw2', '.rwl', 
+        '.rwz', '.srw', '.srf', '.sr2', '.x3f'
+    ];
+    const videoExts = [
+        '.mp4', '.mov', '.avi', '.webm', '.ts', '.TS', '.mkv', '.flv', '.wmv', 
+        '.m4v', '.3gp', '.ogv', '.mts', '.m2ts', '.vob', '.asf', '.rm', '.rmvb', 
+        '.divx', '.xvid', '.mpg', '.mpeg', '.mpe', '.m1v', '.m2v', '.mpv', '.mpv2', 
+        '.m2p', '.m2t', '.m2ts', '.mts', '.ts', '.TS', '.mxf', '.f4v', '.f4p', 
+        '.f4a', '.f4b', '.ogx', '.ogm', '.ogv', '.oga', '.spx', '.opus', '.webm', 
+        '.m4a', '.m4b', '.m4p', '.m4r', '.m4v', '.3g2', '.3gp', '.3gp2', '.3gpp', 
+        '.3gpp2', '.amc', '.amv', '.asf', '.asx', '.avi', '.bik', '.bin', '.divx', 
+        '.drc', '.dv', '.dvr-ms', '.evo', '.fli', '.flv', '.hdmov', '.ifo', '.ivf', 
+        '.m1v', '.m2t', '.m2ts', '.m2v', '.m4v', '.mkv', '.mod', '.mov', '.mp4', 
+        '.mpe', '.mpeg', '.mpg', '.mpl', '.mpls', '.mpv', '.mpv2', '.mts', '.mxf', 
+        '.nsv', '.nuv', '.ogg', '.ogm', '.ogv', '.ogx', '.ps', '.rec', '.rm', '.rmvb', 
+        '.rpl', '.smil', '.smk', '.swf', '.tivo', '.tod', '.tp', '.trp', '.ts', '.TS', 
+        '.vob', '.vp6', '.vro', '.webm', '.wm', '.wmv', '.wtv', '.xvid'
+    ];
     
     if (imageExts.includes(extension)) return 'image';
     if (videoExts.includes(extension)) return 'video';
@@ -1393,7 +1445,38 @@ async function processSpoofAndSplit(file, outputDir, settings, updateProgress) {
 
 async function processSplitOnly(file, outputDir, settings, updateProgress) {
     if (file.type === 'video') {
-        await processVideoSplit(file, outputDir, settings, false, updateProgress);
+        const duration = await getVideoDuration(file.path);
+        
+        if (duration > 10) {
+            // Split video into clips
+            await processVideoSplit(file, outputDir, settings, false, updateProgress);
+        } else {
+            // For videos under 10 seconds
+            const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1);
+            if (settings.removeAudio) {
+                // Remove audio using convertVideo
+                await convertVideo(file.path, outputPath, settings);
+            } else {
+                // Just copy without splitting
+                await electronAPI.copyFile(file.path, outputPath);
+            }
+            outputCount++;
+            updateProgress(100);
+        }
+    }
+}
+
+async function processSplitAndSpoof(file, outputDir, settings, updateProgress) {
+    if (file.type === 'video') {
+        const duration = await getVideoDuration(file.path);
+        
+        if (duration > 10) {
+            // Split video first, then spoof each clip
+            await processVideoSplit(file, outputDir, settings, true, updateProgress);
+        } else {
+            // Just spoof the video without splitting
+            await processSpoof(file, outputDir, settings, updateProgress);
+        }
     }
 }
 
@@ -1415,11 +1498,14 @@ async function processConvert(file, outputDir, settings, updateProgress) {
 // FFmpeg helper functions
 async function getVideoDuration(videoPath) {
     try {
+        // Ensure proper path handling for Windows
+        const normalizedPath = path.normalize(videoPath);
+        
         const command = [
             '-v', 'quiet',
             '-show_entries', 'format=duration',
             '-of', 'default=noprint_wrappers=1:nokey=1',
-            videoPath
+            normalizedPath
         ];
         
         const result = await electronAPI.spawnProcess(ffprobePath, command);
@@ -1428,9 +1514,11 @@ async function getVideoDuration(videoPath) {
             const duration = parseFloat(result.stdout.trim());
             return duration || 90;
         } else {
+            console.warn('FFprobe failed, using default duration:', result.stderr);
             return 90; // Default fallback
         }
     } catch (error) {
+        console.error('Error getting video duration:', error);
         return 90; // Default fallback
     }
 }
@@ -1568,6 +1656,10 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
     updateProgress(50);
     
     return new Promise((resolve, reject) => {
+        // Ensure proper path handling for Windows
+        const normalizedInputPath = path.normalize(inputPath);
+        const normalizedOutputPath = path.normalize(outputPath);
+        
         const brightnessDecimal = effects.brightness / 100;
         const contrastDecimal = effects.contrast / 100;
         const saturationDecimal = effects.saturation / 100;
@@ -1583,7 +1675,7 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
         }
         command = [
             '-y',
-            '-i', inputPath,
+            '-i', normalizedInputPath,
             '-vf', filterComplex,
             '-c:v', 'libx264',
             '-preset', 'fast',
@@ -1596,7 +1688,9 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
             command.push('-c:a', 'aac', '-b:a', '128k');
         }
         
-        command.push(outputPath);
+        command.push(normalizedOutputPath);
+        
+        console.log('Processing video spoof:', { input: normalizedInputPath, output: normalizedOutputPath });
         
         // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
@@ -1619,36 +1713,25 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
 
 async function processVideoSplit(file, outputDir, settings, applySpoof = false, updateProgress) {
    const duration = await getVideoDuration(file.path);
-   
-   if (duration <= 10) {
-       // Video is short enough, just process normally
-       if (applySpoof) {
-           await processSpoof(file, outputDir, settings, updateProgress);
-       } else {
-           const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1);
-           await electronAPI.copyFile(file.path, outputPath);
-           outputCount++;
-           updateProgress(100);
-       }
-       return;
-   }
+   console.log('Video splitting:', { filePath: file.path, duration, applySpoof, settings });
+   addStatusMessage(`Processing video: ${duration.toFixed(2)} seconds total`, 'info');
    
    // Determine clip length based on settings
    const clipLengthSetting = settings.clipLength || '6-8';
-   let getClipLength;
+   let clipLength;
    
    switch (clipLengthSetting) {
        case '8':
-           getClipLength = () => 8;
+           clipLength = 8;
            break;
        case '10':
-           getClipLength = () => 10;
+           clipLength = 10;
            break;
        case '15':
-           getClipLength = () => 15;
+           clipLength = 15;
            break;
        default: // '6-8'
-           getClipLength = () => 6 + Math.random() * 2;
+           clipLength = 6 + Math.random() * 2;
    }
    
    // Split video into clips
@@ -1657,7 +1740,6 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
    let clipNumber = 1;
    
    while (startTime < duration) {
-       const clipLength = getClipLength();
        const endTime = Math.min(startTime + clipLength, duration);
        
        if (endTime - startTime < 3) break; // Skip very short clips
@@ -1670,6 +1752,9 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
        
        startTime = endTime;
    }
+   
+   console.log('Clips created:', clips.length, clips);
+   addStatusMessage(`Created ${clips.length} clips: ${clips.map(c => `${c.duration.toFixed(1)}s`).join(', ')}`, 'info');
    
            // Process each clip
         for (let i = 0; i < clips.length; i++) {
@@ -1684,7 +1769,7 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
                 const effects = generateSpoofEffects(settings.intensity);
                 await processVideoClipWithEffects(file.path, clipPath, clip, effects, settings);
             } else {
-                await extractVideoClip(file.path, clipPath, clip);
+                await extractVideoClip(file.path, clipPath, clip, settings);
             }
             
             outputCount++;
@@ -1695,6 +1780,10 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
 
 async function processVideoClipWithEffects(inputPath, outputPath, clip, effects, settings) {
     return new Promise((resolve, reject) => {
+        // Ensure proper path handling for Windows
+        const normalizedInputPath = path.normalize(inputPath);
+        const normalizedOutputPath = path.normalize(outputPath);
+        
         let command;
         
         if (effects) {
@@ -1713,7 +1802,7 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
             command = [
                 '-y',
                 '-ss', clip.start.toString(),
-                '-i', inputPath,
+                '-i', normalizedInputPath,
                 '-t', clip.duration.toString(),
                 '-vf', filterComplex,
                 '-c:v', 'libx264',
@@ -1727,7 +1816,7 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                 command = [
                     '-y',
                     '-ss', clip.start.toString(),
-                    '-i', inputPath,
+                    '-i', normalizedInputPath,
                     '-t', clip.duration.toString(),
                     '-vf', watermarkFilter,
                     '-c:v', 'libx264',
@@ -1738,7 +1827,7 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                 command = [
                     '-y',
                     '-ss', clip.start.toString(),
-                    '-i', inputPath,
+                    '-i', normalizedInputPath,
                     '-t', clip.duration.toString(),
                     '-c', 'copy',
                     '-map_metadata', '-1'
@@ -1752,7 +1841,9 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
             command.push('-c:a', 'aac', '-b:a', '128k');
         }
         
-        command.push(outputPath);
+        command.push(normalizedOutputPath);
+        
+        console.log('Processing video clip with effects:', { input: normalizedInputPath, output: normalizedOutputPath, clip });
         
         // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
@@ -1769,17 +1860,31 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
     });
 }
 
-async function extractVideoClip(inputPath, outputPath, clip) {
+async function extractVideoClip(inputPath, outputPath, clip, settings = {}) {
    return new Promise((resolve, reject) => {
+       // Ensure proper path handling for Windows
+       const normalizedInputPath = path.normalize(inputPath);
+       const normalizedOutputPath = path.normalize(outputPath);
+       
        const command = [
            '-y',
            '-ss', clip.start.toString(),
-           '-i', inputPath,
+           '-i', normalizedInputPath,
            '-t', clip.duration.toString(),
-           '-c', 'copy',
-           '-map_metadata', '-1',
-           outputPath
+           '-map_metadata', '-1'
        ];
+       
+               // Handle removeAudio setting
+        if (settings.removeAudio) {
+            command.push('-c:v', 'copy', '-an'); // Copy video, remove audio
+        } else {
+            command.push('-c', 'copy'); // Copy all streams
+        }
+        
+        command.push(normalizedOutputPath);
+        
+        console.log('Extracting video clip:', { input: normalizedInputPath, output: normalizedOutputPath, clip });
+       addStatusMessage(`Extracting clip ${clip.number}: ${clip.start.toFixed(1)}s to ${(clip.start + clip.duration).toFixed(1)}s (${clip.duration.toFixed(1)}s duration)`, 'info');
        
        // Use secure FFmpeg spawning
        spawnFFmpeg(command).then(result => {
@@ -1832,9 +1937,13 @@ async function convertImage(inputPath, outputPath, settings) {
 
 async function convertVideo(inputPath, outputPath, settings) {
     return new Promise((resolve, reject) => {
+        // Ensure proper path handling for Windows
+        const normalizedInputPath = path.normalize(inputPath);
+        const normalizedOutputPath = path.normalize(outputPath);
+        
         let command = [
             '-y',
-            '-i', inputPath,
+            '-i', normalizedInputPath,
             '-c:v', 'libx264',
             '-preset', 'fast',
             '-crf', '23',
@@ -1854,7 +1963,9 @@ async function convertVideo(inputPath, outputPath, settings) {
             command.push('-c:a', 'aac', '-b:a', '128k');
         }
         
-        command.push(outputPath);
+        command.push(normalizedOutputPath);
+        
+        console.log('Converting video:', { input: normalizedInputPath, output: normalizedOutputPath });
         
         // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
@@ -2153,6 +2264,17 @@ async function processFileInBatch(file, batchDir, batch, index, settings) {
                 outputCount++;
             }
             break;
+        case 'split-and-spoof':
+            if (file.type === 'video') {
+                await processSplitAndSpoof(file, batchDir, settings, (percent) => {
+                    file.progress = percent;
+                    updateFileList();
+                });
+            } else {
+                await electronAPI.copyFile(file.path, outputPath);
+                outputCount++;
+            }
+            break;
         case 'convert-only':
             await processConvert(file, batchDir, settings, (percent) => {
                 file.progress = percent;
@@ -2258,9 +2380,9 @@ async function selectFolder(mode) {
             const filteredFiles = files.filter(file => {
                 const ext = path.parse(file).extension.toLowerCase();
                 if (mode === 'image') {
-                    return ['.jpg', '.jpeg', '.png', '.heic', '.webp'].includes(ext);
+                    return ['.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.gif', '.tiff', '.tif', '.svg', '.ico', '.jfif', '.avif', '.jxl', '.raw', '.cr2', '.nef', '.arw', '.dng'].includes(ext);
                 } else {
-                    return ['.mp4', '.mov', '.avi', '.webm'].includes(ext);
+                    return ['.mp4', '.mov', '.avi', '.webm', '.ts', '.mkv', '.flv', '.wmv', '.m4v', '.3gp', '.ogv', '.mts', '.m2ts', '.vob', '.asf', '.rm', '.rmvb', '.divx', '.xvid', '.mpg', '.mpeg', '.mxf', '.f4v'].includes(ext);
                 }
             });
             
@@ -2302,8 +2424,8 @@ function showPreview(filePath, mode) {
     }
     
     const ext = filePath.split('.').pop().toLowerCase();
-    const isImage = ["jpg", "jpeg", "png", "heic", "webp"].includes(ext);
-    const isVideo = ["mp4", "mov", "avi", "webm", "mkv"].includes(ext);
+    const isImage = ["jpg", "jpeg", "png", "heic", "webp", "bmp", "gif", "tiff", "tif", "svg", "ico", "jfif", "avif", "jxl", "raw", "cr2", "nef", "arw", "dng"].includes(ext);
+    const isVideo = ["mp4", "mov", "avi", "webm", "mkv", "ts", "flv", "wmv", "m4v", "3gp", "ogv", "mts", "m2ts", "vob", "asf", "rm", "rmvb", "divx", "xvid", "mpg", "mpeg", "mxf", "f4v"].includes(ext);
     
     if (isImage || isVideo) {
         previewElement.src = filePath;
