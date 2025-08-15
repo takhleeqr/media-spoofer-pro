@@ -80,27 +80,27 @@ async function setupFFmpeg() {
             for (const sourceUrl of sources) {
                 try {
                     console.log(`🔄 Trying source: ${sourceUrl}`);
-                    const ffmpegZip = 'ffmpeg-win.zip';
-                    
+            const ffmpegZip = 'ffmpeg-win.zip';
+            
                     await downloadFile(sourceUrl, ffmpegZip);
-                    
-                    // Extract and copy binaries
-                    console.log('📦 Extracting FFmpeg...');
-                    execSync(`powershell -command "Expand-Archive -Path '${ffmpegZip}' -DestinationPath 'ffmpeg-temp' -Force"`);
-                    
+            
+            // Extract and copy binaries
+            console.log('📦 Extracting FFmpeg...');
+            execSync(`powershell -command "Expand-Archive -Path '${ffmpegZip}' -DestinationPath 'ffmpeg-temp' -Force"`);
+            
                     // Find and copy binaries
                     const ffmpegExe = execSync('powershell -command "Get-ChildItem -Path \'ffmpeg-temp\' -Recurse -Name \'ffmpeg.exe\' | Select-Object -First 1"', { encoding: 'utf8' }).trim();
                     const ffprobeExe = execSync('powershell -command "Get-ChildItem -Path \'ffmpeg-temp\' -Recurse -Name \'ffprobe.exe\' | Select-Object -First 1"', { encoding: 'utf8' }).trim();
                     
                     if (ffmpegExe && ffprobeExe) {
-                        // Copy binaries to root directory
+            // Copy binaries to root directory
                         fs.copyFileSync(`ffmpeg-temp/${ffmpegExe}`, 'ffmpeg.exe');
                         fs.copyFileSync(`ffmpeg-temp/${ffprobeExe}`, 'ffprobe.exe');
-                        
-                        // Cleanup
-                        fs.rmSync('ffmpeg-temp', { recursive: true, force: true });
-                        fs.unlinkSync(ffmpegZip);
-                        
+            
+            // Cleanup
+            fs.rmSync('ffmpeg-temp', { recursive: true, force: true });
+            fs.unlinkSync(ffmpegZip);
+            
                         downloadSuccess = true;
                         break;
                     } else {
@@ -137,7 +137,7 @@ async function setupFFmpeg() {
                     // Fallback to manual download if Homebrew fails
                     await manualFFmpegDownload();
                 }
-            } else {
+        } else {
                 // For Linux, try manual download
                 await manualFFmpegDownload();
             }
@@ -172,13 +172,13 @@ async function setupFFmpeg() {
                 if (!downloadSuccess) {
                     throw new Error('All download sources failed');
                 }
-                
-                // Extract
+            
+            // Extract
                 execSync('unzip -o ffmpeg.zip');
                 fs.unlinkSync('ffmpeg.zip');
-                
+            
                 if (fs.existsSync('ffmpeg')) {
-                    fs.chmodSync('ffmpeg', '755');
+            fs.chmodSync('ffmpeg', '755');
                     console.log('✅ FFmpeg downloaded manually');
                 } else {
                     throw new Error('FFmpeg not found after download');
@@ -227,7 +227,7 @@ async function main() {
     
     console.log('\n🎉 Development environment setup complete!');
     if (!isCI) {
-        console.log('You can now run: npm start');
+    console.log('You can now run: npm start');
     }
 }
 

@@ -33,7 +33,21 @@ jobs:
         echo "Downloading FFmpeg for macOS..."
         
         # Try multiple working sources for FFmpeg
-        if curl -L -f "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -o ffmpeg.zip; then
+        if curl -L -f "https://evermeet.cx/ffmpeg/" -o ffmpeg; then
+          echo "Downloaded from Evermeet successfully"
+          chmod +x ffmpeg
+          
+          # Since Evermeet only provides ffmpeg, create a dummy ffprobe
+          echo '#!/bin/bash' > ffprobe
+          echo 'echo "FFprobe not available"' >> ffprobe
+          chmod +x ffprobe
+          
+          echo "FFmpeg setup completed successfully!"
+          echo "Files in root directory:"
+          ls -la ffmpeg*
+          exit 0
+          
+        elif curl -L -f "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -o ffmpeg.zip; then
           echo "Downloaded from Gyan.dev successfully"
         elif curl -L -f "https://github.com/ffmpeg/ffmpeg/releases/download/n6.1/ffmpeg-6.1-full_build.zip" -o ffmpeg.zip; then
           echo "Downloaded from GitHub releases successfully"

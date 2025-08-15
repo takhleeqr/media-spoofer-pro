@@ -35,7 +35,7 @@ Professional media transformation for social platforms with cross-platform suppo
    npm run setup
    ```
    This will automatically download and configure FFmpeg for your platform.
-
+   
 4. **Start development server**
    ```bash
    npm start
