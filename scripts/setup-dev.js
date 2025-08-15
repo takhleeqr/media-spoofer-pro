@@ -139,9 +139,9 @@ async function setupFFmpeg() {
             async function manualFFmpegDownload() {
                 console.log('🔄 Downloading FFmpeg from Evermeet.cx...');
                 try {
-                    // Download FFmpeg and FFprobe from Evermeet.cx
-                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffmpeg', 'ffmpeg.zip');
-                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffprobe', 'ffprobe.zip');
+                    // Download FFmpeg and FFprobe from Evermeet.cx using working URLs
+                    await downloadFile('https://evermeet.cx/ffmpeg/getrelease/zip', 'ffmpeg.zip');
+                    await downloadFile('https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip', 'ffprobe.zip');
                     
                     // Extract the binaries to temp directories
                     console.log('📦 Extracting FFmpeg to temp directory...');
@@ -158,7 +158,7 @@ async function setupFFmpeg() {
                     
                     console.log('📋 Copying files to root directory...');
                     fs.copyFileSync('ffmpeg_temp/ffmpeg', './ffmpeg');
-                    fs.copyFileSync('ffprobe_temp/ffmpeg', './ffprobe');
+                    fs.copyFileSync('ffprobe_temp/ffprobe', './ffprobe');
                     
                     console.log('🧹 Cleaning up temp directories...');
                     execSync('rm -rf ffmpeg_temp/ ffprobe_temp/');

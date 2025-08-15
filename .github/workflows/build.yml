@@ -32,16 +32,16 @@ jobs:
         # Download FFmpeg binaries that will be packaged with the app
         echo "Downloading FFmpeg for macOS..."
         
-        # Download FFmpeg and FFprobe from Evermeet.cx
+        # Download FFmpeg and FFprobe from Evermeet.cx using working URLs
         echo "Downloading FFmpeg for macOS..."
-        curl -L -f "https://evermeet.cx/ffmpeg/get/ffmpeg" -o ffmpeg.zip
+        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
         
         echo "Extracting FFmpeg to temp directory..."
         unzip -q ffmpeg.zip -d ffmpeg_temp/
         
         # Download ffprobe from Evermeet.cx
         echo "Downloading ffprobe for macOS..."
-        curl -L -f "https://evermeet.cx/ffmpeg/get/ffprobe" -o ffprobe.zip
+        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
         
         echo "Extracting ffprobe to temp directory..."
         unzip -q ffprobe.zip -d ffprobe_temp/
@@ -54,7 +54,7 @@ jobs:
         
         echo "Copying files to root directory..."
         cp ffmpeg_temp/ffmpeg ./ffmpeg
-        cp ffprobe_temp/ffmpeg ./ffprobe
+        cp ffprobe_temp/ffprobe ./ffprobe
         
         echo "Cleaning up temp directories..."
         rm -rf ffmpeg_temp/ ffprobe_temp/
