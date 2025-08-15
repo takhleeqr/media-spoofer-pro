@@ -139,13 +139,40 @@ async function setupFFmpeg() {
             async function manualFFmpegDownload() {
                 console.log('🔄 Downloading FFmpeg from Evermeet.cx...');
                 try {
-                    // Download FFmpeg and FFprobe directly from Evermeet.cx (raw binaries)
-                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffmpeg', 'ffmpeg');
-                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffprobe', 'ffprobe');
+                    // Download FFmpeg and FFprobe from Evermeet.cx
+                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffmpeg', 'ffmpeg.zip');
+                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffprobe', 'ffprobe.zip');
+                    
+                    // Extract the binaries to temp directories
+                    console.log('📦 Extracting FFmpeg to temp directory...');
+                    execSync('unzip -q ffmpeg.zip -d ffmpeg_temp/');
+                    
+                    console.log('📦 Extracting ffprobe to temp directory...');
+                    execSync('unzip -q ffprobe.zip -d ffprobe_temp/');
+                    
+                    console.log('🔍 Checking contents of temp directories...');
+                    console.log('ffmpeg_temp contents:');
+                    execSync('ls -la ffmpeg_temp/', { stdio: 'inherit' });
+                    console.log('ffprobe_temp contents:');
+                    execSync('ls -la ffprobe_temp/', { stdio: 'inherit' });
+                    
+                    console.log('📋 Copying files to root directory...');
+                    fs.copyFileSync('ffmpeg_temp/ffmpeg', './ffmpeg');
+                    fs.copyFileSync('ffprobe_temp/ffmpeg', './ffprobe');
+                    
+                    console.log('🧹 Cleaning up temp directories...');
+                    execSync('rm -rf ffmpeg_temp/ ffprobe_temp/');
+                    
+                    console.log('🔍 Checking extracted files...');
+                    execSync('ls -la ffmpeg*', { stdio: 'inherit' });
                     
                     // Make executable
                     fs.chmodSync('ffmpeg', '755');
                     fs.chmodSync('ffprobe', '755');
+                    
+                    // Cleanup zip files
+                    fs.unlinkSync('ffmpeg.zip');
+                    fs.unlinkSync('ffprobe.zip');
                     
                     console.log('✅ FFmpeg downloaded from Evermeet.cx successfully');
                 } catch (error) {
