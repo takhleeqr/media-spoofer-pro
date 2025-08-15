@@ -30,88 +30,30 @@ jobs:
     - name: Download FFmpeg for macOS
       run: |
         # Download FFmpeg binaries that will be packaged with the app
-        echo "Downloading FFmpeg for macOS..."
+        echo "Downloading FFmpeg for macOS from Evermeet.cx..."
         
-        # Try multiple working sources for FFmpeg
-        if curl -L -f "https://evermeet.cx/ffmpeg/" -o ffmpeg; then
-          echo "Downloaded from Evermeet successfully"
+        # Download FFmpeg and FFprobe from Evermeet.cx (proven working source)
+        if curl -L -f "https://evermeet.cx/ffmpeg/get/ffmpeg" -o ffmpeg; then
+          echo "Downloaded FFmpeg from Evermeet.cx successfully"
           chmod +x ffmpeg
-          
-          # Since Evermeet only provides ffmpeg, create a dummy ffprobe
-          echo '#!/bin/bash' > ffprobe
-          echo 'echo "FFprobe not available"' >> ffprobe
+        else
+          echo "ERROR: Failed to download FFmpeg from Evermeet.cx"
+          exit 1
+        fi
+        
+        if curl -L -f "https://evermeet.cx/ffmpeg/get/ffprobe" -o ffprobe; then
+          echo "Downloaded FFprobe from Evermeet.cx successfully"
           chmod +x ffprobe
-          
-          echo "FFmpeg setup completed successfully!"
-          echo "Files in root directory:"
-          ls -la ffmpeg*
-          exit 0
-          
-        elif curl -L -f "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -o ffmpeg.zip; then
-          echo "Downloaded from Gyan.dev successfully"
-        elif curl -L -f "https://github.com/ffmpeg/ffmpeg/releases/download/n6.1/ffmpeg-6.1-full_build.zip" -o ffmpeg.zip; then
-          echo "Downloaded from GitHub releases successfully"
         else
-          echo "All downloads failed, using Homebrew as fallback"
-          brew install ffmpeg
-          
-          # Copy Homebrew binaries to root for packaging
-          cp /usr/local/bin/ffmpeg ./ffmpeg
-          cp /usr/local/bin/ffprobe ./ffprobe
-          chmod +x ffmpeg ffprobe
-          
-          echo "FFmpeg setup completed successfully!"
-          exit 0
+          echo "ERROR: Failed to download FFprobe from Evermeet.cx"
+          exit 1
         fi
-        
-        # Extract
-        echo "Extracting FFmpeg..."
-        unzip -q ffmpeg.zip
-        
-        # Find and copy binaries to root
-        echo "Setting up FFmpeg binaries..."
-        
-        # Look for ffmpeg binary
-        if [ -f "ffmpeg" ]; then
-          echo "FFmpeg found in root"
-        else
-          # Search for ffmpeg in extracted files
-          ffmpeg_path=$(find . -name "ffmpeg" -type f | head -1)
-          if [ -n "$ffmpeg_path" ]; then
-            cp "$ffmpeg_path" ./ffmpeg
-            echo "FFmpeg copied from: $ffmpeg_path"
-          else
-            echo "ERROR: FFmpeg not found"
-            exit 1
-          fi
-        fi
-        
-        # Look for ffprobe binary
-        if [ -f "ffprobe" ]; then
-          echo "FFprobe found in root"
-        else
-          # Search for ffprobe in extracted files
-          ffprobe_path=$(find . -name "ffprobe" -type f | head -1)
-          if [ -n "$ffprobe_path" ]; then
-            cp "$ffprobe_path" ./ffprobe
-            echo "FFprobe copied from: $ffprobe_path"
-          else
-            echo "WARNING: FFprobe not found, creating dummy version"
-            echo '#!/bin/bash' > ffprobe
-            echo 'echo "FFprobe not available"' >> ffprobe
-            chmod +x ffprobe
-          fi
-        fi
-        
-        # Make executable
-        chmod +x ffmpeg ffprobe
         
         # Verify
         echo "Verifying FFmpeg installation..."
         ./ffmpeg -version
+        ./ffprobe -version
         
-        # Cleanup
-        rm -f ffmpeg.zip
         echo "FFmpeg setup completed successfully!"
         echo "Files in root directory:"
         ls -la ffmpeg*

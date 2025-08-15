@@ -126,66 +126,32 @@ async function setupFFmpeg() {
         } else {
             console.log('📥 Setting up FFmpeg for macOS/Linux...');
             
-            // Use Homebrew for macOS (most reliable method)
-            if (platform === 'darwin') {
-                console.log('🍎 macOS detected, using Homebrew...');
-                try {
-                    execSync('brew install ffmpeg', { stdio: 'inherit' });
-                    console.log('✅ FFmpeg installed via Homebrew');
-                } catch (error) {
-                    console.log('❌ Homebrew installation failed, trying manual download...');
-                    // Fallback to manual download if Homebrew fails
-                    await manualFFmpegDownload();
-                }
-        } else {
-                // For Linux, try manual download
+            // For macOS/Linux, try Homebrew first, then Evermeet.cx
+            try {
+                console.log('🍺 Trying Homebrew installation...');
+                execSync('brew install ffmpeg', { stdio: 'inherit' });
+                console.log('✅ FFmpeg installed via Homebrew');
+            } catch (error) {
+                console.log('❌ Homebrew failed, trying Evermeet.cx...');
                 await manualFFmpegDownload();
             }
-        }
-        
-        async function manualFFmpegDownload() {
-            console.log('🔄 Attempting manual FFmpeg download...');
-            try {
-                // Try to download from working sources
-                let downloadSuccess = false;
-                
-                // Source 1: Gyan.dev (known working)
+
+            async function manualFFmpegDownload() {
+                console.log('🔄 Downloading FFmpeg from Evermeet.cx...');
                 try {
-                    await downloadFile('https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip', 'ffmpeg.zip');
-                    downloadSuccess = true;
-                    console.log('✅ Downloaded from Gyan.dev');
+                    // Download FFmpeg and FFprobe from Evermeet.cx (proven working source)
+                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffmpeg', 'ffmpeg');
+                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffprobe', 'ffprobe');
+                    
+                    // Make executable
+                    fs.chmodSync('ffmpeg', '755');
+                    fs.chmodSync('ffprobe', '755');
+                    
+                    console.log('✅ FFmpeg downloaded from Evermeet.cx successfully');
                 } catch (error) {
-                    console.log('❌ Gyan.dev failed, trying GitHub releases...');
+                    console.log(`❌ Evermeet.cx download failed: ${error.message}`);
+                    throw new Error('All FFmpeg setup methods failed');
                 }
-                
-                // Source 2: GitHub releases (fallback)
-                if (!downloadSuccess) {
-                    try {
-                        await downloadFile('https://github.com/ffmpeg/ffmpeg/releases/download/n6.1/ffmpeg-6.1-full_build.zip', 'ffmpeg.zip');
-                        downloadSuccess = true;
-                        console.log('✅ Downloaded from GitHub releases');
-                    } catch (error) {
-                        console.log('❌ GitHub releases failed');
-                    }
-                }
-                
-                if (!downloadSuccess) {
-                    throw new Error('All download sources failed');
-                }
-            
-            // Extract
-                execSync('unzip -o ffmpeg.zip');
-                fs.unlinkSync('ffmpeg.zip');
-            
-                if (fs.existsSync('ffmpeg')) {
-            fs.chmodSync('ffmpeg', '755');
-                    console.log('✅ FFmpeg downloaded manually');
-                } else {
-                    throw new Error('FFmpeg not found after download');
-                }
-            } catch (error) {
-                console.log(`❌ Manual download failed: ${error.message}`);
-                throw new Error('All FFmpeg setup methods failed');
             }
         }
         
