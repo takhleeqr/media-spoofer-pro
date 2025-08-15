@@ -76,9 +76,12 @@ jobs:
       run: |
         echo "Current directory: $(pwd)"
         echo "FFmpeg installation verified:"
-        which ffmpeg
-        which ffprobe
-        ffmpeg -version | head -1
+        echo "Checking local FFmpeg binaries:"
+        ls -la ffmpeg*
+        echo "FFmpeg version:"
+        ./ffmpeg -version | head -1
+        echo "FFprobe version:"
+        ./ffprobe -version | head -1
         echo "Building macOS app..."
         npm run build-mac
       env:
