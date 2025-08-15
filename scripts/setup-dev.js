@@ -124,147 +124,68 @@ async function setupFFmpeg() {
             }
             
         } else {
-            console.log('📥 Downloading FFmpeg for macOS/Linux...');
+            console.log('📥 Setting up FFmpeg for macOS/Linux...');
             
-            // Multiple reliable sources for macOS/Linux - prioritized for compatibility
-            const sources = [
-                // Source 1: Official Evermeet builds (most compatible with all macOS versions)
-                'https://evermeet.cx/ffmpeg/getrelease/zip',
-                // Source 2: BtbN shared build (better compatibility with system libraries)
-                'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl-shared.zip',
-                // Source 3: BtbN static build (universal Intel + Apple Silicon)
-                'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl.zip',
-                // Source 4: Static builds from John Van Sickle (very reliable)
-                'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz'
-            ];
-            
-            let downloadSuccess = false;
-            let lastError = null;
-            
-            for (const sourceUrl of sources) {
+            // Use Homebrew for macOS (most reliable method)
+            if (platform === 'darwin') {
+                console.log('🍎 macOS detected, using Homebrew...');
                 try {
-                    console.log(`🔄 Trying source: ${sourceUrl}`);
-                    
-                    let ffmpegZip, extractCommand;
-                    
-                    if (sourceUrl.includes('evermeet.cx')) {
-                        ffmpegZip = 'ffmpeg-mac.zip';
-                        extractCommand = 'unzip -o ffmpeg-mac.zip';
-                        console.log('📱 Using Evermeet build (official macOS builds - best compatibility)');
-                    } else if (sourceUrl.includes('github.com') && sourceUrl.includes('shared')) {
-                        ffmpegZip = 'ffmpeg-mac-shared.zip';
-                        extractCommand = 'unzip -o ffmpeg-mac-shared.zip';
-                        console.log('🔄 Using BtbN shared build (better compatibility with system libraries)');
-                    } else if (sourceUrl.includes('github.com')) {
-                        ffmpegZip = 'ffmpeg-mac-github.zip';
-                        extractCommand = 'unzip -o ffmpeg-mac-github.zip';
-                        console.log('🔄 Using BtbN static build (universal Intel + Apple Silicon)');
-                    } else {
-                        ffmpegZip = 'ffmpeg-linux.tar.xz';
-                        extractCommand = 'tar -xf ffmpeg-linux.tar.xz';
-                        console.log('🔄 Using static Linux build (fallback option)');
-                    }
-                    
-                    await downloadFile(sourceUrl, ffmpegZip);
-                    
-                    // Verify the downloaded file
-                    const stats = fs.statSync(ffmpegZip);
-                    console.log(`✅ Downloaded ${ffmpegZip} (${(stats.size / 1024 / 1024).toFixed(1)}MB)`);
-                    
-                    // Extract
-                    console.log('📦 Extracting FFmpeg...');
-                    execSync(extractCommand);
-                    
-                    // Check if both binaries exist after extraction
-                    const ffmpegExists = fs.existsSync('ffmpeg');
-                    const ffprobeExists = fs.existsSync('ffprobe');
-                    
-                    console.log(`FFmpeg binary found: ${ffmpegExists}`);
-                    console.log(`FFprobe binary found: ${ffprobeExists}`);
-                    
-                    // If both binaries exist, we're good
-                    if (ffmpegExists && ffprobeExists) {
-                        console.log('✅ Both FFmpeg and FFprobe found!');
-                    } else {
-                        // Try to find binaries in subdirectories
-                        console.log('🔍 Searching for binaries in subdirectories...');
-                        
-                        // Look for ffmpeg and ffprobe in extracted directories
-                        const findCommand = platform === 'win32' ? 
-                            'dir /s /b ffmpeg*' : 
-                            'find . -name "ffmpeg*" -o -name "ffprobe*"';
-                        
-                        try {
-                            const foundFiles = execSync(findCommand, { encoding: 'utf8' });
-                            console.log('Found files:', foundFiles);
-                            
-                            // Try to copy from subdirectories
-                            if (!ffmpegExists) {
-                                const ffmpegFiles = foundFiles.split('\n').filter(f => f.includes('ffmpeg') && !f.includes('ffprobe'));
-                                if (ffmpegFiles.length > 0) {
-                                    const sourcePath = ffmpegFiles[0].trim();
-                                    console.log(`Copying FFmpeg from: ${sourcePath}`);
-                                    fs.copyFileSync(sourcePath, './ffmpeg');
-                                }
-                            }
-                            
-                            if (!ffprobeExists) {
-                                const ffprobeFiles = foundFiles.split('\n').filter(f => f.includes('ffprobe'));
-                                if (ffprobeFiles.length > 0) {
-                                    const sourcePath = ffprobeFiles[0].trim();
-                                    console.log(`Copying FFprobe from: ${sourcePath}`);
-                                    fs.copyFileSync(sourcePath, './ffprobe');
-                                }
-                            }
-                        } catch (error) {
-                            console.log('Search command failed:', error.message);
-                        }
-                        
-                        // Check again if we found the binaries
-                        const finalFfmpegExists = fs.existsSync('ffmpeg');
-                        const finalFfprobeExists = fs.existsSync('ffprobe');
-                        
-                        if (!finalFfmpegExists || !finalFfprobeExists) {
-                            console.log('❌ Still missing binaries, trying next source...');
-                            // Clean up and try next source
-                            if (fs.existsSync('ffmpeg')) fs.unlinkSync('ffmpeg');
-                            if (fs.existsSync('ffprobe')) fs.unlinkSync('ffprobe');
-                            continue;
-                        }
-                    }
-                    
-                    // Make executable
-                    if (fs.existsSync('ffmpeg')) {
-                        fs.chmodSync('ffmpeg', '755');
-                    }
-                    if (fs.existsSync('ffprobe')) {
-                        fs.chmodSync('ffprobe', '755');
-                    }
-                    
-                    // Cleanup
-                    fs.unlinkSync(ffmpegZip);
-                    
-                    downloadSuccess = true;
-                    break;
-                    
+                    execSync('brew install ffmpeg', { stdio: 'inherit' });
+                    console.log('✅ FFmpeg installed via Homebrew');
                 } catch (error) {
-                    console.log(`❌ Failed to download from ${sourceUrl}: ${error.message}`);
-                    lastError = error;
-                    
-                    // Clean up failed download
-                    if (fs.existsSync('ffmpeg-mac.zip')) fs.unlinkSync('ffmpeg-mac.zip');
-                    if (fs.existsSync('ffmpeg-mac-github.zip')) fs.unlinkSync('ffmpeg-mac-github.zip');
-                    if (fs.existsSync('ffmpeg-mac-shared.zip')) fs.unlinkSync('ffmpeg-mac-shared.zip');
-                    if (fs.existsSync('ffmpeg-linux.tar.xz')) fs.unlinkSync('ffmpeg-linux.tar.xz');
-                    
-                    // Also clean up any partial binaries
-                    if (fs.existsSync('ffmpeg')) fs.unlinkSync('ffmpeg');
-                    if (fs.existsSync('ffprobe')) fs.unlinkSync('ffprobe');
+                    console.log('❌ Homebrew installation failed, trying manual download...');
+                    // Fallback to manual download if Homebrew fails
+                    await manualFFmpegDownload();
                 }
+            } else {
+                // For Linux, try manual download
+                await manualFFmpegDownload();
             }
-            
-            if (!downloadSuccess) {
-                throw new Error(`All download sources failed. Last error: ${lastError.message}`);
+        }
+        
+        async function manualFFmpegDownload() {
+            console.log('🔄 Attempting manual FFmpeg download...');
+            try {
+                // Try to download from working sources
+                let downloadSuccess = false;
+                
+                // Source 1: Gyan.dev (known working)
+                try {
+                    await downloadFile('https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip', 'ffmpeg.zip');
+                    downloadSuccess = true;
+                    console.log('✅ Downloaded from Gyan.dev');
+                } catch (error) {
+                    console.log('❌ Gyan.dev failed, trying GitHub releases...');
+                }
+                
+                // Source 2: GitHub releases (fallback)
+                if (!downloadSuccess) {
+                    try {
+                        await downloadFile('https://github.com/ffmpeg/ffmpeg/releases/download/n6.1/ffmpeg-6.1-full_build.zip', 'ffmpeg.zip');
+                        downloadSuccess = true;
+                        console.log('✅ Downloaded from GitHub releases');
+                    } catch (error) {
+                        console.log('❌ GitHub releases failed');
+                    }
+                }
+                
+                if (!downloadSuccess) {
+                    throw new Error('All download sources failed');
+                }
+                
+                // Extract
+                execSync('unzip -o ffmpeg.zip');
+                fs.unlinkSync('ffmpeg.zip');
+                
+                if (fs.existsSync('ffmpeg')) {
+                    fs.chmodSync('ffmpeg', '755');
+                    console.log('✅ FFmpeg downloaded manually');
+                } else {
+                    throw new Error('FFmpeg not found after download');
+                }
+            } catch (error) {
+                console.log(`❌ Manual download failed: ${error.message}`);
+                throw new Error('All FFmpeg setup methods failed');
             }
         }
         
