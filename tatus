@@ -1,5 +1,0 @@
-[33m7f4a036[m[33m ([m[1;33mtag: [m[1;33mv2.0.10[m[33m)[m Fix: always remove audio from short videos in split-only mode if remove audio is checked
-[33mb864421[m[33m ([m[1;33mtag: [m[1;33mv2.0.9[m[33m)[m Enhanced macOS compatibility for preview and watermark functionality
-[33m1167d43[m[33m ([m[1;33mtag: [m[1;33mv2.0.8[m[33m)[m feat: Add watermark functionality and remove startup popup
-[33m0d0639d[m feat: Add comprehensive watermark functionality
-[33md348ce7[m[33m ([m[1;33mtag: [m[1;33mv2.0.7[m[33m)[m fix: macOS click event handling for mode selection cards

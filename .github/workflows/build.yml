@@ -9,8 +9,8 @@ on:
     types: [ published ]
 
 jobs:
-  build-mac:
-    runs-on: macos-latest
+  build-mac-intel:
+    runs-on: macos-12  # Intel Mac runner for native Intel builds
     permissions:
       contents: read
     
@@ -27,30 +27,22 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Download FFmpeg for macOS
+    - name: Download FFmpeg for macOS Intel
       run: |
-        # Download FFmpeg binaries that will be packaged with the app
-        echo "Downloading FFmpeg for macOS..."
+        echo "Downloading FFmpeg for macOS Intel..."
         
-        # Download FFmpeg and FFprobe from Evermeet.cx using working URLs
-        echo "Downloading FFmpeg for macOS..."
+        # Download FFmpeg and FFprobe from Evermeet.cx
+        echo "Downloading FFmpeg for macOS Intel..."
         curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
         
         echo "Extracting FFmpeg to temp directory..."
         unzip -q ffmpeg.zip -d ffmpeg_temp/
         
-        # Download ffprobe from Evermeet.cx
-        echo "Downloading ffprobe for macOS..."
+        echo "Downloading ffprobe for macOS Intel..."
         curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
         
         echo "Extracting ffprobe to temp directory..."
         unzip -q ffprobe.zip -d ffprobe_temp/
-        
-        echo "Checking contents of temp directories..."
-        echo "ffmpeg_temp contents:"
-        ls -la ffmpeg_temp/
-        echo "ffprobe_temp contents:"
-        ls -la ffprobe_temp/
         
         echo "Copying files to root directory..."
         cp ffmpeg_temp/ffmpeg ./ffmpeg
@@ -59,41 +51,117 @@ jobs:
         echo "Cleaning up temp directories..."
         rm -rf ffmpeg_temp/ ffprobe_temp/
         
-        echo "Checking extracted files..."
-        ls -la ffmpeg*
-        
         # Make executable
         chmod +x ffmpeg ffprobe
         
         # Verify
-        echo "Verifying FFmpeg installation..."
+        echo "Verifying FFmpeg installation for Intel Mac..."
         ./ffmpeg -version
         ./ffprobe -version
         
-        echo "FFmpeg download and setup completed successfully!"
+        echo "FFmpeg download and setup completed successfully for Intel Mac!"
         
-    - name: Build macOS app
+    - name: Build Intel Mac app
       run: |
+        echo "Building Intel Mac app (x64)..."
         echo "Current directory: $(pwd)"
         echo "FFmpeg installation verified:"
-        echo "Checking local FFmpeg binaries:"
         ls -la ffmpeg*
         echo "FFmpeg version:"
         ./ffmpeg -version | head -1
         echo "FFprobe version:"
         ./ffprobe -version | head -1
-        echo "Building macOS app..."
-        npm run build-mac
+        
+        # Build only Intel version
+        electron-builder --mac --x64
+        
+        echo "Intel Mac build completed!"
       env:
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         
-    - name: Upload macOS build artifacts
+    - name: Upload Intel Mac build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: MediaSpooferPro-macOS
+        name: MediaSpooferPro-macOS-Intel
         path: dist/
         
-  build-win:
+  build-mac-arm:
+    runs-on: macos-latest  # Apple Silicon runner for native ARM64 builds
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Download FFmpeg for macOS ARM64
+      run: |
+        echo "Downloading FFmpeg for macOS ARM64..."
+        
+        # Download FFmpeg and FFprobe from Evermeet.cx
+        echo "Downloading FFmpeg for macOS ARM64..."
+        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
+        
+        echo "Extracting FFmpeg to temp directory..."
+        unzip -q ffmpeg.zip -d ffmpeg_temp/
+        
+        echo "Downloading ffprobe for macOS ARM64..."
+        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
+        
+        echo "Extracting ffprobe to temp directory..."
+        unzip -q ffprobe.zip -d ffprobe_temp/
+        
+        echo "Copying files to root directory..."
+        cp ffmpeg_temp/ffmpeg ./ffmpeg
+        cp ffprobe_temp/ffprobe ./ffprobe
+        
+        echo "Cleaning up temp directories..."
+        rm -rf ffmpeg_temp/ ffprobe_temp/
+        
+        # Make executable
+        chmod +x ffmpeg ffprobe
+        
+        # Verify
+        echo "Verifying FFmpeg installation for ARM64 Mac..."
+        ./ffmpeg -version
+        ./ffprobe -version
+        
+        echo "FFmpeg download and setup completed successfully for ARM64 Mac!"
+        
+    - name: Build ARM64 Mac app
+      run: |
+        echo "Building ARM64 Mac app..."
+        echo "Current directory: $(pwd)"
+        echo "FFmpeg installation verified:"
+        ls -la ffmpeg*
+        echo "FFmpeg version:"
+        ./ffmpeg -version | head -1
+        echo "FFprobe version:"
+        ./ffprobe -version | head -1
+        
+        # Build only ARM64 version
+        electron-builder --mac --arm64
+        
+        echo "ARM64 Mac build completed!"
+      env:
+        ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+        
+    - name: Upload ARM64 Mac build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: MediaSpooferPro-macOS-ARM64
+        path: dist/
+        
+  build-windows:
     runs-on: windows-latest
     permissions:
       contents: read
@@ -198,8 +266,78 @@ jobs:
         name: MediaSpooferPro-Windows
         path: dist/
         
+  combine-mac:
+    needs: [build-mac-intel, build-mac-arm]
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Download Intel Mac artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: MediaSpooferPro-macOS-Intel
+        path: intel-build/
+        
+    - name: Download ARM64 Mac artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: MediaSpooferPro-macOS-ARM64
+        path: arm64-build/
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Download FFmpeg for macOS
+      run: |
+        echo "Downloading FFmpeg for macOS universal build..."
+        
+        # Download FFmpeg and FFprobe from Evermeet.cx
+        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
+        unzip -q ffmpeg.zip -d ffmpeg_temp/
+        
+        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
+        unzip -q ffprobe.zip -d ffprobe_temp/
+        
+        cp ffmpeg_temp/ffmpeg ./ffmpeg
+        cp ffprobe_temp/ffprobe ./ffprobe
+        
+        rm -rf ffmpeg_temp/ ffprobe_temp/
+        chmod +x ffmpeg ffprobe
+        
+        echo "FFmpeg ready for universal build!"
+        
+    - name: Combine Mac architectures
+      run: |
+        echo "Combining Intel and ARM64 Mac builds into universal binary..."
+        
+        # Copy Intel build to dist
+        mkdir -p dist/
+        cp -r intel-build/* dist/
+        
+        # Run the combine script to create universal binary
+        npm run combine-mac
+        
+        echo "Universal Mac binary created successfully!"
+        ls -la dist/
+        
+    - name: Upload Universal Mac build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: MediaSpooferPro-macOS-Universal
+        path: dist/
+        
   release:
-    needs: [build-mac, build-win]
+    needs: [combine-mac, build-windows]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     permissions:
@@ -212,8 +350,17 @@ jobs:
     - name: Create release assets
       run: |
         mkdir -p release-assets
-        mv MediaSpooferPro-macOS/* release-assets/ || true
-        mv MediaSpooferPro-Windows/* release-assets/ || true
+        
+        # Copy universal Mac build
+        if [ -d "MediaSpooferPro-macOS-Universal" ]; then
+          cp -r MediaSpooferPro-macOS-Universal/* release-assets/
+        fi
+        
+        # Copy Windows build
+        if [ -d "MediaSpooferPro-Windows" ]; then
+          cp -r MediaSpooferPro-Windows/* release-assets/
+        fi
+        
         echo "Release assets created:"
         ls -la release-assets/
         
@@ -245,15 +392,21 @@ jobs:
         ls -la MediaSpooferPro-*
         
     - name: Upload release assets
-      uses: softprops/action-gh-release@v2
+      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        files: |
-          MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
-          MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
-        tag_name: ${{ github.event.release.tag_name }}
-        name: ${{ github.event.release.name }}
-        body: ${{ github.event.release.body }}
-        draft: false
-        prerelease: false 
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
+        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
+        asset_content_type: application/octet-stream
+        
+    - name: Upload Windows release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
+        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
+        asset_content_type: application/octet-stream 

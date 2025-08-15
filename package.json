@@ -10,6 +10,8 @@
     "build": "electron-builder",
     "build-win": "electron-builder --win",
     "build-mac": "electron-builder --mac --x64 && electron-builder --mac --arm64 && npm run combine-mac",
+    "build-mac-intel": "electron-builder --mac --x64",
+    "build-mac-arm": "electron-builder --mac --arm64",
     "combine-mac": "node scripts/combine-mac-architectures.js"
   },
   "keywords": [
