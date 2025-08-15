@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Output folder selection
     selectOutputFolder: () => ipcRenderer.invoke('select-output-folder'),
     selectFolder: () => ipcRenderer.invoke('select-folder'),
+    readDir: (dirPath) => ipcRenderer.invoke('read-dir', dirPath),
     readDirRecursive: (dirPath) => ipcRenderer.invoke('read-dir-recursive', dirPath),
     
     // Open output folder
@@ -24,6 +25,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     mkdir: (path) => ipcRenderer.invoke('mkdir', path),
     copyFile: (src, dest) => ipcRenderer.invoke('copy-file', src, dest),
     unlink: (path) => ipcRenderer.invoke('unlink', path),
+    readdir: (dirPath) => ipcRenderer.invoke('readdir', dirPath),
+    rmdir: (dirPath) => ipcRenderer.invoke('rmdir', dirPath),
+    cleanupTempDirs: (outputDir) => ipcRenderer.invoke('cleanup-temp-dirs', outputDir),
     
     // Process management
     spawnProcess: (command, args) => ipcRenderer.invoke('spawn-process', command, args),

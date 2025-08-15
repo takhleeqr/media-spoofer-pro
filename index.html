@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Spoofer Pro</title>
+    <title>MediaSpoofer - Media Processing Tool</title>
+    
     <style>
         * {
             margin: 0;
@@ -105,12 +106,45 @@
             background: linear-gradient(90deg, #667eea, #764ba2);
             transition: width 0.3s ease;
             width: 0%;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .overall-progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
         }
         
         .overall-progress-text {
             text-align: center;
             color: #718096;
             font-size: 0.9rem;
+            font-weight: 600;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+        }
+        
+        .progress-text {
+            font-size: 0.8rem;
+            color: #718096;
+            text-align: center;
+            font-weight: 500;
+            margin-top: 4px;
         }
         
         /* Rest of your existing CSS stays the same... */
@@ -378,20 +412,9 @@
             flex: 1;
         }
         
-        .file-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-            font-size: 1.2rem;
-        }
+        /* Old file icon styles removed - using new icon system */
         
-        .file-icon.image { background: #48bb78; }
-        .file-icon.video { background: #ed8936; }
+        /* Old file icon styles removed - using new icon system */
         
         .file-details {
             flex: 1;
@@ -425,8 +448,22 @@
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #667eea, #764ba2);
-            transition: width 0.3s ease;
+            transition: width 0.2s ease;
             width: 0%;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 1.5s infinite;
         }
         
         .progress-text {
@@ -492,9 +529,92 @@
         }
         
         .btn:disabled {
-            opacity: 0.6;
+            opacity: 0.5;
             cursor: not-allowed;
-            transform: none !important;
+        }
+        
+        /* Preview Navigation Styles */
+        .preview-navigation {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .preview-navigation .btn {
+            min-width: 100px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border: none;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .preview-navigation .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+        }
+        
+        .preview-navigation .btn:disabled {
+            background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        .preview-navigation span {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 80px;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .position-display {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            color: #374151;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            min-width: 60px;
+            border: 2px solid #d1d5db;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        /* Preview Section Enhancements */
+        .preview-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .preview-wrapper {
+            transition: all 0.3s ease;
+            margin-bottom: 0;
+        }
+        
+        .preview-wrapper:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         }
         
         .status-panel {
@@ -604,7 +724,6 @@
             background: #e2e8f0;
             outline: none;
             -webkit-appearance: none;
-            appearance: none;
         }
         
         .slider::-webkit-slider-thumb {
@@ -613,19 +732,47 @@
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            background: #667eea;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
         }
         
         .slider::-moz-range-thumb {
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            background: #667eea;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
             cursor: pointer;
             border: none;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+        }
+        
+        .number-input {
+            width: 80px;
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s ease;
+            background: white;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .number-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .number-input::-webkit-inner-spin-button,
+        .number-input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .number-input[type=number] {
+            -moz-appearance: textfield;
         }
         
         .status-message {
@@ -675,6 +822,27 @@
             border-radius: 4px;
             font-family: monospace;
             color: #667eea;
+        }
+        
+        /* Watermark background color container styling */
+        #imageWatermarkBackgroundColorContainer,
+        #videoWatermarkBackgroundColorContainer {
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        #imageWatermarkBackgroundColorContainer[style*="display: none"],
+        #videoWatermarkBackgroundColorContainer[style*="display: none"] {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+        
+        #imageWatermarkBackgroundColorContainer:not([style*="display: none"]),
+        #videoWatermarkBackgroundColorContainer:not([style*="display: none"]) {
+            max-height: 100px;
+            opacity: 1;
         }
         
         @media (max-width: 1024px) {
@@ -740,6 +908,79 @@
             font-weight: 600;
             color: #4a5568;
         }
+
+        /* File List Enhancements */
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .file-item:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+        }
+        
+        .file-item.active {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #f0f4ff 0%, #f8faff 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+        
+        .file-item.active .file-name {
+            color: #1e40af;
+            font-weight: 700;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .file-icon {
+            font-size: 24px;
+            margin-right: 12px;
+            color: #3b82f6;
+        }
+        
+        .file-actions {
+            display: flex;
+            align-items: center;
+            margin: 0 12px;
+        }
+        
+        .btn-sm {
+            padding: 6px 8px;
+            font-size: 12px;
+            border-radius: 6px;
+            min-width: auto;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+        
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .progress-container {
+            flex: 1;
+            margin-left: 12px;
+        }
     </style>
 </head>
 <body>
@@ -751,13 +992,13 @@
         
         <!-- Mode Selection Screen -->
         <div class="mode-selection" id="modeSelection">
-            <div class="mode-card" id="imageModeCard">
+            <div class="mode-card" id="imageModeCard" onclick="window.selectMode('image')">
                 <div class="mode-icon">📷</div>
                 <div class="mode-title">Process Images</div>
                 <div class="mode-description">Transform photos with visual effects, format conversion, and bulk renaming</div>
             </div>
             
-            <div class="mode-card" id="videoModeCard">
+            <div class="mode-card" id="videoModeCard" onclick="window.selectMode('video')">
                 <div class="mode-icon">🎬</div>
                 <div class="mode-title">Process Videos</div>
                 <div class="mode-description">Split videos, apply effects, convert formats, and bulk rename clips</div>
@@ -805,8 +1046,19 @@
                         <div class="preview-container" style="display: flex; justify-content: center; align-items: center; margin: 20px 0;">
                             <div class="preview-wrapper" style="position: relative; width: 320px; height: 480px; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.2);">
                                 <img id="image-preview" style="display: none; width: 100%; height: 100%; object-fit: contain;" />
-                                <div id="image-text-watermark" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;"></div>
+                                <div id="image-text-watermark" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;"></div>
                             </div>
+                        </div>
+                        
+                        <!-- Navigation Buttons -->
+                        <div class="preview-navigation">
+                            <button class="btn" onclick="navigatePreview('image', 'prev')">
+                                ← Previous
+                            </button>
+                            <div class="position-display"></div>
+                            <button class="btn" onclick="navigatePreview('image', 'next')">
+                                Next →
+                            </button>
                         </div>
                     </div>
                     
@@ -824,8 +1076,8 @@
                         <div class="setting-item">
                             <label>Processing Type</label>
                             <select id="imageProcessingMode">
-                                <option value="spoof-only">Apply Visual Effects</option>
-                                <option value="convert-only">Format Convert Only</option>
+                                <option value="spoof-only">Spoof</option>
+                                <option value="convert-only">Convert</option>
                             </select>
                         </div>
                         
@@ -849,10 +1101,23 @@
                         <div class="setting-item">
                             <label>Image Format</label>
                             <select id="imageFormat">
-                                <option value="jpg">JPG (Fastest)</option>
+                                <option value="jpg" selected>JPG (Fastest)</option>
+                                <option value="original">Original (No Conversion)</option>
                                 <option value="png">PNG (Best Quality)</option>
-                                <option value="webp">WebP (Smallest Size)</option>
+                                <option value="webm">WebP (Smallest Size)</option>
                             </select>
+                        </div>
+                        
+                        <div class="setting-item" id="imageQualityGroup">
+                            <label>Quality Preset</label>
+                            <select id="imageQuality">
+                                <option value="lossless">Lossless (No Quality Loss)</option>
+                                <option value="ultra">Ultra High (Minimal Loss)</option>
+                                <option value="high" selected>High Quality (Balanced)</option>
+                                <option value="medium">Medium (Good Compression)</option>
+                                <option value="small">Small Size (Aggressive)</option>
+                            </select>
+
                         </div>
                     </div>
                     
@@ -861,17 +1126,6 @@
                         <div class="setting-item">
                             <label>Naming Pattern</label>
                             <input type="text" id="imageNamingPattern" placeholder="e.g., brand_image_001" value="photo_{number}">
-                            <small style="color: #718096; font-size: 0.8rem; margin-top: 4px; display: block;">
-                                Use <code>{word}</code> for editable preset word (suggested: "photo"), <code>{number}</code> for 12-digit random number
-                            </small>
-                        </div>
-                        <div class="pattern-examples">
-                            <h5>Examples:</h5>
-                            <ul>
-                                <li><code>photo_{number}</code> → photo_123456789012, photo_987654321098...</li>
-                                <li><code>brand_{word}_{number}</code> → brand_summer_123456789012...</li>
-                                <li><code>{word}_product_{number}</code> → summer_product_123456789012...</li>
-                            </ul>
                         </div>
                     </div>
                     
@@ -903,9 +1157,8 @@
                             </div>
                             
                             <div class="setting-item">
-                                <label>Size (% of image)</label>
-                                <input type="range" id="imageWatermarkSize" min="5" max="50" value="15" class="slider">
-                                <span id="imageWatermarkSizeValue">15%</span>
+                                <label>Size (px)</label>
+                                <input type="number" id="imageWatermarkSize" min="8" max="200" value="48" class="number-input" style="width: 80px;">
                             </div>
                             
                             <div class="setting-item">
@@ -923,8 +1176,6 @@
                                 </select>
                             </div>
                             
-
-                            
                             <div class="setting-item">
                                 <label>Color</label>
                                 <input type="color" id="imageWatermarkColor" value="#ffffff">
@@ -934,6 +1185,21 @@
                                 <label>Opacity (%)</label>
                                 <input type="range" id="imageWatermarkOpacity" min="10" max="100" value="80" class="slider">
                                 <span id="imageWatermarkOpacityValue">80%</span>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Background</label>
+                                <div class="checkbox-group" style="margin-top: 8px;">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="imageWatermarkBackgroundEnabled">
+                                        <label for="imageWatermarkBackgroundEnabled">Add Background</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="setting-item" id="imageWatermarkBackgroundColorContainer" style="display: none;">
+                                <label>Background Color</label>
+                                <input type="color" id="imageWatermarkBackgroundColor" value="#000000">
                             </div>
                         </div>
                     </div>
@@ -982,8 +1248,19 @@
                         <div class="preview-container" style="display: flex; justify-content: center; align-items: center; margin: 20px 0;">
                             <div class="preview-wrapper" style="position: relative; width: 320px; height: 480px; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.2);">
                                 <video id="video-preview" style="display: none; width: 100%; height: 100%; object-fit: contain;" controls></video>
-                                <div id="video-text-watermark" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-size: 18px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;"></div>
+                                <div id="video-text-watermark" style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;"></div>
                             </div>
+                        </div>
+                        
+                        <!-- Navigation Buttons -->
+                        <div class="preview-navigation">
+                            <button class="btn" onclick="navigatePreview('video', 'prev')">
+                                ← Previous
+                            </button>
+                            <div class="position-display"></div>
+                            <button class="btn" onclick="navigatePreview('video', 'next')">
+                                Next →
+                            </button>
                         </div>
                     </div>
                     
@@ -1001,10 +1278,10 @@
                         <div class="setting-item">
                             <label>Processing Type</label>
                             <select id="videoProcessingMode">
-                                <option value="spoof-split">Apply Effects + Split Long Videos</option>
-                                <option value="spoof-only" selected>Apply Effects Only</option>
-                                <option value="split-only">Split into Clips Only</option>
-                                <option value="convert-only">Format Convert Only</option>
+                                <option value="spoof-split">Spoof + Split</option>
+                                <option value="spoof-only" selected>Spoof</option>
+                                <option value="split-only">Split</option>
+                                <option value="convert-only">Convert</option>
                             </select>
                         </div>
                         
@@ -1025,14 +1302,27 @@
                    
                    <div class="settings-group">
                        <h4>Video Options</h4>
-                       <div class="setting-item">
-                           <label>Output Format</label>
-                           <select id="videoFormat">
-                               <option value="mp4">MP4 (Fastest)</option>
-                               <option value="webm">WebM (Smaller Size)</option>
-                               <option value="mov">MOV (Mac Compatible)</option>
-                           </select>
-                       </div>
+                                               <div class="setting-item">
+                            <label>Output Format</label>
+                            <select id="videoFormat">
+                                <option value="mp4" selected>MP4 (Fastest)</option>
+                                <option value="original">Original (No Conversion)</option>
+                                <option value="webm">WebM (Smaller Size)</option>
+                                <option value="mov">MOV (Mac Compatible)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item" id="videoQualityGroup">
+                            <label>Quality Preset</label>
+                            <select id="videoQuality">
+                                <option value="lossless">Lossless (No Quality Loss)</option>
+                                <option value="ultra">Ultra High (Minimal Loss)</option>
+                                <option value="high" selected>High Quality (Balanced)</option>
+                                <option value="medium">Medium (Good Compression)</option>
+                                <option value="small">Small Size (Aggressive)</option>
+                            </select>
+
+                        </div>
                        
                        <div class="setting-item" id="clipLengthGroup">
                            <label>Clip Length (seconds)</label>
@@ -1058,20 +1348,9 @@
                    
                    <div class="bulk-rename-section">
                        <h4>🏷️ Bulk Rename</h4>
-                                               <div class="setting-item">
+                                                                       <div class="setting-item">
                             <label>Naming Pattern</label>
                             <input type="text" id="videoNamingPattern" placeholder="e.g., brand_video_001" value="clip_{number}">
-                            <small style="color: #718096; font-size: 0.8rem; margin-top: 4px; display: block;">
-                                Use <code>{word}</code> for editable preset word (suggested: "clip"), <code>{number}</code> for 12-digit random number
-                            </small>
-                        </div>
-                                               <div class="pattern-examples">
-                            <h5>Examples:</h5>
-                            <ul>
-                                <li><code>clip_{number}</code> → clip_123456789012, clip_987654321098...</li>
-                                <li><code>brand_{word}_{number}</code> → brand_summer_123456789012...</li>
-                                <li><code>{word}_video_{number}</code> → summer_video_123456789012...</li>
-                            </ul>
                         </div>
                    </div>
                    
@@ -1103,10 +1382,10 @@
                            </div>
                            
                            <div class="setting-item">
-                               <label>Size (% of video)</label>
-                               <input type="range" id="videoWatermarkSize" min="5" max="50" value="15" class="slider">
-                               <span id="videoWatermarkSizeValue">15%</span>
+                               <label>Size (pixels)</label>
+                               <input type="number" id="videoWatermarkSize" min="8" max="200" value="48" class="number-input" style="width: 80px;">
                            </div>
+
                            
                            <div class="setting-item">
                                <label>Position</label>
@@ -1123,7 +1402,6 @@
                                </select>
                            </div>
                            
-
                            
                            <div class="setting-item">
                                <label>Color</label>
@@ -1134,6 +1412,21 @@
                                <label>Opacity (%)</label>
                                <input type="range" id="videoWatermarkOpacity" min="10" max="100" value="80" class="slider">
                                <span id="videoWatermarkOpacityValue">80%</span>
+                           </div>
+                           
+                           <div class="setting-item">
+                               <label>Background</label>
+                               <div class="checkbox-group" style="margin-top: 8px;">
+                                   <div class="checkbox-item">
+                                       <input type="checkbox" id="videoWatermarkBackgroundEnabled">
+                                       <label for="videoWatermarkBackgroundEnabled">Add Background</label>
+                                   </div>
+                               </div>
+                           </div>
+                           
+                           <div class="setting-item" id="videoWatermarkBackgroundColorContainer" style="display: none;">
+                               <label>Background Color</label>
+                               <input type="color" id="videoWatermarkBackgroundColor" value="#000000">
                            </div>
                        </div>
                    </div>

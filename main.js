@@ -102,6 +102,33 @@ ipcMain.handle('select-folder', async () => {
    return result.filePaths[0];
 });
 
+// Handle non-recursive directory reading (only top-level files)
+ipcMain.handle('read-dir', async (event, dirPath) => {
+   const files = [];
+   
+   try {
+       // Ensure cross-platform path handling
+       const normalizedPath = dirPath.replace(/\\/g, '/');
+       const items = fs.readdirSync(normalizedPath);
+       
+       for (const item of items) {
+           // Use cross-platform path joining
+           const fullPath = normalizedPath + '/' + item;
+           const stat = fs.statSync(fullPath);
+           
+           // Only include files, not directories
+           if (stat.isFile()) {
+               files.push(fullPath);
+           }
+       }
+       
+       return files;
+   } catch (error) {
+       console.error('read-dir error:', error);
+       throw new Error(`Failed to read directory: ${error.message}`);
+   }
+});
+
 // Handle recursive directory reading
 ipcMain.handle('read-dir-recursive', async (event, dirPath) => {
    const files = [];
@@ -128,6 +155,66 @@ ipcMain.handle('read-dir-recursive', async (event, dirPath) => {
    } catch (error) {
        console.error('read-dir-recursive error:', error);
        throw new Error(`Failed to read directory: ${error.message}`);
+   }
+});
+
+// Handle directory listing (non-recursive)
+ipcMain.handle('readdir', async (event, dirPath) => {
+   try {
+       // Ensure cross-platform path handling
+       const normalizedPath = dirPath.replace(/\\/g, '/');
+       const items = fs.readdirSync(normalizedPath);
+       return items;
+   } catch (error) {
+       console.error('readdir error:', error);
+       throw new Error(`Failed to read directory: ${error.message}`);
+   }
+});
+
+// Handle directory removal
+ipcMain.handle('rmdir', async (event, dirPath) => {
+   try {
+       // Ensure cross-platform path handling
+       const normalizedPath = dirPath.replace(/\\/g, '/');
+       
+       // Use fs.rmSync with recursive option for better cleanup
+       // This will remove the directory and all its contents
+       fs.rmSync(normalizedPath, { recursive: true, force: true });
+       return true;
+   } catch (error) {
+       console.error('rmdir error:', error);
+       throw new Error(`Failed to remove directory: ${error.message}`);
+   }
+});
+
+// Handle cleanup of temporary conversion directories
+ipcMain.handle('cleanup-temp-dirs', async (event, outputDir) => {
+   try {
+       // Ensure cross-platform path handling
+       const normalizedPath = outputDir.replace(/\\/g, '/');
+       
+       if (fs.existsSync(normalizedPath)) {
+           const items = fs.readdirSync(normalizedPath);
+           
+           for (const item of items) {
+               if (item === 'temp_converted') {
+                   const tempDirPath = normalizedPath + '/' + item;
+                   
+                   try {
+                       // Remove the entire temp_converted directory and its contents
+                       fs.rmSync(tempDirPath, { recursive: true, force: true });
+                       console.log('Cleaned up temp directory:', tempDirPath);
+                   } catch (tempError) {
+                       console.warn('Failed to cleanup temp directory:', tempError);
+                   }
+               }
+           }
+       }
+       
+       return true;
+   } catch (error) {
+       console.error('cleanup-temp-dirs error:', error);
+       throw new Error(`Failed to cleanup temporary directories: ${error.message}`);
    }
 });
 
@@ -236,7 +323,7 @@ ipcMain.handle('unlink', async (event, filePath) => {
 ipcMain.handle('spawn-process', async (event, command, args) => {
    const { spawn } = require('child_process');
    return new Promise((resolve, reject) => {
-       // Ensure command is executable on macOS
+              // Ensure command is executable on macOS
        const options = {
            stdio: ['pipe', 'pipe', 'pipe']
        };

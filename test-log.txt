@@ -1,0 +1,2 @@
+Processing started at 2025-07-10T20:10:53.903Z
+Settings: {"mode":"spoof-only","intensity":"heavy","duplicates":1,"clipLength":"6-8","removeAudio":false,"watermark":null}

@@ -6,7 +6,7 @@ Professional media transformation tool for social platforms. Transform images an
 
 ### Image Processing
 - **Visual Effects**: Apply various filters and effects to images
-- **Format Conversion**: Convert between JPG, PNG, HEIC, WebP formats
+- **Format Conversion**: Convert between JPG, PNG, HEIC, WebP formats or preserve original format
 - **Batch Processing**: Process multiple images simultaneously
 - **Metadata Removal**: Strip EXIF data for privacy
 - **Custom Naming**: Flexible file naming patterns
@@ -14,15 +14,15 @@ Professional media transformation tool for social platforms. Transform images an
 ### Video Processing
 - **Video Effects**: Apply visual effects to video clips
 - **Video Splitting**: Split videos into shorter clips
-- **Format Conversion**: Convert between MP4, MOV, AVI, WebM formats
+- **Format Conversion**: Convert between MP4, MOV, AVI, WebM formats or preserve original format
 - **Audio Management**: Remove or preserve audio tracks
 - **Batch Processing**: Process multiple videos with different settings
 
 ### Processing Modes
-- **Spoof Only**: Apply effects without splitting
-- **Split Only**: Split videos into clips without effects
-- **Spoof & Split**: Apply effects and split into clips
-- **Convert Only**: Format conversion only
+- **Spoof**: Apply effects without splitting
+- **Split**: Split videos into clips without effects
+- **Spoof + Split**: Apply effects and split into clips
+- **Convert**: Format conversion only
 
 ## Installation
 
