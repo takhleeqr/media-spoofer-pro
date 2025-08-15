@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-mac-intel:
-    runs-on: macos-12  # Intel Mac runner for native Intel builds
+    runs-on: macos-11  # Intel Mac runner for native Intel builds (better availability)
     permissions:
       contents: read
     
