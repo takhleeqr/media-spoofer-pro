@@ -27,6 +27,14 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
+    - name: Install Wine for Windows builds
+      run: |
+        echo "Installing Wine for Windows builds on Ubuntu..."
+        sudo dpkg --add-architecture i386
+        sudo apt-get update
+        sudo apt-get install -y wine wine32 wine64 libwine libwine:i386 fonts-wine
+        echo "Wine installation completed!"
+      
     - name: Configure Mac build to avoid license issues
       run: |
         echo "Configuring Mac build to avoid license issues..."
@@ -111,6 +119,7 @@ jobs:
         echo "Windows build completed!"
       env:
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
+        WINE: wine
         
     - name: Combine Mac architectures into universal binary
       run: |
