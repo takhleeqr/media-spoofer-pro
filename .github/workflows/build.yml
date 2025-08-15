@@ -29,33 +29,24 @@ jobs:
       
     - name: Download FFmpeg for macOS
       run: |
-        # Download FFmpeg for macOS from a reliable source
-        echo "Downloading FFmpeg for macOS..."
-        curl -L https://evermeet.cx/ffmpeg/getrelease/zip -o ffmpeg.zip
+        # Download FFmpeg for macOS from a single source that includes both binaries
+        echo "Downloading FFmpeg for macOS from a single source..."
+        curl -L https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl.zip -o ffmpeg-mac.zip
         
         echo "Extracting FFmpeg to temp directory..."
         mkdir -p ffmpeg_temp
-        unzip ffmpeg.zip -d ffmpeg_temp/
+        unzip ffmpeg-mac.zip -d ffmpeg_temp/
         
-        echo "Downloading ffprobe for macOS..."
-        curl -L https://evermeet.cx/ffprobe/getrelease/zip -o ffprobe.zip
-        
-        echo "Extracting ffprobe to temp directory..."
-        mkdir -p ffprobe_temp
-        unzip ffprobe.zip -d ffprobe_temp/
-        
-        echo "Checking contents of temp directories..."
+        echo "Checking contents of temp directory..."
         echo "ffmpeg_temp contents:"
         ls -la ffmpeg_temp/
-        echo "ffprobe_temp contents:"
-        ls -la ffprobe_temp/
         
         echo "Copying files to root directory..."
-        cp ffmpeg_temp/ffmpeg ./ffmpeg
-        cp ffprobe_temp/ffprobe ./ffprobe
+        cp ffmpeg_temp/bin/ffmpeg ./ffmpeg
+        cp ffmpeg_temp/bin/ffprobe ./ffprobe
         
-        echo "Cleaning up temp directories..."
-        rm -rf ffmpeg_temp ffprobe_temp
+        echo "Cleaning up temp directory..."
+        rm -rf ffmpeg_temp
         
         echo "Checking extracted files..."
         ls -la
