@@ -65,6 +65,8 @@
       "category": "public.app-category.utilities",
       "darkModeSupport": true,
       "electronLanguages": ["en"],
+      "x64ArchFiles": "!Contents/Resources/ffmpeg*",
+      "arm64ArchFiles": "!Contents/Resources/ffmpeg*",
       "extendInfo": {
         "NSHighResolutionCapable": true,
         "LSMinimumSystemVersion": "10.15.0",
