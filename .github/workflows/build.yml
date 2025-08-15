@@ -74,7 +74,7 @@ jobs:
         ls -la ffmpeg*
         
         # Build Intel Mac version using cross-compilation
-        electron-builder --mac --x64
+        npm run build-mac-intel
         
         echo "Intel Mac build completed!"
       env:
@@ -86,7 +86,7 @@ jobs:
         echo "Current directory: $(pwd)"
         
         # Build ARM64 Mac version using cross-compilation
-        electron-builder --mac --arm64
+        npm run build-mac-arm
         
         echo "ARM64 Mac build completed!"
       env:
@@ -100,7 +100,7 @@ jobs:
         ls -la ffmpeg*
         
         # Build Windows version
-        electron-builder --win
+        npm run build-win
         
         echo "Windows build completed!"
       env:
