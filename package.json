@@ -8,7 +8,7 @@
     "setup": "node scripts/setup-dev.js",
     "build": "electron-builder",
     "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac --x64"
+    "build-mac": "electron-builder --mac --universal"
   },
   "keywords": [
     "media",
@@ -37,8 +37,7 @@
       "!ffprobe*"
     ],
     "extraResources": [
-      "ffmpeg*",
-      "ffprobe*"
+      "ffmpeg-windows/**/*"
     ],
     "win": {
       "target": "nsis",
@@ -49,7 +48,7 @@
       "target": "dmg",
       "icon": "logo.png",
       "publish": null,
-      "defaultArch": "x64",
+      "defaultArch": "universal",
       "minimumSystemVersion": "10.15.0",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
