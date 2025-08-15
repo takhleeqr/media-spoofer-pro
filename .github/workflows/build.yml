@@ -34,6 +34,13 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y wine wine32 wine64 libwine libwine:i386 fonts-wine
         echo "Wine installation completed!"
+        
+    - name: Install macOS development tools
+      run: |
+        echo "Installing macOS development tools for universal binary creation..."
+        sudo apt-get update
+        sudo apt-get install -y clang llvm-dev libc++-dev libc++abi-dev
+        echo "macOS development tools installed!"
       
     - name: Configure Mac build to avoid license issues
       run: |
@@ -121,16 +128,37 @@ jobs:
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         WINE: wine
         
-    - name: Combine Mac architectures into universal binary
+    - name: Package Mac builds separately
       run: |
-        echo "Combining Intel and ARM64 Mac builds into universal binary..."
+        echo "Packaging Mac builds separately (no universal binary on Ubuntu)..."
         
-        # Run the combine script to create universal binary
-        npm run combine-mac
+        # List what we have
+        echo "Available builds:"
+        ls -la dist/
         
-        echo "Universal Mac binary created successfully!"
+        # Create a simple package structure
+        mkdir -p dist/mac-packages
+        
+        # Copy Intel build
+        if [ -d "dist/mac-x64" ]; then
+          echo "Packaging Intel Mac build..."
+          cd dist/mac-x64
+          zip -r "../mac-packages/MediaSpooferPro-macOS-Intel.zip" .
+          cd ../..
+        fi
+        
+        # Copy ARM64 build
+        if [ -d "dist/mac-arm64" ]; then
+          echo "Packaging ARM64 Mac build..."
+          cd dist/mac-arm64
+          zip -r "../mac-packages/MediaSpooferPro-macOS-ARM64.zip" .
+          cd ../..
+        fi
+        
+        echo "Mac packages created successfully!"
         echo "Final build artifacts:"
         ls -la dist/
+        ls -la dist/mac-packages/
         
     - name: Upload all build artifacts
       uses: actions/upload-artifact@v4
@@ -160,20 +188,16 @@ jobs:
         echo "Preparing release assets..."
         ls -la dist/
         
-        # Find the universal Mac ZIP (should be the main one)
-        universal_zip=$(find dist -name "*.zip" -not -name "*arm64*" -not -name "*x64*" | head -1)
-        if [ -n "$universal_zip" ]; then
-          echo "Found universal macOS ZIP: $universal_zip"
-          cp "$universal_zip" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.zip"
-        else
-          # Fallback to any ZIP file
-          for file in dist/*.zip; do
-            if [ -f "$file" ]; then
-              echo "Found macOS ZIP: $file"
-              cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.zip"
-              break
-            fi
-          done
+        # Copy Intel Mac package
+        if [ -f "dist/mac-packages/MediaSpooferPro-macOS-Intel.zip" ]; then
+          echo "Found Intel Mac package"
+          cp "dist/mac-packages/MediaSpooferPro-macOS-Intel.zip" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-Intel.zip"
+        fi
+        
+        # Copy ARM64 Mac package
+        if [ -f "dist/mac-packages/MediaSpooferPro-macOS-ARM64.zip" ]; then
+          echo "Found ARM64 Mac package"
+          cp "dist/mac-packages/MediaSpooferPro-macOS-ARM64.zip" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-ARM64.zip"
         fi
         
         # Find Windows EXE
@@ -187,14 +211,24 @@ jobs:
         echo "Release assets prepared:"
         ls -la MediaSpooferPro-*
         
-    - name: Upload macOS release asset
+    - name: Upload Intel Mac release asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.zip
-        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.zip
+        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-Intel.zip
+        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-Intel.zip
+        asset_content_type: application/zip
+        
+    - name: Upload ARM64 Mac release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-ARM64.zip
+        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-ARM64.zip
         asset_content_type: application/zip
         
     - name: Upload Windows release asset
