@@ -32,35 +32,12 @@ jobs:
         # Download FFmpeg binaries that will be packaged with the app
         echo "Downloading FFmpeg for macOS..."
         
-        # Download FFmpeg from Evermeet.cx
-        echo "Downloading FFmpeg for macOS..."
-        curl -L -f "https://evermeet.cx/ffmpeg/get/ffmpeg" -o ffmpeg.zip
+        # Download FFmpeg and FFprobe directly from Evermeet.cx (raw binaries)
+        echo "Downloading FFmpeg binary..."
+        curl -L -f "https://evermeet.cx/ffmpeg/get/ffmpeg" -o ffmpeg
         
-        echo "Extracting FFmpeg to temp directory..."
-        unzip -q ffmpeg.zip -d ffmpeg_temp/
-        
-        # Download ffprobe from Evermeet.cx
-        echo "Downloading ffprobe for macOS..."
-        curl -L -f "https://evermeet.cx/ffmpeg/get/ffprobe" -o ffprobe.zip
-        
-        echo "Extracting ffprobe to temp directory..."
-        unzip -q ffprobe.zip -d ffprobe_temp/
-        
-        echo "Checking contents of temp directories..."
-        echo "ffmpeg_temp contents:"
-        ls -la ffmpeg_temp/
-        echo "ffprobe_temp contents:"
-        ls -la ffprobe_temp/
-        
-        echo "Copying files to root directory..."
-        cp ffmpeg_temp/ffmpeg ./ffmpeg
-        cp ffprobe_temp/ffmpeg ./ffprobe
-        
-        echo "Cleaning up temp directories..."
-        rm -rf ffmpeg_temp/ ffprobe_temp/
-        
-        echo "Checking extracted files..."
-        ls -la ffmpeg*
+        echo "Downloading FFprobe binary..."
+        curl -L -f "https://evermeet.cx/ffmpeg/get/ffprobe" -o ffprobe
         
         # Make executable
         chmod +x ffmpeg ffprobe
