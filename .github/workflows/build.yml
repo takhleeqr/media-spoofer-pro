@@ -9,8 +9,8 @@ on:
     types: [ published ]
 
 jobs:
-  build-mac-intel:
-    runs-on: macos-10.15  # Intel Mac runner for native Intel builds (best availability)
+  build-all-platforms:
+    runs-on: ubuntu-latest  # Always available, no queue delays!
     permissions:
       contents: read
     
@@ -27,352 +27,132 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Download FFmpeg for macOS Intel
+    - name: Download FFmpeg for all platforms
       run: |
-        echo "Downloading FFmpeg for macOS Intel..."
+        echo "Setting up FFmpeg for cross-platform builds..."
         
-        # Download FFmpeg and FFprobe from Evermeet.cx
-        echo "Downloading FFmpeg for macOS Intel..."
-        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
+        # Create platform-specific directories
+        mkdir -p ffmpeg-mac ffmpeg-win
         
-        echo "Extracting FFmpeg to temp directory..."
-        unzip -q ffmpeg.zip -d ffmpeg_temp/
+        # Download macOS FFmpeg (works for both Intel and ARM64)
+        echo "Downloading FFmpeg for macOS..."
+        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg-mac.zip
+        unzip -q ffmpeg-mac.zip -d ffmpeg-mac/
         
-        echo "Downloading ffprobe for macOS Intel..."
-        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
+        echo "Downloading ffprobe for macOS..."
+        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe-mac.zip
+        unzip -q ffprobe-mac.zip -d ffprobe-mac/
         
-        echo "Extracting ffprobe to temp directory..."
-        unzip -q ffprobe.zip -d ffprobe_temp/
+        # Download Windows FFmpeg
+        echo "Downloading FFmpeg for Windows..."
+        curl -L -f "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o ffmpeg-win.zip
+        unzip -q ffmpeg-win.zip -d ffmpeg-win/
         
-        echo "Copying files to root directory..."
-        cp ffmpeg_temp/ffmpeg ./ffmpeg
-        cp ffprobe_temp/ffprobe ./ffprobe
-        
-        echo "Cleaning up temp directories..."
-        rm -rf ffmpeg_temp/ ffprobe_temp/
-        
-        # Make executable
+        # Copy macOS binaries to root (will be packaged with Mac builds)
+        cp ffmpeg-mac/ffmpeg ./ffmpeg
+        cp ffprobe-mac/ffprobe ./ffprobe
         chmod +x ffmpeg ffprobe
         
-        # Verify
-        echo "Verifying FFmpeg installation for Intel Mac..."
-        ./ffmpeg -version
-        ./ffprobe -version
+        # Copy Windows binaries to root (will be packaged with Windows builds)
+        find ffmpeg-win -name "ffmpeg.exe" -exec cp {} ./ffmpeg.exe \;
+        find ffmpeg-win -name "ffprobe.exe" -exec cp {} ./ffprobe.exe \;
         
-        echo "FFmpeg download and setup completed successfully for Intel Mac!"
+        echo "FFmpeg setup completed for all platforms!"
+        echo "macOS binaries:"
+        ls -la ffmpeg ffprobe
+        echo "Windows binaries:"
+        ls -la ffmpeg.exe ffprobe.exe
         
-    - name: Build Intel Mac app
+        # Cleanup
+        rm -rf ffmpeg-mac.zip ffprobe-mac.zip ffmpeg-win.zip ffmpeg-mac/ ffprobe-mac/ ffmpeg-win/
+        
+    - name: Build Intel Mac app (x64)
       run: |
-        echo "Building Intel Mac app (x64)..."
+        echo "Building Intel Mac app (x64) from Ubuntu..."
         echo "Current directory: $(pwd)"
-        echo "FFmpeg installation verified:"
+        echo "FFmpeg binaries ready:"
         ls -la ffmpeg*
-        echo "FFmpeg version:"
-        ./ffmpeg -version | head -1
-        echo "FFprobe version:"
-        ./ffprobe -version | head -1
         
-        # Build only Intel version
-        npm run build-mac-intel
+        # Build Intel Mac version using cross-compilation
+        electron-builder --mac --x64
         
         echo "Intel Mac build completed!"
       env:
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         
-    - name: Upload Intel Mac build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: MediaSpooferPro-macOS-Intel
-        path: dist/
-        
-  build-mac-arm:
-    runs-on: macos-latest  # Apple Silicon runner for native ARM64 builds
-    permissions:
-      contents: read
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Download FFmpeg for macOS ARM64
-      run: |
-        echo "Downloading FFmpeg for macOS ARM64..."
-        
-        # Download FFmpeg and FFprobe from Evermeet.cx
-        echo "Downloading FFmpeg for macOS ARM64..."
-        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
-        
-        echo "Extracting FFmpeg to temp directory..."
-        unzip -q ffmpeg.zip -d ffmpeg_temp/
-        
-        echo "Downloading ffprobe for macOS ARM64..."
-        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
-        
-        echo "Extracting ffprobe to temp directory..."
-        unzip -q ffprobe.zip -d ffprobe_temp/
-        
-        echo "Copying files to root directory..."
-        cp ffmpeg_temp/ffmpeg ./ffmpeg
-        cp ffprobe_temp/ffprobe ./ffprobe
-        
-        echo "Cleaning up temp directories..."
-        rm -rf ffmpeg_temp/ ffprobe_temp/
-        
-        # Make executable
-        chmod +x ffmpeg ffprobe
-        
-        # Verify
-        echo "Verifying FFmpeg installation for ARM64 Mac..."
-        ./ffmpeg -version
-        ./ffprobe -version
-        
-        echo "FFmpeg download and setup completed successfully for ARM64 Mac!"
-        
     - name: Build ARM64 Mac app
       run: |
-        echo "Building ARM64 Mac app..."
+        echo "Building ARM64 Mac app from Ubuntu..."
         echo "Current directory: $(pwd)"
-        echo "FFmpeg installation verified:"
-        ls -la ffmpeg*
-        echo "FFmpeg version:"
-        ./ffmpeg -version | head -1
-        echo "FFprobe version:"
-        ./ffprobe -version | head -1
         
-        # Build only ARM64 version
-        npm run build-mac-arm
+        # Build ARM64 Mac version using cross-compilation
+        electron-builder --mac --arm64
         
         echo "ARM64 Mac build completed!"
       env:
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         
-    - name: Upload ARM64 Mac build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: MediaSpooferPro-macOS-ARM64
-        path: dist/
-        
-  build-windows:
-    runs-on: windows-latest
-    permissions:
-      contents: read
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Download FFmpeg for Windows
-      run: |
-        # Download FFmpeg for Windows with multiple fallback sources
-        Write-Host "Downloading FFmpeg for Windows..."
-        
-        $sources = @(
-          "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
-          "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-          "https://github.com/ffmpeg/ffmpeg/releases/download/n6.1/ffmpeg-6.1-full_build.zip"
-        )
-        
-        $ffmpegZip = "ffmpeg-win.zip"
-        $downloadSuccess = $false
-        
-        foreach ($source in $sources) {
-          try {
-            Write-Host "Trying source: $source"
-            Invoke-WebRequest -Uri $source -OutFile $ffmpegZip -UseBasicParsing
-            
-            # Verify file size
-            $fileInfo = Get-Item $ffmpegZip
-            if ($fileInfo.Length -gt 1000000) {  # More than 1MB
-              Write-Host "Successfully downloaded from: $source"
-              $downloadSuccess = $true
-              break
-            } else {
-              Write-Host "File too small, trying next source..."
-              Remove-Item $ffmpegZip -Force
-            }
-          } catch {
-            Write-Host "Failed to download from: $source"
-            Write-Host "Error: $($_.Exception.Message)"
-            if (Test-Path $ffmpegZip) {
-              Remove-Item $ffmpegZip -Force
-            }
-          }
-        }
-        
-        if (-not $downloadSuccess) {
-          Write-Host "ERROR: All download sources failed!"
-          exit 1
-        }
-        
-        Write-Host "Extracting FFmpeg..."
-        Expand-Archive -Path $ffmpegZip -DestinationPath "ffmpeg-temp" -Force
-        
-        Write-Host "Searching for FFmpeg binaries..."
-        $ffmpegExe = Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffmpeg.exe" | Select-Object -First 1
-        $ffprobeExe = Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffprobe.exe" | Select-Object -First 1
-        
-        if (-not $ffmpegExe -or -not $ffprobeExe) {
-          Write-Host "ERROR: Could not find FFmpeg binaries in extracted files"
-          Write-Host "Contents of ffmpeg-temp:"
-          Get-ChildItem -Path "ffmpeg-temp" -Recurse | Select-Object FullName
-          exit 1
-        }
-        
-        Write-Host "Copying FFmpeg binaries to root directory..."
-        Copy-Item "ffmpeg-temp\$ffmpegExe" "ffmpeg.exe"
-        Copy-Item "ffmpeg-temp\$ffprobeExe" "ffprobe.exe"
-        
-        Write-Host "Verifying FFmpeg installation..."
-        .\ffmpeg.exe -version
-        .\ffprobe.exe -version
-        
-        Write-Host "Cleaning up..."
-        Remove-Item -Recurse -Force "ffmpeg-temp"
-        Remove-Item $ffmpegZip -Force
-        
-        Write-Host "FFmpeg setup completed successfully!"
-        
     - name: Build Windows app
       run: |
+        echo "Building Windows app from Ubuntu..."
         echo "Current directory: $(pwd)"
-        echo "FFmpeg files before build:"
-        dir ffmpeg*
-        echo "Building Windows app..."
-        npm run build-win
+        echo "FFmpeg files ready:"
+        ls -la ffmpeg*
+        
+        # Build Windows version
+        electron-builder --win
+        
+        echo "Windows build completed!"
       env:
         ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
         
-    - name: Upload Windows build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: MediaSpooferPro-Windows
-        path: dist/
-        
-  combine-mac:
-    needs: [build-mac-intel, build-mac-arm]
-    runs-on: macos-latest
-    permissions:
-      contents: read
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Download Intel Mac artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: MediaSpooferPro-macOS-Intel
-        path: intel-build/
-        
-    - name: Download ARM64 Mac artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: MediaSpooferPro-macOS-ARM64
-        path: arm64-build/
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Download FFmpeg for macOS
-      run: |
-        echo "Downloading FFmpeg for macOS universal build..."
-        
-        # Download FFmpeg and FFprobe from Evermeet.cx
-        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
-        unzip -q ffmpeg.zip -d ffmpeg_temp/
-        
-        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
-        unzip -q ffprobe.zip -d ffprobe_temp/
-        
-        cp ffmpeg_temp/ffmpeg ./ffmpeg
-        cp ffprobe_temp/ffprobe ./ffprobe
-        
-        rm -rf ffmpeg_temp/ ffprobe_temp/
-        chmod +x ffmpeg ffprobe
-        
-        echo "FFmpeg ready for universal build!"
-        
-    - name: Combine Mac architectures
+    - name: Combine Mac architectures into universal binary
       run: |
         echo "Combining Intel and ARM64 Mac builds into universal binary..."
-        
-        # Copy Intel build to dist
-        mkdir -p dist/
-        cp -r intel-build/* dist/
         
         # Run the combine script to create universal binary
         npm run combine-mac
         
         echo "Universal Mac binary created successfully!"
+        echo "Final build artifacts:"
         ls -la dist/
         
-    - name: Upload Universal Mac build artifacts
+    - name: Upload all build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: MediaSpooferPro-macOS-Universal
+        name: MediaSpooferPro-All-Platforms
         path: dist/
         
   release:
-    needs: [combine-mac, build-windows]
+    needs: [build-all-platforms]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     permissions:
       contents: write
     
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
       
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: MediaSpooferPro-All-Platforms
+        path: dist/
+        
     - name: Create release assets
       run: |
-        mkdir -p release-assets
+        echo "Preparing release assets..."
+        ls -la dist/
         
-        # Copy universal Mac build
-        if [ -d "MediaSpooferPro-macOS-Universal" ]; then
-          cp -r MediaSpooferPro-macOS-Universal/* release-assets/
-        fi
-        
-        # Copy Windows build
-        if [ -d "MediaSpooferPro-Windows" ]; then
-          cp -r MediaSpooferPro-Windows/* release-assets/
-        fi
-        
-        echo "Release assets created:"
-        ls -la release-assets/
-        
-        # Find and rename the actual files for upload
-        # Look for universal DMG first, then fallback to any DMG
-        universal_dmg=$(find release-assets -name "*.dmg" -not -name "*arm64*" -not -name "*x64*" | head -1)
+        # Find the universal Mac DMG (should be the main one)
+        universal_dmg=$(find dist -name "*.dmg" -not -name "*arm64*" -not -name "*x64*" | head -1)
         if [ -n "$universal_dmg" ]; then
           echo "Found universal macOS DMG: $universal_dmg"
-          cp "$universal_dmg" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg"
+          cp "$universal_dmg" "MediaSpooferPro-${{ github.event_release.tag_name }}-macOS.dmg"
         else
           # Fallback to any DMG file
-          for file in release-assets/*.dmg; do
+          for file in dist/*.dmg; do
             if [ -f "$file" ]; then
               echo "Found macOS DMG: $file"
               cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg"
@@ -381,17 +161,18 @@ jobs:
           done
         fi
         
-        for file in release-assets/*.exe; do
+        # Find Windows EXE
+        for file in dist/*.exe; do
           if [ -f "$file" ]; then
             echo "Found Windows EXE: $file"
             cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe"
           fi
         done
         
-        echo "Files ready for upload:"
+        echo "Release assets prepared:"
         ls -la MediaSpooferPro-*
         
-    - name: Upload release assets
+    - name: Upload macOS release asset
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
