@@ -9,7 +9,7 @@
     "test-ffmpeg": "node test-ffmpeg-setup.js",
     "build": "electron-builder",
     "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac --universal"
+    "build-mac": "electron-builder --mac"
   },
   "keywords": [
     "media",
@@ -56,7 +56,6 @@
       "target": "dmg",
       "icon": "logo.png",
       "publish": null,
-      "defaultArch": "universal",
       "minimumSystemVersion": "10.15.0",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
@@ -65,7 +64,6 @@
       "category": "public.app-category.utilities",
       "darkModeSupport": true,
       "electronLanguages": ["en"],
-      "singleArchFiles": "!Contents/Resources/ffmpeg*",
       "extendInfo": {
         "NSHighResolutionCapable": true,
         "LSMinimumSystemVersion": "10.15.0",
