@@ -29,83 +29,77 @@ jobs:
       
     - name: Download FFmpeg for macOS
       run: |
-        # Try multiple sources for FFmpeg on macOS - prioritized for compatibility
-        echo "Attempting to download FFmpeg for macOS..."
+        # Simple, robust FFmpeg download for macOS
+        echo "Downloading FFmpeg for macOS..."
         
-        # Source 1: Evermeet (official macOS builds - best compatibility with all versions)
-        echo "Trying Evermeet (official macOS builds)..."
-        if curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg-mac.zip; then
-          echo "Successfully downloaded from Evermeet (best compatibility)"
+        # Try BtbN builds first (most reliable, always has both binaries)
+        if curl -L -f "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl.zip" -o ffmpeg-mac.zip; then
+          echo "Downloaded BtbN build successfully"
         else
-          echo "Evermeet failed, trying BtbN shared build..."
-          # Source 2: BtbN shared build (better compatibility with system libraries)
-          if curl -L -f "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl-shared.zip" -o ffmpeg-mac.zip; then
-            echo "Successfully downloaded BtbN shared build"
+          echo "BtbN failed, trying Evermeet..."
+          if curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg-mac.zip; then
+            echo "Downloaded Evermeet build successfully"
           else
-            echo "BtbN shared failed, trying BtbN static build..."
-            # Source 3: BtbN static build (universal Intel + Apple Silicon)
-            if curl -L -f "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl.zip" -o ffmpeg-mac.zip; then
-              echo "Successfully downloaded BtbN static build"
-            else
-              echo "All sources failed, using Homebrew as fallback..."
-              # Source 4: Use Homebrew as fallback
-              brew install ffmpeg
-              echo "FFmpeg installed via Homebrew"
-              exit 0
-            fi
+            echo "All downloads failed, using Homebrew"
+            brew install ffmpeg
+            exit 0
           fi
         fi
         
-        # Verify download size
-        file_size=$(stat -f%z ffmpeg-mac.zip)
-        echo "Downloaded file size: $file_size bytes"
-        
-        if [ "$file_size" -lt 1000000 ]; then
-          echo "ERROR: Downloaded file is too small ($file_size bytes), likely corrupted"
-          exit 1
-        fi
-        
+        # Extract and setup
         echo "Extracting FFmpeg..."
-        mkdir -p ffmpeg_temp
-        unzip -q ffmpeg-mac.zip -d ffmpeg_temp/
+        unzip -q ffmpeg-mac.zip
         
-        echo "Searching for FFmpeg binaries in extracted files..."
-        find ffmpeg_temp -name "ffmpeg" -type f
-        find ffmpeg_temp -name "ffprobe" -type f
+        # Find and copy binaries
+        echo "Setting up FFmpeg binaries..."
         
-        # Check if both binaries exist after extraction
-        ffmpeg_found=$(find ffmpeg_temp -name "ffmpeg" -type f | head -1)
-        ffprobe_found=$(find ffmpeg_temp -name "ffprobe" -type f | head -1)
-        
-        echo "FFmpeg binary found: $ffmpeg_found"
-        echo "FFprobe binary found: $ffprobe_found"
-        
-        # If both binaries exist, we're good
-        if [ -n "$ffmpeg_found" ] && [ -n "$ffprobe_found" ]; then
-          echo "✅ Both FFmpeg and FFprobe found!"
+        # Look for ffmpeg binary
+        if [ -f "ffmpeg" ]; then
+          echo "FFmpeg found in root"
+        elif [ -f "ffmpeg_temp/ffmpeg" ]; then
+          cp ffmpeg_temp/ffmpeg ./ffmpeg
+          echo "FFmpeg copied from ffmpeg_temp"
         else
-          echo "❌ Missing binaries, trying next source..."
-          rm -rf ffmpeg_temp ffmpeg-mac.zip
-          continue
+          # Search recursively
+          ffmpeg_path=$(find . -name "ffmpeg" -type f | head -1)
+          if [ -n "$ffmpeg_path" ]; then
+            cp "$ffmpeg_path" ./ffmpeg
+            echo "FFmpeg copied from: $ffmpeg_path"
+          else
+            echo "ERROR: FFmpeg not found"
+            exit 1
+          fi
         fi
         
-        # Copy binaries to root directory
-        echo "Copying FFmpeg binaries to root directory..."
-        cp "$ffmpeg_found" ./ffmpeg
-        cp "$ffprobe_found" ./ffprobe
+        # Look for ffprobe binary
+        if [ -f "ffprobe" ]; then
+          echo "FFprobe found in root"
+        elif [ -f "ffmpeg_temp/ffprobe" ]; then
+          cp ffmpeg_temp/ffprobe ./ffprobe
+          echo "FFprobe copied from ffmpeg_temp"
+        else
+          # Search recursively
+          ffprobe_path=$(find . -name "ffprobe" -type f | head -1)
+          if [ -n "$ffprobe_path" ]; then
+            cp "$ffprobe_path" ./ffprobe
+            echo "FFprobe copied from: $ffprobe_path"
+          else
+            echo "ERROR: FFprobe not found"
+            exit 1
+          fi
+        fi
         
         # Make executable
         chmod +x ffmpeg ffprobe
         
+        # Verify
         echo "Verifying FFmpeg installation..."
         ./ffmpeg -version
         ./ffprobe -version
         
-        echo "Cleaning up..."
+        # Cleanup
         rm -rf ffmpeg_temp ffmpeg-mac.zip
-        
         echo "FFmpeg setup completed successfully!"
-        break
         
     - name: Build macOS app
       run: |
