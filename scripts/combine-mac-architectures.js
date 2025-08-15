@@ -44,12 +44,13 @@ if (fs.existsSync(x64App) && fs.existsSync(arm64App)) {
         console.log('✅ Verifying universal binary...');
         execSync(`lipo -info "${universalBinary}"`, { stdio: 'inherit' });
         
-        // Copy the universal app to the universal directory
-        fs.rmSync(universalDir, { recursive: true, force: true });
-        fs.mkdirSync(universalDir, { recursive: true });
-        execSync(`cp -R "${x64App}" "${universalDir}/"`, { stdio: 'inherit' });
-        
         console.log('🎉 Universal macOS app created successfully!');
+        console.log('📁 Universal app location:', universalDir);
+        
+        // List contents to verify
+        console.log('📋 Contents of universal directory:');
+        execSync(`ls -la "${universalDir}"`, { stdio: 'inherit' });
+        
     } else {
         console.error('❌ Could not find main binaries');
         process.exit(1);
