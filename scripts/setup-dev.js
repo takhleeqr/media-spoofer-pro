@@ -140,12 +140,42 @@ async function setupFFmpeg() {
                 console.log('🔄 Downloading FFmpeg from Evermeet.cx...');
                 try {
                     // Download FFmpeg and FFprobe from Evermeet.cx (proven working source)
-                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffmpeg', 'ffmpeg');
-                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffprobe', 'ffprobe');
+                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffmpeg', 'ffmpeg.zip');
+                    await downloadFile('https://evermeet.cx/ffmpeg/get/ffprobe', 'ffprobe.zip');
+                    
+                    // Extract the binaries
+                    console.log('📦 Extracting FFmpeg binaries...');
+                    execSync('unzip -q ffmpeg.zip');
+                    execSync('unzip -q ffprobe.zip');
+                    
+                    // Find and copy the actual binary files
+                    console.log('🔍 Setting up FFmpeg binaries...');
+                    
+                    // Look for ffmpeg binary
+                    const ffmpegPath = execSync('find . -name "ffmpeg" -type f | head -1', { encoding: 'utf8' }).trim();
+                    if (ffmpegPath) {
+                        fs.copyFileSync(ffmpegPath, './ffmpeg');
+                        console.log(`FFmpeg copied from: ${ffmpegPath}`);
+                    } else {
+                        throw new Error('FFmpeg not found after extraction');
+                    }
+                    
+                    // Look for ffprobe binary
+                    const ffprobePath = execSync('find . -name "ffprobe" -type f | head -1', { encoding: 'utf8' }).trim();
+                    if (ffprobePath) {
+                        fs.copyFileSync(ffprobePath, './ffprobe');
+                        console.log(`FFprobe copied from: ${ffprobePath}`);
+                    } else {
+                        throw new Error('FFprobe not found after extraction');
+                    }
                     
                     // Make executable
                     fs.chmodSync('ffmpeg', '755');
                     fs.chmodSync('ffprobe', '755');
+                    
+                    // Cleanup
+                    fs.unlinkSync('ffmpeg.zip');
+                    fs.unlinkSync('ffprobe.zip');
                     
                     console.log('✅ FFmpeg downloaded from Evermeet.cx successfully');
                 } catch (error) {
