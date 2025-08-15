@@ -88,8 +88,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "license": "LICENSE.txt"
+      "createDesktopShortcut": true
     }
   }
 }
