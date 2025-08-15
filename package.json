@@ -9,7 +9,8 @@
     "test-ffmpeg": "node test-ffmpeg-setup.js",
     "build": "electron-builder",
     "build-win": "electron-builder --win",
-    "build-mac": "electron-builder --mac"
+    "build-mac": "electron-builder --mac --x64 && electron-builder --mac --arm64 && npm run combine-mac",
+    "combine-mac": "node scripts/combine-mac-architectures.js"
   },
   "keywords": [
     "media",
@@ -56,6 +57,7 @@
       "target": "dmg",
       "icon": "logo.png",
       "publish": null,
+      "defaultArch": "universal",
       "minimumSystemVersion": "10.15.0",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
