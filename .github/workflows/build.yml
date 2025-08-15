@@ -151,17 +151,17 @@ jobs:
         echo "Preparing release assets..."
         ls -la dist/
         
-        # Find the universal Mac DMG (should be the main one)
-        universal_dmg=$(find dist -name "*.dmg" -not -name "*arm64*" -not -name "*x64*" | head -1)
-        if [ -n "$universal_dmg" ]; then
-          echo "Found universal macOS DMG: $universal_dmg"
-          cp "$universal_dmg" "MediaSpooferPro-${{ github.event_release.tag_name }}-macOS.dmg"
+        # Find the universal Mac ZIP (should be the main one)
+        universal_zip=$(find dist -name "*.zip" -not -name "*arm64*" -not -name "*x64*" | head -1)
+        if [ -n "$universal_zip" ]; then
+          echo "Found universal macOS ZIP: $universal_zip"
+          cp "$universal_zip" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.zip"
         else
-          # Fallback to any DMG file
-          for file in dist/*.dmg; do
+          # Fallback to any ZIP file
+          for file in dist/*.zip; do
             if [ -f "$file" ]; then
-              echo "Found macOS DMG: $file"
-              cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg"
+              echo "Found macOS ZIP: $file"
+              cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.zip"
               break
             fi
           done
@@ -184,9 +184,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
-        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.dmg
-        asset_content_type: application/octet-stream
+        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.zip
+        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS.zip
+        asset_content_type: application/zip
         
     - name: Upload Windows release asset
       uses: actions/upload-release-asset@v1

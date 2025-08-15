@@ -56,7 +56,7 @@
       "publish": null
     },
     "mac": {
-      "target": "dmg",
+      "target": "zip",
       "icon": "logo.png",
       "publish": null,
       "defaultArch": "universal",
