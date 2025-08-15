@@ -30,65 +30,47 @@ jobs:
     - name: Download FFmpeg for macOS
       run: |
         # Download FFmpeg binaries that will be packaged with the app
-        echo "Downloading FFmpeg for macOS from Evermeet.cx..."
+        echo "Downloading FFmpeg for macOS..."
         
-        # Download FFmpeg and FFprobe from Evermeet.cx (proven working source)
-        if curl -L -f "https://evermeet.cx/ffmpeg/get/ffmpeg" -o ffmpeg.zip; then
-          echo "Downloaded FFmpeg from Evermeet.cx successfully"
-        else
-          echo "ERROR: Failed to download FFmpeg from Evermeet.cx"
-          exit 1
-        fi
+        # Download FFmpeg from Evermeet.cx
+        echo "Downloading FFmpeg for macOS..."
+        curl -L -f "https://evermeet.cx/ffmpeg/get/ffmpeg" -o ffmpeg.zip
         
-        if curl -L -f "https://evermeet.cx/ffmpeg/get/ffprobe" -o ffprobe.zip; then
-          echo "Downloaded FFprobe from Evermeet.cx successfully"
-        else
-          echo "ERROR: Failed to download FFprobe from Evermeet.cx"
-          exit 1
-        fi
+        echo "Extracting FFmpeg to temp directory..."
+        unzip -q ffmpeg.zip -d ffmpeg_temp/
         
-        # Extract the binaries
-        echo "Extracting FFmpeg binaries..."
-        unzip -q ffmpeg.zip
-        unzip -q ffprobe.zip
+        # Download ffprobe from Evermeet.cx
+        echo "Downloading ffprobe for macOS..."
+        curl -L -f "https://evermeet.cx/ffmpeg/get/ffprobe" -o ffprobe.zip
         
-        # Find and copy the actual binary files
-        echo "Setting up FFmpeg binaries..."
+        echo "Extracting ffprobe to temp directory..."
+        unzip -q ffprobe.zip -d ffprobe_temp/
         
-        # Look for ffmpeg binary
-        ffmpeg_path=$(find . -name "ffmpeg" -type f | head -1)
-        if [ -n "$ffmpeg_path" ]; then
-          cp "$ffmpeg_path" ./ffmpeg
-          echo "FFmpeg copied from: $ffmpeg_path"
-        else
-          echo "ERROR: FFmpeg not found after extraction"
-          exit 1
-        fi
+        echo "Checking contents of temp directories..."
+        echo "ffmpeg_temp contents:"
+        ls -la ffmpeg_temp/
+        echo "ffprobe_temp contents:"
+        ls -la ffprobe_temp/
         
-        # Look for ffprobe binary
-        ffprobe_path=$(find . -name "ffprobe" -type f | head -1)
-        if [ -n "$ffprobe_path" ]; then
-          cp "$ffprobe_path" ./ffprobe
-          echo "FFprobe copied from: $ffprobe_path"
-        else
-          echo "ERROR: FFprobe not found after extraction"
-          exit 1
-        fi
+        echo "Copying files to root directory..."
+        cp ffmpeg_temp/ffmpeg ./ffmpeg
+        cp ffprobe_temp/ffmpeg ./ffprobe
+        
+        echo "Cleaning up temp directories..."
+        rm -rf ffmpeg_temp/ ffprobe_temp/
+        
+        echo "Checking extracted files..."
+        ls -la ffmpeg*
         
         # Make executable
         chmod +x ffmpeg ffprobe
-        
-        # Cleanup
-        rm -f ffmpeg.zip ffprobe.zip
         
         # Verify
         echo "Verifying FFmpeg installation..."
         ./ffmpeg -version
         ./ffprobe -version
         
-        echo "FFmpeg setup completed successfully!"
-        echo "Files in root directory:"
-        ls -la ffmpeg*
+        echo "FFmpeg download and setup completed successfully!"
         
     - name: Build macOS app
       run: |

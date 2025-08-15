@@ -143,37 +143,34 @@ async function setupFFmpeg() {
                     await downloadFile('https://evermeet.cx/ffmpeg/get/ffmpeg', 'ffmpeg.zip');
                     await downloadFile('https://evermeet.cx/ffmpeg/get/ffprobe', 'ffprobe.zip');
                     
-                    // Extract the binaries
-                    console.log('📦 Extracting FFmpeg binaries...');
-                    execSync('unzip -q ffmpeg.zip');
-                    execSync('unzip -q ffprobe.zip');
+                    // Extract the binaries to temp directories
+                    console.log('📦 Extracting FFmpeg to temp directory...');
+                    execSync('unzip -q ffmpeg.zip -d ffmpeg_temp/');
                     
-                    // Find and copy the actual binary files
-                    console.log('🔍 Setting up FFmpeg binaries...');
+                    console.log('📦 Extracting ffprobe to temp directory...');
+                    execSync('unzip -q ffprobe.zip -d ffprobe_temp/');
                     
-                    // Look for ffmpeg binary
-                    const ffmpegPath = execSync('find . -name "ffmpeg" -type f | head -1', { encoding: 'utf8' }).trim();
-                    if (ffmpegPath) {
-                        fs.copyFileSync(ffmpegPath, './ffmpeg');
-                        console.log(`FFmpeg copied from: ${ffmpegPath}`);
-                    } else {
-                        throw new Error('FFmpeg not found after extraction');
-                    }
+                    console.log('🔍 Checking contents of temp directories...');
+                    console.log('ffmpeg_temp contents:');
+                    execSync('ls -la ffmpeg_temp/', { stdio: 'inherit' });
+                    console.log('ffprobe_temp contents:');
+                    execSync('ls -la ffprobe_temp/', { stdio: 'inherit' });
                     
-                    // Look for ffprobe binary
-                    const ffprobePath = execSync('find . -name "ffprobe" -type f | head -1', { encoding: 'utf8' }).trim();
-                    if (ffprobePath) {
-                        fs.copyFileSync(ffprobePath, './ffprobe');
-                        console.log(`FFprobe copied from: ${ffprobePath}`);
-                    } else {
-                        throw new Error('FFprobe not found after extraction');
-                    }
+                    console.log('📋 Copying files to root directory...');
+                    fs.copyFileSync('ffmpeg_temp/ffmpeg', './ffmpeg');
+                    fs.copyFileSync('ffprobe_temp/ffmpeg', './ffprobe');
+                    
+                    console.log('🧹 Cleaning up temp directories...');
+                    execSync('rm -rf ffmpeg_temp/ ffprobe_temp/');
+                    
+                    console.log('🔍 Checking extracted files...');
+                    execSync('ls -la ffmpeg*', { stdio: 'inherit' });
                     
                     // Make executable
                     fs.chmodSync('ffmpeg', '755');
                     fs.chmodSync('ffprobe', '755');
                     
-                    // Cleanup
+                    // Cleanup zip files
                     fs.unlinkSync('ffmpeg.zip');
                     fs.unlinkSync('ffprobe.zip');
                     
@@ -223,8 +220,8 @@ async function main() {
     
     console.log('\n🎉 Development environment setup complete!');
     if (!isCI) {
-    console.log('You can now run: npm start');
+        console.log('You can now run: npm start');
     }
 }
 
-main().catch(console.error); 
+main().catch(console.error);
