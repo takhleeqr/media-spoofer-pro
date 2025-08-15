@@ -73,7 +73,7 @@ jobs:
         ./ffprobe -version | head -1
         
         # Build only Intel version
-        electron-builder --mac --x64
+        npm run build-mac-intel
         
         echo "Intel Mac build completed!"
       env:
@@ -149,7 +149,7 @@ jobs:
         ./ffprobe -version | head -1
         
         # Build only ARM64 version
-        electron-builder --mac --arm64
+        npm run build-mac-arm
         
         echo "ARM64 Mac build completed!"
       env:
