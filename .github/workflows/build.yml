@@ -27,6 +27,12 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
+    - name: Install missing Mac build dependencies
+      run: |
+        echo "Installing missing Mac build dependencies..."
+        npm install dmg-license
+        echo "Mac build dependencies installed!"
+      
     - name: Download FFmpeg for all platforms
       run: |
         echo "Setting up FFmpeg for cross-platform builds..."
