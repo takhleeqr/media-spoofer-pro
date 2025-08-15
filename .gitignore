@@ -95,3 +95,17 @@ ffmpeg-temp/
 # Temporary build files
 *.tmp
 *.temp
+
+# Test and debug files (excluded from production builds)
+test-*.js
+test-*.html
+debug-*.js
+debug-*.html
+test-*.txt
+test-*.log
+test-output/
+debug-*/
+temp-ffmpeg/
+MediaSpoofer_Output/
+null/
+undefined/

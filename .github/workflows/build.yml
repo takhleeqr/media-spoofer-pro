@@ -29,48 +29,66 @@ jobs:
       
     - name: Download FFmpeg for macOS
       run: |
-        # Download FFmpeg for macOS from a single source that includes both binaries
-        echo "Downloading FFmpeg for macOS from a single source..."
-        curl -L https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl.zip -o ffmpeg-mac.zip
+        # Try multiple sources for FFmpeg on macOS - prioritized for compatibility
+        echo "Attempting to download FFmpeg for macOS..."
         
-        echo "Extracting FFmpeg to temp directory..."
+        # Source 1: Evermeet (official macOS builds - best compatibility with all versions)
+        echo "Trying Evermeet (official macOS builds)..."
+        if curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg-mac.zip; then
+          echo "Successfully downloaded from Evermeet (best compatibility)"
+        else
+          echo "Evermeet failed, trying BtbN shared build..."
+          # Source 2: BtbN shared build (better compatibility with system libraries)
+          if curl -L -f "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl-shared.zip" -o ffmpeg-mac.zip; then
+            echo "Successfully downloaded BtbN shared build"
+          else
+            echo "BtbN shared failed, trying BtbN static build..."
+            # Source 3: BtbN static build (universal Intel + Apple Silicon)
+            if curl -L -f "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl.zip" -o ffmpeg-mac.zip; then
+              echo "Successfully downloaded BtbN static build"
+            else
+              echo "All sources failed, using Homebrew as fallback..."
+              # Source 4: Use Homebrew as fallback
+              brew install ffmpeg
+              echo "FFmpeg installed via Homebrew"
+              exit 0
+            fi
+          fi
+        fi
+        
+        # Verify download size
+        file_size=$(stat -f%z ffmpeg-mac.zip)
+        echo "Downloaded file size: $file_size bytes"
+        
+        if [ "$file_size" -lt 1000000 ]; then
+          echo "ERROR: Downloaded file is too small ($file_size bytes), likely corrupted"
+          exit 1
+        fi
+        
+        echo "Extracting FFmpeg..."
         mkdir -p ffmpeg_temp
-        unzip ffmpeg-mac.zip -d ffmpeg_temp/
+        unzip -q ffmpeg-mac.zip -d ffmpeg_temp/
         
-        echo "Checking contents of temp directory..."
-        echo "ffmpeg_temp contents:"
-        ls -la ffmpeg_temp/
+        echo "Searching for FFmpeg binaries in extracted files..."
+        find ffmpeg_temp -name "ffmpeg" -type f
+        find ffmpeg_temp -name "ffprobe" -type f
         
-        echo "Copying files to root directory..."
-        cp ffmpeg_temp/bin/ffmpeg ./ffmpeg
-        cp ffmpeg_temp/bin/ffprobe ./ffprobe
-        
-        echo "Cleaning up temp directory..."
-        rm -rf ffmpeg_temp
-        
-        echo "Checking extracted files..."
-        ls -la
-        
-        # Check if both files exist
-        if [ ! -f "ffmpeg" ]; then
-            echo "ERROR: ffmpeg file not found!"
-            exit 1
-        fi
-        
-        if [ ! -f "ffprobe" ]; then
-            echo "ERROR: ffprobe file not found!"
-            exit 1
-        fi
+        # Copy binaries to root directory
+        echo "Copying FFmpeg binaries to root directory..."
+        find ffmpeg_temp -name "ffmpeg" -type f -exec cp {} ./ffmpeg \;
+        find ffmpeg_temp -name "ffprobe" -type f -exec cp {} ./ffprobe \;
         
         # Make executable
-        chmod +x ffmpeg
-        chmod +x ffprobe
+        chmod +x ffmpeg ffprobe
         
         echo "Verifying FFmpeg installation..."
         ./ffmpeg -version
         ./ffprobe -version
         
-        echo "FFmpeg download and setup completed successfully!"
+        echo "Cleaning up..."
+        rm -rf ffmpeg_temp ffmpeg-mac.zip
+        
+        echo "FFmpeg setup completed successfully!"
         
     - name: Build macOS app
       run: |
@@ -108,64 +126,80 @@ jobs:
       
     - name: Download FFmpeg for Windows
       run: |
-        # Download FFmpeg for Windows
-        $ffmpegUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-        $ffmpegZip = "ffmpeg-win.zip"
+        # Download FFmpeg for Windows with multiple fallback sources
+        Write-Host "Downloading FFmpeg for Windows..."
         
-        Write-Host "Downloading FFmpeg from: $ffmpegUrl"
-        try {
-            Invoke-WebRequest -Uri $ffmpegUrl -OutFile $ffmpegZip -UseBasicParsing
-        } catch {
-            Write-Host "Failed to download from primary URL, trying alternative..."
-            $altUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
-            Invoke-WebRequest -Uri $altUrl -OutFile $ffmpegZip -UseBasicParsing
+        $sources = @(
+          "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+          "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+          "https://github.com/ffmpeg/ffmpeg/releases/download/n6.1/ffmpeg-6.1-full_build.zip"
+        )
+        
+        $ffmpegZip = "ffmpeg-win.zip"
+        $downloadSuccess = $false
+        
+        foreach ($source in $sources) {
+          try {
+            Write-Host "Trying source: $source"
+            Invoke-WebRequest -Uri $source -OutFile $ffmpegZip -UseBasicParsing
+            
+            # Verify file size
+            $fileInfo = Get-Item $ffmpegZip
+            if ($fileInfo.Length -gt 1000000) {  # More than 1MB
+              Write-Host "Successfully downloaded from: $source"
+              $downloadSuccess = $true
+              break
+            } else {
+              Write-Host "File too small, trying next source..."
+              Remove-Item $ffmpegZip -Force
+            }
+          } catch {
+            Write-Host "Failed to download from: $source"
+            Write-Host "Error: $($_.Exception.Message)"
+            if (Test-Path $ffmpegZip) {
+              Remove-Item $ffmpegZip -Force
+            }
+          }
+        }
+        
+        if (-not $downloadSuccess) {
+          Write-Host "ERROR: All download sources failed!"
+          exit 1
         }
         
         Write-Host "Extracting FFmpeg..."
         Expand-Archive -Path $ffmpegZip -DestinationPath "ffmpeg-temp" -Force
         
-        Write-Host "Looking for FFmpeg binaries..."
-        Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffmpeg.exe"
-        Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffprobe.exe"
-        
-        Write-Host "Copying FFmpeg binaries..."
+        Write-Host "Searching for FFmpeg binaries..."
         $ffmpegExe = Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffmpeg.exe" | Select-Object -First 1
         $ffprobeExe = Get-ChildItem -Path "ffmpeg-temp" -Recurse -Name "ffprobe.exe" | Select-Object -First 1
         
-        if ($ffmpegExe) {
-            Copy-Item "ffmpeg-temp\$ffmpegExe" "ffmpeg.exe"
+        if (-not $ffmpegExe -or -not $ffprobeExe) {
+          Write-Host "ERROR: Could not find FFmpeg binaries in extracted files"
+          Write-Host "Contents of ffmpeg-temp:"
+          Get-ChildItem -Path "ffmpeg-temp" -Recurse | Select-Object FullName
+          exit 1
         }
-        if ($ffprobeExe) {
-            Copy-Item "ffmpeg-temp\$ffprobeExe" "ffprobe.exe"
-        }
+        
+        Write-Host "Copying FFmpeg binaries to root directory..."
+        Copy-Item "ffmpeg-temp\$ffmpegExe" "ffmpeg.exe"
+        Copy-Item "ffmpeg-temp\$ffprobeExe" "ffprobe.exe"
         
         Write-Host "Verifying FFmpeg installation..."
-        if (Test-Path "ffmpeg.exe") {
-            .\ffmpeg.exe -version
-        } else {
-            Write-Host "ERROR: ffmpeg.exe not found!"
-            exit 1
-        }
-        if (Test-Path "ffprobe.exe") {
-            .\ffprobe.exe -version
-        } else {
-            Write-Host "ERROR: ffprobe.exe not found!"
-            exit 1
-        }
+        .\ffmpeg.exe -version
+        .\ffprobe.exe -version
         
-        Write-Host "FFmpeg download and setup completed successfully!"
+        Write-Host "Cleaning up..."
+        Remove-Item -Recurse -Force "ffmpeg-temp"
+        Remove-Item $ffmpegZip -Force
         
-        # Verify files are in the right place before building
-        Write-Host "Final verification - FFmpeg files in root directory:"
-        Get-ChildItem -Path "." -Name "ffmpeg*"
-        Get-ChildItem -Path "." -Name "ffprobe*"
+        Write-Host "FFmpeg setup completed successfully!"
         
     - name: Build Windows app
       run: |
         echo "Current directory: $(pwd)"
         echo "FFmpeg files before build:"
         dir ffmpeg*
-        dir ffprobe*
         echo "Building Windows app..."
         npm run build-win
       env:

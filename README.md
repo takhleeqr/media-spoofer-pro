@@ -1,72 +1,82 @@
 # Media Spoofer Pro
 
-Professional media transformation tool for social platforms. Transform images and videos with advanced effects, format conversion, and batch processing capabilities.
+Professional media transformation for social platforms with cross-platform support.
 
-## Features
+## 🚀 Features
 
-### Image Processing
-- **Visual Effects**: Apply various filters and effects to images
-- **Format Conversion**: Convert between JPG, PNG, HEIC, WebP formats or preserve original format
-- **Batch Processing**: Process multiple images simultaneously
-- **Metadata Removal**: Strip EXIF data for privacy
-- **Custom Naming**: Flexible file naming patterns
+- Cross-platform compatibility (Windows, macOS, Linux)
+- Built-in FFmpeg binaries for seamless operation
+- Professional media processing capabilities
+- Electron-based desktop application
 
-### Video Processing
-- **Video Effects**: Apply visual effects to video clips
-- **Video Splitting**: Split videos into shorter clips
-- **Format Conversion**: Convert between MP4, MOV, AVI, WebM formats or preserve original format
-- **Audio Management**: Remove or preserve audio tracks
-- **Batch Processing**: Process multiple videos with different settings
-
-### Processing Modes
-- **Spoof**: Apply effects without splitting
-- **Split**: Split videos into clips without effects
-- **Spoof + Split**: Apply effects and split into clips
-- **Convert**: Format conversion only
-
-## Installation
+## 🛠️ Development Setup
 
 ### Prerequisites
+
 - Node.js 18+ 
-- FFmpeg (automatically downloaded during setup)
+- npm or yarn
+- Git
 
-### Development vs Production
+### Local Development
 
-**Development (Local):**
-- FFmpeg binaries are downloaded locally during `npm run setup`
-- Includes all development tools and debugging capabilities
-- Larger repository size due to included binaries
-
-**Production (GitHub Builds):**
-- FFmpeg binaries are downloaded during automated build process
-- Optimized for distribution with smaller package sizes
-- Automated installer creation for Windows and macOS
-
-### Development Setup
-1. Clone the repository:
+1. **Clone the repository**
    ```bash
-   git clone https://github.com/takhleeqr/media-spoofer-pro.git
-   cd media-spoofer-pro
+   git clone <your-repo-url>
+   cd MediaSpooferApp
    ```
 
-2. Install dependencies:
+2. **Install dependencies**
    ```bash
    npm install
    ```
 
-3. Setup FFmpeg (automated):
+3. **Setup FFmpeg (automated)**
    ```bash
    npm run setup
    ```
-   
-   Or manually download FFmpeg binaries and place them in the project root.
+   This will automatically download and configure FFmpeg for your platform.
 
-4. Start the application:
+4. **Start development server**
    ```bash
    npm start
    ```
 
-### Building for Distribution
+### Manual FFmpeg Setup (if automated setup fails)
+
+#### Windows
+```bash
+# Option 1: Download from official source
+# Visit https://ffmpeg.org/download.html and download Windows builds
+# Extract ffmpeg.exe and ffprobe.exe to the project root
+
+# Option 2: Use Chocolatey
+choco install ffmpeg
+# Then copy from C:\ProgramData\chocolatey\bin\ffmpeg.exe
+```
+
+#### macOS
+```bash
+# Option 1: Use Homebrew
+brew install ffmpeg
+# Then copy from /usr/local/bin/ffmpeg
+
+# Option 2: Download from official source
+# Visit https://ffmpeg.org/download.html and download macOS builds
+```
+
+#### Linux
+```bash
+# Option 1: Use package manager
+sudo apt update && sudo apt install ffmpeg  # Ubuntu/Debian
+sudo yum install ffmpeg                     # CentOS/RHEL
+
+# Option 2: Download from official source
+# Visit https://ffmpeg.org/download.html and download Linux builds
+```
+
+## 🏗️ Building for Distribution
+
+### Local Builds
 
 #### Windows
 ```bash
@@ -78,122 +88,164 @@ npm run build-win
 npm run build-mac
 ```
 
-#### Both Platforms
+#### All Platforms
 ```bash
 npm run build
 ```
 
-## Security Improvements
+### GitHub Actions (Recommended)
 
-This version includes several security enhancements:
+The project includes a comprehensive GitHub Actions workflow that automatically:
 
-- **Context Isolation**: Enabled for secure renderer process
-- **Node Integration**: Disabled to prevent security vulnerabilities
-- **Preload Script**: Secure IPC communication between processes
-- **Input Validation**: Proper file path and type validation
+1. **Builds for both Windows and macOS**
+2. **Downloads appropriate FFmpeg binaries for each platform**
+3. **Creates installers with embedded FFmpeg**
+4. **Releases cross-platform packages**
 
-## Bug Fixes
+#### How it works:
 
-### Critical Fixes
-- **Fixed duplicate code**: Removed duplicate import statements and variable declarations in `renderer.js`
-- **Improved error handling**: Better error messages and retry logic
-- **Cross-platform compatibility**: Proper FFmpeg path detection for different operating systems
+1. **Push to main branch**: Triggers build and test
+2. **Create a release**: Automatically builds and packages both platforms
+3. **Download installers**: Users get platform-specific installers with FFmpeg included
 
-### Performance Improvements
-- **Batch processing**: Efficient handling of multiple files
-- **Progress tracking**: Real-time progress updates
-- **Memory management**: Proper cleanup of temporary files
+#### Workflow Features:
 
-## GitHub Actions
+- **Multi-source FFmpeg downloads** with fallbacks
+- **Automatic binary verification** to ensure integrity
+- **Cross-platform compatibility** testing
+- **Seamless user experience** - no manual FFmpeg installation needed
 
-Automated builds are configured for:
-- **macOS**: Automatic DMG installer creation
-- **Windows**: Automatic NSIS installer creation
-- **Release Management**: Automated release asset creation
+## 📦 Package Contents
 
-## Usage
+Each platform-specific installer includes:
 
-1. **Select Mode**: Choose between Image or Video processing
-2. **Add Files**: Drag and drop or select files to process
-3. **Configure Settings**: Set processing mode, effects, and output options
-4. **Choose Output**: Select output folder or use default location
-5. **Start Processing**: Click start to begin batch processing
-6. **Monitor Progress**: Track progress in real-time
-7. **Access Results**: Open output folder to view processed files
+- **Media Spoofer Pro application**
+- **FFmpeg binary** (platform-specific)
+- **FFprobe binary** (platform-specific)
+- **All necessary dependencies**
 
-## File Formats Supported
+## 🔧 Configuration
 
-### Images
-- JPG/JPEG
-- PNG
-- HEIC
-- WebP
+### package.json Build Settings
 
-### Videos
-- MP4
-- MOV
-- AVI
-- WebM
+The `package.json` includes optimized build configurations:
 
-## Processing Options
+```json
+{
+  "build": {
+    "extraResources": [
+      "ffmpeg.exe",
+      "ffprobe.exe", 
+      "ffmpeg",
+      "ffprobe"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "logo.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "logo.png",
+      "defaultArch": "universal"
+    }
+  }
+}
+```
 
-### Intensity Levels
-- **Light**: Subtle effects
-- **Medium**: Balanced effects
-- **Heavy**: Strong effects
+### Platform-Specific Settings
 
-### Duplicate Settings
-- Create multiple variations of each file
-- Customizable naming patterns
-- Batch organization
+- **Windows**: NSIS installer with desktop shortcuts
+- **macOS**: Universal DMG with hardened runtime
+- **Linux**: AppImage support (configurable)
 
-## Troubleshooting
+## 🚀 Deployment
 
-### FFmpeg Not Found
-Ensure FFmpeg binaries are in the application folder:
-- Windows: `ffmpeg.exe`, `ffprobe.exe`
-- macOS/Linux: `ffmpeg`, `ffprobe`
+### GitHub Releases
 
-### Processing Errors
-- Check file formats are supported
-- Ensure sufficient disk space
-- Verify file permissions
+1. **Create a new release** on GitHub
+2. **Tag with version** (e.g., v1.0.0)
+3. **GitHub Actions automatically**:
+   - Builds both platforms
+   - Includes FFmpeg binaries
+   - Creates installers
+   - Uploads to release assets
 
-### Performance Issues
-- Reduce batch size for large files
-- Close other applications
-- Check available RAM
+### Manual Distribution
 
-## License
+Build artifacts are available in the `dist/` directory after building:
 
-MIT License - see LICENSE.txt for details
+```
+dist/
+├── Media Spoofer Pro Setup.exe    # Windows installer
+├── Media Spoofer Pro.dmg          # macOS installer
+└── linux-unpacked/                # Linux unpacked files
+```
 
-## Support
+## 🐛 Troubleshooting
 
-For support, contact: support@ponyagency.com
+### FFmpeg Issues
 
-## Version History
+- **Download failures**: The setup script tries multiple sources automatically
+- **Binary not found**: Ensure FFmpeg binaries are in the project root
+- **Permission errors**: Make sure binaries are executable (chmod +x on Unix systems)
 
-### v1.0.0 (Current)
-- Initial release
-- Image and video processing
-- Batch processing capabilities
-- Cross-platform support
-- Security improvements
-- Automated build system
+### Build Issues
 
-## Contributing
+- **Platform-specific errors**: Check that you're building on the target platform
+- **Missing dependencies**: Run `npm install` and `npm run setup`
+- **Electron builder errors**: Check the `package.json` build configuration
+
+### Common Solutions
+
+```bash
+# Clear and reinstall
+rm -rf node_modules package-lock.json
+npm install
+npm run setup
+
+# Force rebuild
+npm run build -- --force
+
+# Check FFmpeg installation
+./ffmpeg -version  # Unix
+ffmpeg.exe -version # Windows
+```
+
+## 📋 Requirements
+
+### Development
+- Node.js 18+
+- npm 8+
+- Git
+
+### Runtime
+- Windows 10+ / macOS 10.15+ / Linux (glibc 2.17+)
+- 4GB RAM minimum
+- 500MB disk space
+
+### Build
+- Windows: Windows 10+ with PowerShell
+- macOS: macOS 10.15+ with Xcode Command Line Tools
+- Linux: Ubuntu 18.04+ or equivalent
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
+4. Test on multiple platforms
 5. Submit a pull request
 
-## Roadmap
+## 📄 License
 
-- [ ] Additional video effects
-- [ ] Audio processing capabilities
-- [ ] Cloud storage integration
-- [ ] Advanced metadata editing
-- [ ] Plugin system for custom effects 
+MIT License - see [LICENSE.txt](LICENSE.txt) for details.
+
+## 🆘 Support
+
+- **Issues**: Create a GitHub issue
+- **Documentation**: Check this README and inline code comments
+- **Community**: Join our discussions
+
+---
+
+**Built with ❤️ by Pony Agency** 

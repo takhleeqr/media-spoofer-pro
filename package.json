@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "setup": "node scripts/setup-dev.js",
+    "test-ffmpeg": "node test-ffmpeg-setup.js",
     "build": "electron-builder",
     "build-win": "electron-builder --win",
     "build-mac": "electron-builder --mac --universal"
@@ -32,7 +33,13 @@
     "files": [
       "**/*",
       "!node_modules/**/*",
-      "!dist/**/*"
+      "!dist/**/*",
+      "!temp-ffmpeg/**/*",
+      "!test-*/**/*",
+      "!debug-*/**/*",
+      "!scripts/**/*",
+      "!ffmpeg*",
+      "!ffprobe*"
     ],
     "extraResources": [
       "ffmpeg.exe",
@@ -54,7 +61,26 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": null,
-      "entitlementsInherit": null
+      "entitlementsInherit": null,
+      "category": "public.app-category.utilities",
+      "darkModeSupport": true,
+      "electronLanguages": ["en"],
+      "extendInfo": {
+        "NSHighResolutionCapable": true,
+        "LSMinimumSystemVersion": "10.15.0",
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "Video",
+            "CFBundleTypeExtensions": ["mp4", "mov", "avi", "webm"],
+            "CFBundleTypeRole": "Viewer"
+          },
+          {
+            "CFBundleTypeName": "Image",
+            "CFBundleTypeExtensions": ["jpg", "jpeg", "png", "heic", "webp"],
+            "CFBundleTypeRole": "Viewer"
+          }
+        ]
+      }
     },
     "nsis": {
       "oneClick": false,
