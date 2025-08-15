@@ -130,12 +130,12 @@ async function setupFFmpeg() {
             const sources = [
                 // Source 1: Official Evermeet builds (most compatible with all macOS versions)
                 'https://evermeet.cx/ffmpeg/getrelease/zip',
-                // Source 2: GitHub BtbN builds (universal builds for Intel + Apple Silicon)
+                // Source 2: BtbN shared build (better compatibility with system libraries)
+                'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl-shared.zip',
+                // Source 3: BtbN static build (universal Intel + Apple Silicon)
                 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl.zip',
-                // Source 3: Static builds from John Van Sickle (very reliable)
-                'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz',
-                // Source 4: Alternative BtbN build with specific version for maximum compatibility
-                'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-macos64-gpl-shared.zip'
+                // Source 4: Static builds from John Van Sickle (very reliable)
+                'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz'
             ];
             
             let downloadSuccess = false;
@@ -175,6 +175,64 @@ async function setupFFmpeg() {
                     console.log('📦 Extracting FFmpeg...');
                     execSync(extractCommand);
                     
+                    // Check if both binaries exist after extraction
+                    const ffmpegExists = fs.existsSync('ffmpeg');
+                    const ffprobeExists = fs.existsSync('ffprobe');
+                    
+                    console.log(`FFmpeg binary found: ${ffmpegExists}`);
+                    console.log(`FFprobe binary found: ${ffprobeExists}`);
+                    
+                    // If both binaries exist, we're good
+                    if (ffmpegExists && ffprobeExists) {
+                        console.log('✅ Both FFmpeg and FFprobe found!');
+                    } else {
+                        // Try to find binaries in subdirectories
+                        console.log('🔍 Searching for binaries in subdirectories...');
+                        
+                        // Look for ffmpeg and ffprobe in extracted directories
+                        const findCommand = platform === 'win32' ? 
+                            'dir /s /b ffmpeg*' : 
+                            'find . -name "ffmpeg*" -o -name "ffprobe*"';
+                        
+                        try {
+                            const foundFiles = execSync(findCommand, { encoding: 'utf8' });
+                            console.log('Found files:', foundFiles);
+                            
+                            // Try to copy from subdirectories
+                            if (!ffmpegExists) {
+                                const ffmpegFiles = foundFiles.split('\n').filter(f => f.includes('ffmpeg') && !f.includes('ffprobe'));
+                                if (ffmpegFiles.length > 0) {
+                                    const sourcePath = ffmpegFiles[0].trim();
+                                    console.log(`Copying FFmpeg from: ${sourcePath}`);
+                                    fs.copyFileSync(sourcePath, './ffmpeg');
+                                }
+                            }
+                            
+                            if (!ffprobeExists) {
+                                const ffprobeFiles = foundFiles.split('\n').filter(f => f.includes('ffprobe'));
+                                if (ffprobeFiles.length > 0) {
+                                    const sourcePath = ffprobeFiles[0].trim();
+                                    console.log(`Copying FFprobe from: ${sourcePath}`);
+                                    fs.copyFileSync(sourcePath, './ffprobe');
+                                }
+                            }
+                        } catch (error) {
+                            console.log('Search command failed:', error.message);
+                        }
+                        
+                        // Check again if we found the binaries
+                        const finalFfmpegExists = fs.existsSync('ffmpeg');
+                        const finalFfprobeExists = fs.existsSync('ffprobe');
+                        
+                        if (!finalFfmpegExists || !finalFfprobeExists) {
+                            console.log('❌ Still missing binaries, trying next source...');
+                            // Clean up and try next source
+                            if (fs.existsSync('ffmpeg')) fs.unlinkSync('ffmpeg');
+                            if (fs.existsSync('ffprobe')) fs.unlinkSync('ffprobe');
+                            continue;
+                        }
+                    }
+                    
                     // Make executable
                     if (fs.existsSync('ffmpeg')) {
                         fs.chmodSync('ffmpeg', '755');
@@ -198,6 +256,10 @@ async function setupFFmpeg() {
                     if (fs.existsSync('ffmpeg-mac-github.zip')) fs.unlinkSync('ffmpeg-mac-github.zip');
                     if (fs.existsSync('ffmpeg-mac-shared.zip')) fs.unlinkSync('ffmpeg-mac-shared.zip');
                     if (fs.existsSync('ffmpeg-linux.tar.xz')) fs.unlinkSync('ffmpeg-linux.tar.xz');
+                    
+                    // Also clean up any partial binaries
+                    if (fs.existsSync('ffmpeg')) fs.unlinkSync('ffmpeg');
+                    if (fs.existsSync('ffprobe')) fs.unlinkSync('ffprobe');
                 }
             }
             

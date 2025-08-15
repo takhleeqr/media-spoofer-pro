@@ -73,10 +73,26 @@ jobs:
         find ffmpeg_temp -name "ffmpeg" -type f
         find ffmpeg_temp -name "ffprobe" -type f
         
+        # Check if both binaries exist after extraction
+        ffmpeg_found=$(find ffmpeg_temp -name "ffmpeg" -type f | head -1)
+        ffprobe_found=$(find ffmpeg_temp -name "ffprobe" -type f | head -1)
+        
+        echo "FFmpeg binary found: $ffmpeg_found"
+        echo "FFprobe binary found: $ffprobe_found"
+        
+        # If both binaries exist, we're good
+        if [ -n "$ffmpeg_found" ] && [ -n "$ffprobe_found" ]; then
+          echo "✅ Both FFmpeg and FFprobe found!"
+        else
+          echo "❌ Missing binaries, trying next source..."
+          rm -rf ffmpeg_temp ffmpeg-mac.zip
+          continue
+        fi
+        
         # Copy binaries to root directory
         echo "Copying FFmpeg binaries to root directory..."
-        find ffmpeg_temp -name "ffmpeg" -type f -exec cp {} ./ffmpeg \;
-        find ffmpeg_temp -name "ffprobe" -type f -exec cp {} ./ffprobe \;
+        cp "$ffmpeg_found" ./ffmpeg
+        cp "$ffprobe_found" ./ffprobe
         
         # Make executable
         chmod +x ffmpeg ffprobe
@@ -89,6 +105,7 @@ jobs:
         rm -rf ffmpeg_temp ffmpeg-mac.zip
         
         echo "FFmpeg setup completed successfully!"
+        break
         
     - name: Build macOS app
       run: |
