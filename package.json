@@ -32,12 +32,13 @@
     "files": [
       "**/*",
       "!node_modules/**/*",
-      "!dist/**/*",
-      "!ffmpeg*",
-      "!ffprobe*"
+      "!dist/**/*"
     ],
     "extraResources": [
-      "ffmpeg-windows/**/*"
+      "ffmpeg.exe",
+      "ffprobe.exe",
+      "ffmpeg",
+      "ffprobe"
     ],
     "win": {
       "target": "nsis",

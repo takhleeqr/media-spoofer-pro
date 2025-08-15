@@ -52,7 +52,7 @@ jobs:
         
         echo "Copying files to root directory..."
         cp ffmpeg_temp/ffmpeg ./ffmpeg
-        cp ffprobe_temp/ffmpeg ./ffprobe
+        cp ffprobe_temp/ffprobe ./ffprobe
         
         echo "Cleaning up temp directories..."
         rm -rf ffmpeg_temp ffprobe_temp
@@ -164,11 +164,17 @@ jobs:
         
         Write-Host "FFmpeg download and setup completed successfully!"
         
+        # Verify files are in the right place before building
+        Write-Host "Final verification - FFmpeg files in root directory:"
+        Get-ChildItem -Path "." -Name "ffmpeg*"
+        Get-ChildItem -Path "." -Name "ffprobe*"
+        
     - name: Build Windows app
       run: |
         echo "Current directory: $(pwd)"
-        echo "FFmpeg files:"
+        echo "FFmpeg files before build:"
         dir ffmpeg*
+        dir ffprobe*
         echo "Building Windows app..."
         npm run build-win
       env:
