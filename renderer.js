@@ -267,6 +267,9 @@ let videoInterfaceSetup = false;
 // Cross-platform FFmpeg paths
 let ffmpegPath, ffprobePath;
 
+// Video duration cache to avoid redundant ffprobe calls
+const videoDurationCache = new Map();
+
 // Initialize FFmpeg paths when the app loads
 async function initializeFFmpegPaths() {
     const platform = await electronAPI.getPlatform();
@@ -1585,9 +1588,7 @@ function updateButtons() {
     if (selectBtn) selectBtn.disabled = isProcessing;
 
     const selectOutputBtn = document.getElementById('selectOutputBtn');
-    if (currentMode === 'video') {
-        selectOutputBtn.style.display = 'none';
-    } else {
+    if (selectOutputBtn) {
         selectOutputBtn.style.display = 'inline-block';
     }
 }
@@ -1612,9 +1613,10 @@ function hideOverallProgress() {
 async function startProcessing() {
     if (isProcessing) return;
     
-    // Prevent image processing if outputDirectory is not set
-    if (currentMode === 'image' && !outputDirectory) {
-        addStatusMessage('❌ Please select an output folder before starting image processing.', 'error');
+    // Prevent processing if outputDirectory is not set
+    if (!outputDirectory) {
+        const modeText = currentMode === 'image' ? 'image' : 'video';
+        addStatusMessage(`❌ Please select an output folder before starting ${modeText} processing.`, 'error');
         isProcessing = false;
         updateButtons();
         return;
@@ -1626,6 +1628,10 @@ async function startProcessing() {
     outputCount = 0;
     currentBatch = 0;
     startTime = Date.now();
+    
+    // Clear video duration cache to ensure fresh data
+    videoDurationCache.clear();
+    console.log('Cleared video duration cache for fresh processing');
     
     // Reset file statuses
     selectedFiles.forEach(file => {
@@ -1664,20 +1670,13 @@ async function startProcessing() {
     let outputDir;
     
     try {
-        // Create output directory
+        // Use the manually selected output directory
         if (outputDirectory) {
             outputDir = outputDirectory;
             console.log('Using existing global outputDirectory:', outputDir);
         } else {
-            console.log('Global outputDirectory not set, calling createOutputDirectory()');
-            outputDir = await createOutputDirectory();
-            console.log('createOutputDirectory() returned:', outputDir);
-        }
-        
-        // Ensure the global outputDirectory is set if it wasn't before
-        if (!outputDirectory) {
-            outputDirectory = outputDir;
-            console.log('Set global outputDirectory to:', outputDirectory);
+            // This should not happen since we validate outputDirectory in startProcessing()
+            throw new Error('No output directory selected. Please select an output folder before processing.');
         }
         
         // Double-check that outputDir is properly set and is an absolute path
@@ -1739,8 +1738,8 @@ async function startProcessing() {
                     const result = await electronAPI.mkdir(batchDir);
                     console.log('mkdir result:', result);
                     
-                    // Add a small delay to ensure directory is fully created
-                    await new Promise(resolve => setTimeout(resolve, 200));
+                    // Small delay to ensure directory is fully created (reduced for performance)
+                    await new Promise(resolve => setTimeout(resolve, 50));
                     
                     // Verify the directory was created
                     const verifyExists = await electronAPI.exists(batchDir);
@@ -1774,7 +1773,7 @@ async function startProcessing() {
                 while (isPaused && isProcessing) {
                     file.status = 'paused';
                     updateFileList();
-                    await sleep(500);
+                    await sleep(100); // Reduced sleep time for better responsiveness
                 }
                 
                 if (!isProcessing) break;
@@ -1820,7 +1819,7 @@ async function startProcessing() {
                         
                         if (retryCount <= maxRetries) {
                             addStatusMessage(`⚠️ Retry ${retryCount}/${maxRetries} for ${file.name}: ${error.message}`, 'warning');
-                            await sleep(1000); // Wait before retry
+                            await sleep(500); // Reduced wait time before retry
                         } else {
                             addStatusMessage(`❌ Failed to process ${file.name} after ${maxRetries} retries: ${error.message}`, 'error');
                             file.status = 'failed';
@@ -2107,9 +2106,14 @@ async function processConvert(file, outputDir, settings, updateProgress, fileInd
 // FFmpeg helper functions
 async function getVideoDuration(videoPath) {
     try {
-        // Ensure proper path handling for Windows
+        // Check cache first to avoid redundant ffprobe calls
         const normalizedPath = path.normalize(videoPath);
+        if (videoDurationCache.has(normalizedPath)) {
+            console.log('Using cached duration for:', normalizedPath);
+            return videoDurationCache.get(normalizedPath);
+        }
         
+        console.log('Getting video duration with ffprobe for:', normalizedPath);
         const command = [
             '-v', 'quiet',
             '-show_entries', 'format=duration',
@@ -2121,14 +2125,24 @@ async function getVideoDuration(videoPath) {
         
         if (result.code === 0) {
             const duration = parseFloat(result.stdout.trim());
-            return duration || 90;
+            const finalDuration = duration || 90;
+            
+            // Cache the result for future use
+            videoDurationCache.set(normalizedPath, finalDuration);
+            console.log('Cached duration for:', normalizedPath, '=', finalDuration);
+            
+            return finalDuration;
         } else {
             console.warn('FFprobe failed, using default duration:', result.stderr);
-            return 90; // Default fallback
+            const defaultDuration = 90;
+            videoDurationCache.set(normalizedPath, defaultDuration);
+            return defaultDuration;
         }
     } catch (error) {
         console.error('Error getting video duration:', error);
-        return 90; // Default fallback
+        const defaultDuration = 90;
+        videoDurationCache.set(path.normalize(videoPath), defaultDuration);
+        return defaultDuration;
     }
 }
 
@@ -3142,132 +3156,60 @@ async function createOutputDirectory() {
     console.log('createOutputDirectory called, currentMode:', currentMode);
     console.log('selectedFiles:', selectedFiles);
     
-    if (currentMode === 'video') {
-        // Auto-create output folder in the same folder as the first selected file
-        if (selectedFiles.length > 0) {
-            const firstFile = selectedFiles[0];
-            console.log('First file:', firstFile);
+    // For both images and videos, use the same logic - auto-create in parent directory
+    if (selectedFiles.length > 0) {
+        const firstFile = selectedFiles[0];
+        console.log('First file:', firstFile);
+        
+        if (!firstFile || !firstFile.path) {
+            throw new Error('Invalid file object - missing path');
+        }
+        
+        const parentDir = getParentDirectory(firstFile.path);
+        console.log('Parent directory:', parentDir);
+        
+        if (!parentDir) {
+            throw new Error('Could not determine parent directory for file: ' + firstFile.path);
+        }
+        
+        const outDir = path.join(parentDir, 'MediaSpoofer_Output');
+        
+        // Ensure the output directory is an absolute path
+        const absoluteOutDir = path.resolve(outDir);
+        console.log('Output directory:', absoluteOutDir);
+        
+        try {
+            await electronAPI.mkdir(absoluteOutDir);
+            outputDirectory = absoluteOutDir;
+            addStatusMessage(`📂 Output folder created: ${absoluteOutDir}`, 'info');
+            console.log('Final output directory set to:', outputDirectory);
             
-            if (!firstFile || !firstFile.path) {
-                throw new Error('Invalid file object - missing path');
+            const dirExists = await electronAPI.exists(absoluteOutDir);
+            if (!dirExists) {
+                throw new Error(`Failed to verify directory creation: ${absoluteOutDir}`);
             }
             
-            const parentDir = getParentDirectory(firstFile.path);
-            console.log('Parent directory:', parentDir);
+            const outputFolderInfo = document.getElementById('outputFolderInfo');
+            const outputFolderText = document.getElementById('outputFolderText');
+            if (outputFolderInfo) outputFolderInfo.style.display = 'block';
+            if (outputFolderText) outputFolderText.textContent = `Output folder: ${absoluteOutDir}`;
             
-            if (!parentDir) {
-                throw new Error('Could not determine parent directory for file: ' + firstFile.path);
+            // Set the data-path attribute for the Open Output button
+            const openFolderBtn = document.getElementById('openFolderBtn');
+            if (openFolderBtn) {
+                openFolderBtn.setAttribute('data-path', absoluteOutDir);
+                openFolderBtn.disabled = false;
+                console.log('Set openFolderBtn data-path to:', absoluteOutDir);
             }
             
-            // Use cross-platform path joining for better macOS compatibility
-            const outDir = path.join(parentDir, 'MediaSpoofer_Output');
-            
-            // Ensure the output directory is an absolute path
-            const absoluteOutDir = path.resolve(outDir);
-            console.log('Output directory:', absoluteOutDir);
-            
-            // Additional debugging for macOS
-            const platform = await electronAPI.getPlatform();
-            if (platform === 'darwin') {
-                console.log('[DEBUG createOutputDirectory] macOS output directory creation:', {
-                    parentDir,
-                    outDir,
-                    platform,
-                    pathExists: await electronAPI.exists(parentDir)
-                });
-            }
-            
-            try {
-                await electronAPI.mkdir(absoluteOutDir);
-                outputDirectory = absoluteOutDir;
-                addStatusMessage(`📂 Output folder created: ${absoluteOutDir}`, 'info');
-                console.log('Final output directory set to:', outputDirectory);
-                
-                // Verify directory was created successfully (especially important for macOS)
-                const dirExists = await electronAPI.exists(absoluteOutDir);
-                if (!dirExists) {
-                    throw new Error(`Failed to verify directory creation: ${absoluteOutDir}`);
-                }
-                
-                // Show info
-                const outputFolderInfo = document.getElementById('outputFolderInfo');
-                const outputFolderText = document.getElementById('outputFolderText');
-                if (outputFolderInfo) outputFolderInfo.style.display = 'block';
-                if (outputFolderText) outputFolderText.textContent = `Output folder: ${absoluteOutDir}`;
-                
-                // Set the data-path attribute for the Open Output button
-                const openFolderBtn = document.getElementById('openFolderBtn');
-                if (openFolderBtn) {
-                    openFolderBtn.setAttribute('data-path', absoluteOutDir);
-                    openFolderBtn.disabled = false;
-                    console.log('Set openFolderBtn data-path to:', absoluteOutDir);
-                }
-                
-                // Return the created directory path
-                return absoluteOutDir;
-            } catch (error) {
-                console.error('Error creating output directory:', error);
-                throw error;
-            }
-        } else {
-            throw new Error('No files selected for output directory creation');
+            // Return the created directory path
+            return absoluteOutDir;
+        } catch (error) {
+            console.error('Error creating output directory:', error);
+            throw error;
         }
     } else {
-        // For images, use the same logic
-        if (selectedFiles.length > 0) {
-            const firstFile = selectedFiles[0];
-            console.log('First file:', firstFile);
-            
-            if (!firstFile || !firstFile.path) {
-                throw new Error('Invalid file object - missing path');
-            }
-            
-            const parentDir = getParentDirectory(firstFile.path);
-            console.log('Parent directory:', parentDir);
-            
-            if (!parentDir) {
-                throw new Error('Could not determine parent directory for file: ' + firstFile.path);
-            }
-            
-            const outDir = path.join(parentDir, 'MediaSpoofer_Output');
-            
-            // Ensure the output directory is an absolute path
-            const absoluteOutDir = path.resolve(outDir);
-            console.log('Output directory:', absoluteOutDir);
-            
-            try {
-                await electronAPI.mkdir(absoluteOutDir);
-                outputDirectory = absoluteOutDir;
-                addStatusMessage(`📂 Output folder created: ${absoluteOutDir}`, 'info');
-                console.log('Final output directory set to:', outputDirectory);
-                
-                const dirExists = await electronAPI.exists(absoluteOutDir);
-                if (!dirExists) {
-                    throw new Error(`Failed to verify directory creation: ${absoluteOutDir}`);
-                }
-                
-                const outputFolderInfo = document.getElementById('outputFolderInfo');
-                const outputFolderText = document.getElementById('outputFolderText');
-                if (outputFolderInfo) outputFolderInfo.style.display = 'block';
-                if (outputFolderText) outputFolderText.textContent = `Output folder: ${absoluteOutDir}`;
-                
-                // Set the data-path attribute for the Open Output button
-                const openFolderBtn = document.getElementById('openFolderBtn');
-                if (openFolderBtn) {
-                    openFolderBtn.setAttribute('data-path', absoluteOutDir);
-                    openFolderBtn.disabled = false;
-                    console.log('Set openFolderBtn data-path to:', absoluteOutDir);
-                }
-                
-                // Return the created directory path
-                return absoluteOutDir;
-            } catch (error) {
-                console.error('Error creating output directory:', error);
-                throw error;
-            }
-        } else {
-            throw new Error('No files selected for output directory creation');
-        }
+        throw new Error('No files selected for output directory creation');
     }
 }
 
