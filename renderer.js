@@ -738,18 +738,21 @@ function setupImageInterface() {
     const imageProcessingMode = document.getElementById('imageProcessingMode');
     const imageIntensityGroup = document.getElementById('imageIntensityGroup');
     const imageDuplicatesGroup = document.getElementById('imageDuplicatesGroup');
+    const imageRotationGroup = document.getElementById('imageRotationGroup');
     
     if (imageProcessingMode) {
         imageProcessingMode.addEventListener('change', () => {
             const mode = imageProcessingMode.value;
             
-            // Hide intensity and duplicates settings for convert-only mode
+            // Hide intensity, duplicates, and rotation settings for convert-only mode
             if (mode === 'convert-only') {
                 imageIntensityGroup.style.display = 'none';
                 imageDuplicatesGroup.style.display = 'none';
+                if (imageRotationGroup) imageRotationGroup.style.display = 'none';
             } else {
                 imageIntensityGroup.style.display = 'block';
                 imageDuplicatesGroup.style.display = 'block';
+                if (imageRotationGroup) imageRotationGroup.style.display = 'block';
             }
             
             // Hide "Original" option in image format when processing type is convert-only
@@ -770,7 +773,7 @@ function setupImageInterface() {
             }
         });
         
-        // Initialize the format option visibility
+        // Initialize the format option visibility and rotation checkbox visibility
         const mode = imageProcessingMode.value;
         const imageFormat = document.getElementById('imageFormat');
         if (imageFormat && mode === 'convert-only') {
@@ -781,6 +784,11 @@ function setupImageInterface() {
                     imageFormat.value = 'jpg';
                 }
             }
+        }
+        
+        // Initialize rotation checkbox visibility (show for spoof-only, hide for convert-only)
+        if (imageRotationGroup) {
+            imageRotationGroup.style.display = mode === 'convert-only' ? 'none' : 'block';
         }
     }
     
@@ -850,6 +858,7 @@ function setupVideoInterface() {
     const videoIntensityGroup = document.getElementById('videoIntensityGroup');
     const clipLengthGroup = document.getElementById('clipLengthGroup');
     const videoDuplicatesGroup = document.getElementById('videoDuplicatesGroup');
+    const videoRotationGroup = document.getElementById('videoRotationGroup');
     
     if (videoProcessingMode) {
         // Function to update UI visibility based on mode
@@ -858,21 +867,25 @@ function setupVideoInterface() {
                 videoIntensityGroup.style.display = 'none';
                 videoDuplicatesGroup.style.display = 'none';
                 clipLengthGroup.style.display = 'none';
+                if (videoRotationGroup) videoRotationGroup.style.display = 'none';
             } else if (mode === 'spoof-only') {
                 // Hide clip length for effects-only mode
                 videoIntensityGroup.style.display = 'block';
                 videoDuplicatesGroup.style.display = 'block';
                 clipLengthGroup.style.display = 'none';
+                if (videoRotationGroup) videoRotationGroup.style.display = 'block';
             } else if (mode === 'split-only') {
-                // Hide intensity for split-only mode, but show duplicates
+                // Hide intensity and rotation for split-only mode, but show duplicates
                 videoIntensityGroup.style.display = 'none';
                 videoDuplicatesGroup.style.display = 'block';
                 clipLengthGroup.style.display = 'block';
+                if (videoRotationGroup) videoRotationGroup.style.display = 'none';
             } else {
                 // Show all settings for spoof-split mode
                 videoIntensityGroup.style.display = 'block';
                 videoDuplicatesGroup.style.display = 'block';
                 clipLengthGroup.style.display = 'block';
+                if (videoRotationGroup) videoRotationGroup.style.display = 'block';
             }
         };
         
@@ -909,6 +922,11 @@ function setupVideoInterface() {
             if (originalOption) {
                 originalOption.style.display = 'block'; // Default mode is spoof-only, so show original
             }
+        }
+        
+        // Initialize rotation checkbox visibility for default mode
+        if (videoRotationGroup) {
+            videoRotationGroup.style.display = 'block'; // Default mode is spoof-only, so show rotation
         }
     }
     
@@ -2015,7 +2033,7 @@ async function processFile(file, outputDir, batch, index, settings, convertedFil
 // Processing mode implementations
 async function processSpoof(file, outputDir, settings, updateProgress, convertedFilePath = null, fileIndex = 0) {
     const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1, fileIndex);
-    const effects = generateSpoofEffects(settings.intensity);
+    const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
     
     console.log('processSpoof called with file type:', file.type, 'file path:', file.path);
     
@@ -2146,7 +2164,7 @@ async function getVideoDuration(videoPath) {
     }
 }
 
-function generateSpoofEffects(intensity) {
+function generateSpoofEffects(intensity, enableRotation = true) {
     if (!intensity) return null;
     
     const ranges = {
@@ -2158,7 +2176,8 @@ function generateSpoofEffects(intensity) {
     const range = ranges[intensity] || ranges.medium;
     
     return {
-        rotation: (Math.random() * range.rotation * 2) - range.rotation,
+        rotation: enableRotation ? ((Math.random() * range.rotation * 2) - range.rotation) : 0,
+        enableRotation: enableRotation,
         brightness: (Math.random() * range.brightness * 2) - range.brightness,
         contrast: range.contrast[0] + (Math.random() * (range.contrast[1] - range.contrast[0])),
         saturation: range.saturation[0] + (Math.random() * (range.saturation[1] - range.saturation[0])),
@@ -2259,7 +2278,12 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
         const contrastDecimal = effects.contrast / 100;
         const saturationDecimal = effects.saturation / 100;
         
-        let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+        // Build filter complex - conditionally include rotation
+        let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
+        if (effects.enableRotation && effects.rotation !== 0) {
+            filterComplex += `,rotate=${effects.rotation}*PI/180`;
+        }
+        filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
         
         // Add watermark if enabled
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
@@ -2342,7 +2366,12 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
         const contrastDecimal = effects.contrast / 100;
         const saturationDecimal = effects.saturation / 100;
         
-        let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+        // Build filter complex - conditionally include rotation
+        let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
+        if (effects.enableRotation && effects.rotation !== 0) {
+            filterComplex += `,rotate=${effects.rotation}*PI/180`;
+        }
+        filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
         
         // Add watermark if enabled
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
@@ -2518,7 +2547,7 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
             updateProgress(clipProgress);
             
             if (applySpoof) {
-                const effects = generateSpoofEffects(settings.intensity);
+                const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
                 await processVideoClipWithEffects(inputPath, clipPath, clip, effects, settings);
             } else {
                 await extractVideoClip(inputPath, clipPath, clip, settings);
@@ -2546,7 +2575,12 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
             const contrastDecimal = effects.contrast / 100;
             const saturationDecimal = effects.saturation / 100;
             
-            let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale},rotate=${effects.rotation}*PI/180,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+            // Build filter complex - conditionally include rotation
+            let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
+            if (effects.enableRotation && effects.rotation !== 0) {
+                filterComplex += `,rotate=${effects.rotation}*PI/180`;
+            }
+            filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
             
             // Add watermark if enabled
             const watermarkFilter = generateWatermarkFilter(settings.watermark);
@@ -3113,6 +3147,10 @@ function getProcessingSettings() {
        settings.imageQuality = document.getElementById('imageQuality').value;
        settings.namingPattern = document.getElementById('imageNamingPattern').value;
        
+       // Rotation setting for images (only relevant for spoof modes)
+       const imageRotationCheckbox = document.getElementById('imageRotationEnabled');
+       settings.enableRotation = imageRotationCheckbox ? imageRotationCheckbox.checked : true;
+       
        // Watermark settings for images
        settings.watermark = {
            enabled: document.getElementById('imageWatermarkEnabled').checked,
@@ -3134,6 +3172,10 @@ function getProcessingSettings() {
        settings.removeAudio = document.getElementById('removeAudio').checked;
        settings.clipLength = document.getElementById('clipLength').value;
        settings.namingPattern = document.getElementById('videoNamingPattern').value;
+       
+       // Rotation setting for videos (only relevant for spoof modes)
+       const videoRotationCheckbox = document.getElementById('videoRotationEnabled');
+       settings.enableRotation = videoRotationCheckbox ? videoRotationCheckbox.checked : true;
        
        // Watermark settings for videos
        settings.watermark = {
