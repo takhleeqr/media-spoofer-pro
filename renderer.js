@@ -2164,6 +2164,38 @@ async function getVideoDuration(videoPath) {
     }
 }
 
+// Get video display aspect ratio to detect portrait orientation
+// Returns an object with both ratio string (e.g., "9:16") and decimal (e.g., 0.5625)
+async function getVideoDAR(videoPath) {
+    try {
+        const normalizedPath = path.normalize(videoPath);
+        const command = [
+            '-v', 'error',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=display_aspect_ratio',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            normalizedPath
+        ];
+        
+        const result = await electronAPI.spawnProcess(ffprobePath, command);
+        
+        if (result.code === 0) {
+            const dar = result.stdout.trim();
+            if (dar && dar.includes(':')) {
+                const [num, den] = dar.split(':').map(Number);
+                return {
+                    ratio: dar, // e.g., "9:16"
+                    decimal: num / den // e.g., 0.5625
+                };
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('Error getting video DAR:', error);
+        return null;
+    }
+}
+
 function generateSpoofEffects(intensity, enableRotation = true) {
     if (!intensity) return null;
     
@@ -2320,6 +2352,11 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
             console.log('Added pixel format conversion for MOV file');
         }
         
+        // Ensure even dimensions for H.264 compatibility and preserve aspect ratio
+        // This fixes Instagram/TikTok display issues where videos appear stretched or cropped
+        // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
+        filterComplex += `,scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
+        
         command = [
             '-y',
             '-i', inputPath,
@@ -2354,13 +2391,18 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
     
     updateProgress(50);
     
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         // Ensure proper path handling for Windows
         const normalizedInputPath = path.normalize(inputPath);
         const normalizedOutputPath = path.normalize(outputPath);
         
         // Determine output format from file extension
         const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
+        
+        // Check if original video is portrait (DAR < 1 means height > width)
+        const originalDAR = await getVideoDAR(normalizedInputPath);
+        const isPortrait = originalDAR !== null && originalDAR.decimal < 1;
+        console.log('Original video DAR:', originalDAR ? `${originalDAR.ratio} (${originalDAR.decimal})` : 'unknown', 'Is portrait:', isPortrait);
         
         const brightnessDecimal = effects.brightness / 100;
         const contrastDecimal = effects.contrast / 100;
@@ -2406,6 +2448,36 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
             // Add pixel format conversion for MOV files to ensure compatibility
             filterComplex += ',format=yuv420p';
             console.log('Added pixel format conversion for MOV file');
+        }
+        
+        // Smart aspect ratio preservation: Maintain original DAR after all filters
+        // This ensures Instagram/TikTok display videos correctly without quality loss
+        if (originalDAR !== null) {
+            // Smart aspect ratio preservation: Maintain original DAR with high quality
+            // The key: scale to match the original DAR, ensuring square pixels (SAR=1:1)
+            // This way pixel dimensions = display dimensions, so it displays correctly everywhere
+            const darRatio = originalDAR.decimal;
+            const darRatioString = originalDAR.ratio; // e.g., "9:16"
+            const [darNum, darDen] = darRatioString.split(':').map(Number);
+            
+            // Scale to match DAR: calculate dimensions that exactly match the DAR
+            // For portrait (9:16): scale to maintain height, calculate width = height * (9/16)
+            // For landscape (16:9): scale to maintain width, calculate height = width * (9/16)
+            // Use the current frame's dimensions but ensure they match the DAR exactly
+            if (darRatio < 1) {
+                // Portrait: use height as base, calculate width to match DAR exactly
+                // width = height * (darNum/darDen), ensuring even dimensions
+                filterComplex += `,scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
+            } else {
+                // Landscape or square: use width as base, calculate height to match DAR exactly
+                // height = width * (darDen/darNum), ensuring even dimensions
+                filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
+            }
+            console.log('Smart aspect ratio preservation: Original DAR =', darRatioString, `(${darRatio}), Scaling to match DAR with square pixels`);
+        } else {
+            // Fallback: If DAR detection failed, just ensure even dimensions
+            filterComplex += `,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1:1`;
+            console.log('DAR detection failed, using fallback: ensuring even dimensions');
         }
         
         command = [
@@ -2560,7 +2632,7 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
 }
 
 async function processVideoClipWithEffects(inputPath, outputPath, clip, effects, settings) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         // Ensure proper path handling for Windows
         const normalizedInputPath = path.normalize(inputPath);
         const normalizedOutputPath = path.normalize(outputPath);
@@ -2616,6 +2688,38 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                 console.log('Added pixel format conversion for MOV file');
             }
             
+            // Smart aspect ratio preservation: Maintain original DAR after all filters
+            // This ensures Instagram/TikTok display videos correctly without quality loss
+            const originalDAR = await getVideoDAR(normalizedInputPath);
+            
+            if (originalDAR !== null) {
+                // Smart aspect ratio preservation: Maintain original DAR with high quality
+                // The key: scale to match the original DAR, ensuring square pixels (SAR=1:1)
+                // This way pixel dimensions = display dimensions, so it displays correctly everywhere
+                const darRatio = originalDAR.decimal;
+                const darRatioString = originalDAR.ratio; // e.g., "9:16"
+                const [darNum, darDen] = darRatioString.split(':').map(Number);
+                
+                // Scale to match DAR: calculate dimensions that exactly match the DAR
+                // For portrait (9:16): scale to maintain height, calculate width = height * (9/16)
+                // For landscape (16:9): scale to maintain width, calculate height = width * (9/16)
+                // Use the current frame's dimensions but ensure they match the DAR exactly
+                if (darRatio < 1) {
+                    // Portrait: use height as base, calculate width to match DAR exactly
+                    // width = height * (darNum/darDen), ensuring even dimensions
+                    filterComplex += `,scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
+                } else {
+                    // Landscape or square: use width as base, calculate height to match DAR exactly
+                    // height = width * (darDen/darNum), ensuring even dimensions
+                    filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
+                }
+                console.log('Smart aspect ratio preservation: Original DAR =', darRatioString, `(${darRatio}), Scaling to match DAR with square pixels`);
+            } else {
+                // Fallback: If DAR detection failed, just ensure even dimensions
+                filterComplex += `,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1:1`;
+                console.log('DAR detection failed, using fallback: ensuring even dimensions');
+            }
+            
             command = [
                 '-y',
                 '-ss', clip.start.toString(),
@@ -2651,12 +2755,15 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
             // For no effects, we need to handle watermark separately since we can't use -c copy with -vf
             const watermarkFilter = generateWatermarkFilter(settings.watermark);
             if (watermarkFilter) {
+                // Ensure even dimensions and preserve original display aspect ratio for Instagram/TikTok compatibility
+                // setsar=1:1 removes non-square pixel aspect ratio, setdar=dar preserves original display aspect ratio
+                const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=1:1,setdar=dar`;
                 command = [
                     '-y',
                     '-ss', clip.start.toString(),
                     '-i', normalizedInputPath,
                     '-t', clip.duration.toString(),
-                    '-vf', watermarkFilter,
+                    '-vf', finalFilter,
                     '-map_metadata', '-1'
                 ];
                 
@@ -2807,7 +2914,10 @@ async function extractVideoClip(inputPath, outputPath, clip, settings = {}) {
        // Add watermark if enabled
        const watermarkFilter = generateWatermarkFilter(settings.watermark);
        if (watermarkFilter) {
-           command.push('-vf', watermarkFilter);
+           // Ensure even dimensions and preserve aspect ratio for Instagram/TikTok compatibility
+           // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
+           const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
+           command.push('-vf', finalFilter);
        }
        
        // Check if we need to force re-encoding due to watermark or audio removal
@@ -2889,7 +2999,10 @@ async function convertImage(inputPath, outputPath, settings) {
        // Add watermark if enabled
        const watermarkFilter = generateWatermarkFilter(settings.watermark);
        if (watermarkFilter) {
-           command.push('-vf', watermarkFilter);
+           // Ensure even dimensions and preserve aspect ratio for Instagram/TikTok compatibility
+           // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
+           const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
+           command.push('-vf', finalFilter);
        }
        
        // Add quality settings for image conversion
@@ -2970,14 +3083,19 @@ async function convertVideo(inputPath, outputPath, settings) {
                     command.push('-c:v', 'libx264', '-preset', qualitySettings.preset, '-crf', qualitySettings.crf, '-movflags', '+faststart');
             }
         } else {
-            // Check if we can use copy mode (no watermark, no audio removal)
+            // Check if we can use copy mode
             if (!settings.watermark?.enabled && !settings.removeAudio) {
                 // Fast copy - no quality loss, maximum speed
                 command.push('-c:v', 'copy');
                 console.log('Using fast copy mode - no re-encoding needed');
+            } else if (settings.removeAudio && !settings.watermark?.enabled) {
+                // Audio removal only - can use fast copy for video, just remove audio
+                // This is MUCH faster than re-encoding the entire video
+                command.push('-c:v', 'copy');
+                console.log('Using fast copy mode for video - only removing audio (no re-encoding)');
             } else {
-                // Force re-encoding if watermark or audio removal is enabled
-                console.log('Forcing re-encoding due to watermark or audio removal');
+                // Force re-encoding if watermark is enabled (audio removal with watermark needs re-encoding)
+                console.log('Forcing re-encoding due to watermark');
                 switch (outputExt) {
                     case '.mp4':
                         command.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23');
@@ -3003,7 +3121,10 @@ async function convertVideo(inputPath, outputPath, settings) {
         // Add watermark if enabled
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
         if (watermarkFilter) {
-            command.push('-vf', watermarkFilter);
+            // Ensure even dimensions and preserve original display aspect ratio for Instagram/TikTok compatibility
+            // setsar=1:1 removes non-square pixel aspect ratio, setdar=dar preserves original display aspect ratio
+            const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=1:1,setdar=dar`;
+            command.push('-vf', finalFilter);
         }
         
         if (settings.removeAudio) {
@@ -3064,11 +3185,9 @@ function needsVideoReencoding(inputPath, outputExt, settings) {
         return true;
     }
     
-    // 3. Audio removal is enabled (ALWAYS force re-encoding)
-    if (settings.removeAudio) {
-        console.log('Re-encoding needed: Audio removal enabled');
-        return true;
-    }
+    // 3. Audio removal is enabled - but we can use copy mode for video if no watermark
+    // (This check is now handled in convertVideo function to allow fast copy when only removing audio)
+    // Audio removal alone doesn't require video re-encoding, only remuxing
     
     // 4. Quality preset requires compression (only re-encode for Medium and Small)
     if (settings.videoQuality && (settings.videoQuality === 'medium' || settings.videoQuality === 'small')) {
