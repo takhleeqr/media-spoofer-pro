@@ -16,58 +16,58 @@ let completedSteps = 0;
 
 // Make functions available globally for HTML onclick handlers immediately
 console.log('Defining selectMode function globally...');
-window.selectMode = function(mode) {
+window.selectMode = function (mode) {
     try {
         console.log('selectMode called with mode:', mode);
-        
+
         // Ensure DOM elements are available
         if (!modeSelection || !imageInterface || !videoInterface || !processSection) {
             console.error('DOM elements not initialized yet');
             return;
         }
-        
+
         currentMode = mode;
         modeSelection.style.display = 'none';
-        
+
         // Clear any existing previews when switching modes
         clearPreview('image');
         clearPreview('video');
-        
+
         // Reset preview index when switching modes
         currentPreviewIndex = 0;
-        
+
         // Clean up any temporary conversion directories when switching modes
         if (outputDirectory) {
             cleanupRemainingTempDirectories(outputDirectory).catch(error => {
                 console.warn('Cleanup failed during selectMode:', error);
             });
         }
-        
+
         if (mode === 'image') {
             console.log('Setting up image interface');
             imageInterface.classList.add('active');
             setupImageInterface();
         } else if (mode === 'video') {
             console.log('Setting up video interface');
-            
+
             // Remove active class from image interface first
             if (imageInterface) {
                 imageInterface.classList.remove('active');
             }
-            
+
             // Add active class to video interface
             videoInterface.classList.add('active');
             setupVideoInterface();
         }
-        
+
         processSection.style.display = 'block';
         resetProcessing();
-        
+
         // Show preview for first file if any exist
         if (selectedFiles.length > 0) {
             showPreview(selectedFiles[0].path, mode);
         }
-        
+
         console.log('selectMode completed successfully for mode:', mode);
     } catch (error) {
         console.error('Error in selectMode:', error);
@@ -75,41 +75,41 @@ window.selectMode = function(mode) {
 };
 
 console.log('Defining goBack function globally...');
-window.goBack = function() {
+window.goBack = function () {
     // Ensure DOM elements are available
     if (!modeSelection || !imageInterface || !videoInterface || !processSection) {
         console.error('DOM elements not initialized yet');
         return;
     }
-    
+
     // Hide current interface
     imageInterface.classList.remove('active');
     videoInterface.classList.remove('active');
     processSection.style.display = 'none';
-    
+
     // Clear all previews when going back
     clearPreview('image');
     clearPreview('video');
-    
+
     // Show mode selection
     modeSelection.style.display = 'flex';
-    
+
     // Reset state
     currentMode = null;
     selectedFiles = [];
     currentPreviewIndex = 0; // Reset preview index
-    
+
     // Update navigation button states
     updateNavigationButtons('image');
     updateNavigationButtons('video');
-    
+
     // Clean up any temporary conversion directories before resetting
     if (outputDirectory) {
         cleanupRemainingTempDirectories(outputDirectory).catch(error => {
             console.warn('Cleanup failed during goBack:', error);
         });
     }
-    
+
     outputDirectory = null;
     resetProcessing();
 };
@@ -121,17 +121,17 @@ const path = {
         // Handle both forward slashes and backslashes
         const lastSlash = Math.max(filepath.lastIndexOf('/'), filepath.lastIndexOf('\\'));
         const lastDot = filepath.lastIndexOf('.');
-        
+
         // Ensure we're getting the actual file extension (last dot in the filename part)
         let filename = lastSlash >= 0 ? filepath.substring(lastSlash + 1) : filepath;
         let extension = '';
         let name = filename;
-        
+
         if (lastDot > lastSlash) {
             extension = filepath.substring(lastDot);
             name = filepath.substring(lastSlash + 1, lastDot);
         }
-        
+
         return { name, extension, base: filename };
     },
     normalize: (filepath) => {
@@ -178,20 +178,20 @@ function clearPreview(mode) {
         if (previewSection) {
             previewSection.style.display = 'none';
         }
-        
+
         const previewElement = document.getElementById(`${mode === 'image' ? 'image' : 'video'}-preview`);
         if (previewElement) {
             previewElement.style.display = 'none';
             previewElement.src = '';
         }
-        
+
         const watermarkElement = document.getElementById(`${mode === 'image' ? 'image' : 'video'}-text-watermark`);
         if (watermarkElement) {
             watermarkElement.style.display = 'none';
         }
-        
+
         console.log(`Preview cleared for ${mode} mode`);
-        
+
         // Update navigation button states
         updateNavigationButtons(mode);
     } catch (error) {
@@ -207,15 +207,15 @@ function showPreview(filePath, mode) {
         if (previewSection) {
             previewSection.style.display = 'block';
         }
-        
+
         const previewElement = document.getElementById(`${mode === 'image' ? 'image' : 'video'}-preview`);
         if (previewElement) {
             previewElement.style.display = 'block';
             previewElement.src = filePath;
         }
-        
+
         console.log(`Preview shown for ${mode} mode`);
-        
+
         // Update navigation button states
         updateNavigationButtons(mode);
     } catch (error) {
@@ -228,13 +228,13 @@ async function spawnFFmpeg(command) {
     try {
         console.log('Spawning FFmpeg with command:', command);
         console.log('FFmpeg path:', ffmpegPath);
-        
+
         const result = await electronAPI.spawnProcess(ffmpegPath, command);
         console.log('FFmpeg process completed successfully');
         return result;
     } catch (error) {
         console.error('FFmpeg process failed:', error);
-        
+
         // Enhanced debugging for all platforms
         const platform = await electronAPI.getPlatform();
         console.error(`${platform} FFmpeg error details:`, {
@@ -243,7 +243,7 @@ async function spawnFFmpeg(command) {
             errorMessage: error.message,
             errorStack: error.stack
         });
-        
+
         throw new Error(`FFmpeg process failed: ${error.message}`);
     }
 }
@@ -275,14 +275,14 @@ async function initializeFFmpegPaths() {
     const platform = await electronAPI.getPlatform();
     const appPath = await electronAPI.getAppPath();
     const homeDir = await electronAPI.getHomeDir();
-    
+
     console.log('Platform info:', { platform, appPath, homeDir });
-    
+
     // Check if we're in development or production
     const isDev = appPath.includes('node_modules') || appPath.includes('MediaSpooferApp');
-    
+
     console.log('Path detection:', { appPath, isDev, platform });
-    
+
     if (isDev) {
         // Development: look in app folder
         if (platform === 'win32') {
@@ -308,29 +308,29 @@ async function initializeFFmpegPaths() {
             ffprobePath = appDir + '/resources/ffprobe';
         }
     }
-    
+
     console.log('FFmpeg paths initialized:', { ffmpegPath, ffprobePath, isDev, platform });
-    
+
     // Enhanced debugging for all platforms
     let ffmpegExists = false;
     let ffprobeExists = false;
-    
+
     try {
         ffmpegExists = await electronAPI.exists(ffmpegPath);
         ffprobeExists = await electronAPI.exists(ffprobePath);
         console.log('FFmpeg existence check:', { ffmpegExists, ffprobeExists, ffmpegPath, ffprobePath });
-        
+
         if (ffmpegExists) {
             const ffmpegStats = await electronAPI.getFileStats(ffmpegPath);
             console.log('FFmpeg file stats:', ffmpegStats);
         } else {
             console.error('FFmpeg not found at path:', ffmpegPath);
-            
+
             // Try alternative paths for production builds
             if (!isDev) {
                 console.log('Trying alternative production paths...');
                 const alternativePaths = [];
-                
+
                 if (platform === 'win32') {
                     // Try different Windows production paths
                     const baseDir = appPath.replace('/app.asar', '').replace('\\app.asar', '');
@@ -350,7 +350,7 @@ async function initializeFFmpegPaths() {
                         baseDir + '/Contents/Resources/ffprobe'
                     );
                 }
-                
+
                 for (const altPath of alternativePaths) {
                     try {
                         const exists = await electronAPI.exists(altPath);
@@ -369,7 +369,7 @@ async function initializeFFmpegPaths() {
                     }
                 }
             }
-            
+
             // macOS-specific debugging
             if (platform === 'darwin') {
                 console.error('macOS FFmpeg path issue detected. Common macOS paths:');
@@ -382,7 +382,7 @@ async function initializeFFmpegPaths() {
             console.log('FFprobe file stats:', ffprobeStats);
         } else {
             console.error('FFprobe not found at path:', ffprobePath);
-            
+
             // macOS-specific debugging
             if (platform === 'darwin') {
                 console.error('macOS FFprobe path issue detected. Common macOS paths:');
@@ -393,11 +393,11 @@ async function initializeFFmpegPaths() {
     } catch (error) {
         console.error('Error checking FFmpeg files:', error);
     }
-    
+
     // macOS fallback path checking
     if (platform === 'darwin' && (!ffmpegExists || !ffprobeExists)) {
         console.log('Attempting macOS fallback path detection...');
-        
+
         // Try alternative macOS paths
         const alternativePaths = [
             appPath + '/ffmpeg',
@@ -405,7 +405,7 @@ async function initializeFFmpegPaths() {
             appPath.replace('/resources', '') + '/ffmpeg',
             appPath.replace('/resources', '') + '/ffprobe'
         ];
-        
+
         for (const altPath of alternativePaths) {
             try {
                 const exists = await electronAPI.exists(altPath);
@@ -431,23 +431,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOM loaded, initializing application...');
     console.log('Document ready state:', document.readyState);
     console.log('Document body:', !!document.body);
-    
+
     // Wait a bit to ensure everything is fully loaded
     await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     // Initialize DOM elements
     modeSelection = document.getElementById('modeSelection');
     imageInterface = document.getElementById('imageInterface');
     videoInterface = document.getElementById('videoInterface');
     processSection = document.getElementById('processSection');
-    
+
     console.log('DOM elements initialized:', {
         modeSelection: !!modeSelection,
         imageInterface: !!imageInterface,
         videoInterface: !!videoInterface,
         processSection: !!processSection
     });
-    
+
     // Debug: Check if elements exist and their properties
     if (videoInterface) {
         console.log('Video interface found:', videoInterface);
@@ -458,37 +458,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
         console.error('Video interface NOT found!');
     }
-    
+
     // Check if electronAPI is available
     if (!window.electronAPI) {
         console.error('electronAPI is not available!');
         alert('Error: electronAPI not available. Please restart the application.');
         return;
     }
-    
+
     console.log('electronAPI is available:', Object.keys(window.electronAPI));
-    
+
     // Initialize FFmpeg paths
     await initializeFFmpegPaths();
     checkFFmpegInstallation();
     setupModeSelection();
-    
+
     // Set up mode selection event listeners
     setupModeSelectionEventListeners();
-    
+
     // Set up interfaces
     setupImageInterface();
     setupVideoInterface();
-    
+
     // Add keyboard navigation for preview
     setupPreviewKeyboardNavigation();
-    
+
     // Initialize navigation button states
     updateNavigationButtons('image');
     updateNavigationButtons('video');
-    
+
     console.log('Application initialized successfully');
-    
+
     // Final check - test if elements are clickable
     const testElement = document.getElementById('imageModeCard');
     if (testElement) {
@@ -503,79 +503,79 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupModeSelectionEventListeners() {
     try {
         console.log('Setting up mode selection event listeners...');
-        
+
         const imageModeCard = document.getElementById('imageModeCard');
         const videoModeCard = document.getElementById('videoModeCard');
-        
+
         console.log('Found elements:', {
             imageModeCard: !!imageModeCard,
             videoModeCard: !!videoModeCard
         });
-        
+
         if (imageModeCard) {
             console.log('Adding click listener to imageModeCard');
             // Remove any existing listeners first
             imageModeCard.replaceWith(imageModeCard.cloneNode(true));
             const newImageModeCard = document.getElementById('imageModeCard');
-            
+
             // Add visual feedback
             newImageModeCard.style.cursor = 'pointer';
             newImageModeCard.style.userSelect = 'none';
-            
+
             newImageModeCard.addEventListener('click', (e) => {
                 console.log('Image mode card clicked!', e);
                 e.preventDefault();
                 e.stopPropagation();
                 selectMode('image');
             });
-            
+
             // Also add onclick as backup
             newImageModeCard.onclick = () => {
                 console.log('Image mode card onclick triggered');
                 selectMode('image');
             };
-            
+
             // Test if element is clickable
             console.log('Image mode card element:', newImageModeCard);
             console.log('Image mode card computed styles:', window.getComputedStyle(newImageModeCard));
         } else {
             console.error('imageModeCard not found!');
         }
-        
+
         if (videoModeCard) {
             console.log('Adding click listener to videoModeCard');
             // Remove any existing listeners first
             videoModeCard.replaceWith(videoModeCard.cloneNode(true));
             const newVideoModeCard = document.getElementById('videoModeCard');
-            
+
             // Add visual feedback
             newVideoModeCard.style.cursor = 'pointer';
             newVideoModeCard.style.userSelect = 'none';
-            
+
             newVideoModeCard.addEventListener('click', (e) => {
                 console.log('Video mode card clicked!', e);
                 e.preventDefault();
                 e.stopPropagation();
                 selectMode('video');
             });
-            
+
             // Also add onclick as backup
             newVideoModeCard.onclick = () => {
                 console.log('Video mode card onclick triggered');
                 selectMode('video');
             };
-            
+
             // Test if element is clickable
             console.log('Video mode card element:', newVideoModeCard);
             console.log('Video mode card computed styles:', window.getComputedStyle(newVideoModeCard));
         } else {
             console.error('videoModeCard not found!');
         }
-        
+
         // Add event listeners for back buttons
         const imageBackBtn = document.getElementById('imageBackBtn');
         const videoBackBtn = document.getElementById('videoBackBtn');
-    
+
         if (imageBackBtn) {
             imageBackBtn.addEventListener('click', () => {
                 console.log('Image back button clicked');
@@ -584,7 +584,7 @@ function setupModeSelectionEventListeners() {
         } else {
             console.error('imageBackBtn not found!');
         }
-    
+
         if (videoBackBtn) {
             videoBackBtn.addEventListener('click', () => {
                 console.log('Video back button clicked');
@@ -593,9 +593,9 @@ function setupModeSelectionEventListeners() {
         } else {
             console.error('videoBackBtn not found!');
         }
-        
+
         console.log('Mode selection event listeners setup completed');
-        
+
         // Add test button listener
         const testButton = document.getElementById('testButton');
         if (testButton) {
@@ -615,7 +615,7 @@ function setupModeSelectionEventListeners() {
 function setupPreviewKeyboardNavigation() {
     document.addEventListener('keydown', (e) => {
         if (selectedFiles.length === 0) return;
-        
+
         switch (e.key) {
             case 'ArrowLeft':
                 e.preventDefault();
@@ -641,7 +641,7 @@ function setupPreviewKeyboardNavigation() {
 async function checkFFmpegInstallation() {
     const ffmpegExists = await electronAPI.exists(ffmpegPath);
     const ffprobeExists = await electronAPI.exists(ffprobePath);
-    
+
     if (!ffmpegExists || !ffprobeExists) {
         console.warn('FFmpeg not found. Please ensure ffmpeg and ffprobe are in the app folder.');
     }
@@ -655,7 +655,7 @@ function setupModeSelection() {
         console.error('DOM elements not available in setupModeSelection');
         return;
     }
-    
+
     // Mode selection is handled by onclick in HTML
     // Just ensure we start with the right display
     modeSelection.style.display = 'flex';
@@ -667,18 +667,18 @@ function setupModeSelection() {
 // Image interface setup
 function setupImageInterface() {
     console.log('setupImageInterface called, already setup:', imageInterfaceSetup);
-    
+
     if (imageInterfaceSetup) {
         console.log('Image interface already setup, skipping');
         return;
     }
-    
+
     const imageDropZone = document.getElementById('imageDropZone');
     const selectImageBtn = document.getElementById('selectImageBtn');
     const selectImageFolderBtn = document.getElementById('selectImageFolderBtn');
     const clearImageBtn = document.getElementById('clearImageBtn');
     const imageFileList = document.getElementById('imageFileList');
-    
+
     console.log('DOM elements found:', {
         imageDropZone: !!imageDropZone,
         selectImageBtn: !!selectImageBtn,
@@ -686,7 +686,7 @@ function setupImageInterface() {
         clearImageBtn: !!clearImageBtn,
         imageFileList: !!imageFileList
     });
-    
+
     // Set default values
     document.getElementById('imageDuplicates').value = 1;
     document.getElementById('imageIntensity').value = 'heavy';
@@ -710,7 +710,7 @@ function setupImageInterface() {
     } else {
         console.error('selectImageFolderBtn not found!');
     }
-    
+
     if (clearImageBtn) {
         console.log('Adding click listener to clearImageBtn');
         clearImageBtn.addEventListener('click', () => {
@@ -720,7 +720,7 @@ function setupImageInterface() {
     } else {
         console.error('clearImageBtn not found!');
     }
-    
+
     // Drag and drop
     if (imageDropZone) {
         console.log('Setting up image drop zone event listeners');
@@ -733,17 +733,17 @@ function setupImageInterface() {
         imageDropZone.addEventListener('drop', (e) => handleDrop(e, 'image'));
         console.log('Image drop zone event listeners set up successfully');
     }
-    
+
     // Settings change handlers
     const imageProcessingMode = document.getElementById('imageProcessingMode');
     const imageIntensityGroup = document.getElementById('imageIntensityGroup');
     const imageDuplicatesGroup = document.getElementById('imageDuplicatesGroup');
     const imageRotationGroup = document.getElementById('imageRotationGroup');
-    
+
     if (imageProcessingMode) {
         imageProcessingMode.addEventListener('change', () => {
             const mode = imageProcessingMode.value;
-            
+
             // Hide intensity, duplicates, and rotation settings for convert-only mode
             if (mode === 'convert-only') {
                 imageIntensityGroup.style.display = 'none';
@@ -754,7 +754,7 @@ function setupImageInterface() {
                 imageDuplicatesGroup.style.display = 'block';
                 if (imageRotationGroup) imageRotationGroup.style.display = 'block';
             }
-            
+
             // Hide "Original" option in image format when processing type is convert-only
             const imageFormat = document.getElementById('imageFormat');
             if (imageFormat) {
@@ -772,7 +772,7 @@ function setupImageInterface() {
                 }
             }
         });
-        
+
         // Initialize the format option visibility and rotation checkbox visibility
         const mode = imageProcessingMode.value;
         const imageFormat = document.getElementById('imageFormat');
@@ -785,17 +785,17 @@ function setupImageInterface() {
                 }
             }
         }
-        
+
         // Initialize rotation checkbox visibility (show for spoof-only, hide for convert-only)
         if (imageRotationGroup) {
             imageRotationGroup.style.display = mode === 'convert-only' ? 'none' : 'block';
         }
     }
-    
+
     // Watermark UI handlers
     const imageWatermarkUI = setupWatermarkUI('image');
     window.imageWatermarkUI = imageWatermarkUI; // Store reference globally
-    
+
     setupProcessingControls();
     imageInterfaceSetup = true;
 }
@@ -803,12 +803,12 @@ function setupImageInterface() {
 // Video interface setup
 function setupVideoInterface() {
     console.log('setupVideoInterface called, already setup:', videoInterfaceSetup);
-    
+
     if (videoInterfaceSetup) {
         console.log('Video interface already setup, skipping');
         return;
     }
-    
+
     const videoDropZone = document.getElementById('videoDropZone');
     const selectVideoBtn = document.getElementById('selectVideoBtn');
     const selectVideoFolderBtn = document.getElementById('selectVideoFolderBtn');
@@ -819,7 +819,7 @@ function setupVideoInterface() {
     document.getElementById('videoProcessingMode').value = 'spoof-only';
     document.getElementById('videoDuplicates').value = 1;
     document.getElementById('videoIntensity').value = 'heavy';
-    
+
     // Event listeners
     if (selectVideoBtn) {
         selectVideoBtn.addEventListener('click', () => {
@@ -839,7 +839,7 @@ function setupVideoInterface() {
             clearFiles();
         });
     }
-    
+
     // Drag and drop
     if (videoDropZone) {
         console.log('Setting up video drop zone event listeners');
@@ -852,14 +852,14 @@ function setupVideoInterface() {
         videoDropZone.addEventListener('drop', (e) => handleDrop(e, 'video'));
         console.log('Video drop zone event listeners set up successfully');
     }
-    
+
     // Settings change handlers
     const videoProcessingMode = document.getElementById('videoProcessingMode');
     const videoIntensityGroup = document.getElementById('videoIntensityGroup');
     const clipLengthGroup = document.getElementById('clipLengthGroup');
     const videoDuplicatesGroup = document.getElementById('videoDuplicatesGroup');
     const videoRotationGroup = document.getElementById('videoRotationGroup');
-    
+
     if (videoProcessingMode) {
         // Function to update UI visibility based on mode
         const updateUIVisibility = (mode) => {
@@ -888,12 +888,12 @@ function setupVideoInterface() {
                 if (videoRotationGroup) videoRotationGroup.style.display = 'block';
             }
         };
-        
+
         // Set up change event listener
         videoProcessingMode.addEventListener('change', () => {
             const mode = videoProcessingMode.value;
             updateUIVisibility(mode);
-            
+
             // Hide "Original" option in video format when processing type is convert-only
             const videoFormat = document.getElementById('videoFormat');
             if (videoFormat) {
@@ -911,10 +911,10 @@ function setupVideoInterface() {
                 }
             }
         });
-        
+
         // Initialize UI visibility for default mode
         updateUIVisibility('spoof-only');
-        
+
         // Initialize the format option visibility
         const videoFormat = document.getElementById('videoFormat');
         if (videoFormat) {
@@ -923,17 +923,17 @@ function setupVideoInterface() {
                 originalOption.style.display = 'block'; // Default mode is spoof-only, so show original
             }
         }
-        
+
         // Initialize rotation checkbox visibility for default mode
         if (videoRotationGroup) {
             videoRotationGroup.style.display = 'block'; // Default mode is spoof-only, so show rotation
         }
     }
-    
+
     // Watermark UI handlers
     const videoWatermarkUI = setupWatermarkUI('video');
     window.videoWatermarkUI = videoWatermarkUI; // Store reference globally
-    
+
     setupProcessingControls();
     videoInterfaceSetup = true;
 }
@@ -945,7 +945,7 @@ function calculateDefaultWatermarkSize(width, height, mode = 'video') {
     const smallerDimension = Math.min(width, height);
     const percentage = mode === 'video' ? 0.06 : 0.1; // 6% for video, 10% for image
     const calculatedSize = Math.round(smallerDimension * percentage);
-    
+
     // Ensure size is within reasonable bounds
     return Math.max(16, Math.min(120, calculatedSize));
 }
@@ -954,20 +954,20 @@ function calculateDefaultWatermarkSize(width, height, mode = 'video') {
 function setupWatermarkUI(mode) {
     try {
         const prefix = mode === 'image' ? 'image' : 'video';
-        
+
         // Get watermark elements
         const watermarkEnabled = document.getElementById(`${prefix}WatermarkEnabled`);
         const watermarkSettings = document.getElementById(`${prefix}WatermarkSettings`);
-        
+
         // If basic watermark elements don't exist, return early
         if (!watermarkEnabled || !watermarkSettings) {
             console.warn(`Watermark elements not found for ${mode} mode`);
-            return { 
-                updateWatermarkSizeForMedia: () => {}, 
-                updateWatermarkPreview: () => {} 
+            return {
+                updateWatermarkSizeForMedia: () => { },
+                updateWatermarkPreview: () => { }
             };
         }
-        
+
         const watermarkText = document.getElementById(`${prefix}WatermarkText`);
         const watermarkFont = document.getElementById(`${prefix}WatermarkFont`);
         const watermarkSize = document.getElementById(`${prefix}WatermarkSize`);
@@ -978,11 +978,11 @@ function setupWatermarkUI(mode) {
         const watermarkBackgroundEnabled = document.getElementById(`${prefix}WatermarkBackgroundEnabled`);
         const watermarkBackgroundColor = document.getElementById(`${prefix}WatermarkBackgroundColor`);
         const watermarkBackgroundColorContainer = document.getElementById(`${prefix}WatermarkBackgroundColorContainer`);
-        
+
         // Preview elements
         const previewElement = document.getElementById(`${prefix === 'image' ? 'image' : 'video'}-preview`);
         const watermarkElement = document.getElementById(`${prefix === 'image' ? 'image' : 'video'}-text-watermark`);
-        
+
         // Function to update watermark size based on loaded media
         function updateWatermarkSizeForMedia(width, height) {
             if (watermarkSize) {
@@ -991,7 +991,7 @@ function setupWatermarkUI(mode) {
                 updateWatermarkPreview();
             }
         }
-        
+
         // Update preview function with proper scaling
         function updateWatermarkPreview() {
             try {
@@ -999,21 +999,21 @@ function setupWatermarkUI(mode) {
                     if (watermarkElement) watermarkElement.style.display = 'none';
                     return;
                 }
-                
+
                 if (watermarkElement && previewElement && watermarkFont && watermarkSize && watermarkColor && watermarkOpacity) {
                     watermarkElement.textContent = watermarkText.value;
                     watermarkElement.style.fontFamily = watermarkFont.value;
-                    
+
                     // Use the actual watermark size for preview (no scaling)
                     // This gives you an accurate preview of how it will look in the output
                     const previewSize = watermarkSize.value;
                     watermarkElement.style.fontSize = `${Math.max(8, previewSize)}px`;
-                    
 
-                    
+
+
                     watermarkElement.style.color = watermarkColor.value;
                     watermarkElement.style.opacity = watermarkOpacity.value / 100;
-                    
+
                     // Handle background
                     if (watermarkBackgroundEnabled && watermarkBackgroundEnabled.checked && watermarkBackgroundColor) {
                         watermarkElement.style.backgroundColor = watermarkBackgroundColor.value;
@@ -1024,21 +1024,21 @@ function setupWatermarkUI(mode) {
                         watermarkElement.style.padding = '0';
                         watermarkElement.style.borderRadius = '0';
                     }
-                    
+
                     // Position the watermark
                     if (watermarkPosition) {
                         const position = watermarkPosition.value;
                         watermarkElement.style.position = 'absolute';
-                        
+
                         // Reset all positioning
                         watermarkElement.style.top = '';
                         watermarkElement.style.left = '';
                         watermarkElement.style.right = '';
                         watermarkElement.style.bottom = '';
-                        
+
                         // Build transform string for positioning
                         let transformString = '';
-                        
+
                         switch (position) {
                             case 'top-left':
                                 watermarkElement.style.top = '16px';
@@ -1082,11 +1082,11 @@ function setupWatermarkUI(mode) {
                                 watermarkElement.style.right = '16px';
                                 break;
                         }
-                        
+
                         // Apply the combined transform
                         watermarkElement.style.transform = transformString;
                     }
-                    
+
                     watermarkElement.style.display = 'block';
                 }
             } catch (error) {
@@ -1094,7 +1094,7 @@ function setupWatermarkUI(mode) {
                 // Don't let watermark errors break the UI
             }
         }
-        
+
         // Toggle watermark settings visibility when checkbox changes
         if (watermarkEnabled && watermarkSettings) {
             watermarkEnabled.addEventListener('change', () => {
@@ -1102,7 +1102,7 @@ function setupWatermarkUI(mode) {
                 updateWatermarkPreview();
             });
         }
-        
+
         // Toggle background color container visibility
         if (watermarkBackgroundEnabled && watermarkBackgroundColorContainer) {
             watermarkBackgroundEnabled.addEventListener('change', () => {
@@ -1110,7 +1110,7 @@ function setupWatermarkUI(mode) {
                 updateWatermarkPreview();
             });
         }
-        
+
         // Add event listeners
         if (watermarkEnabled) watermarkEnabled.addEventListener('change', updateWatermarkPreview);
         if (watermarkText) watermarkText.addEventListener('input', updateWatermarkPreview);
@@ -1119,7 +1119,7 @@ function setupWatermarkUI(mode) {
         if (watermarkPosition) watermarkPosition.addEventListener('change', updateWatermarkPreview);
         if (watermarkColor) watermarkColor.addEventListener('change', updateWatermarkPreview);
         if (watermarkOpacity) watermarkOpacity.addEventListener('input', updateWatermarkPreview);
-        
+
         // Add background event listeners with null checks
         if (watermarkBackgroundEnabled) {
             watermarkBackgroundEnabled.addEventListener('change', updateWatermarkPreview);
@@ -1127,7 +1127,7 @@ function setupWatermarkUI(mode) {
         if (watermarkBackgroundColor) {
             watermarkBackgroundColor.addEventListener('change', updateWatermarkPreview);
         }
-        
+
         // Update opacity value display
         if (watermarkOpacity && watermarkOpacityValue) {
             watermarkOpacity.addEventListener('input', () => {
@@ -1135,28 +1135,28 @@ function setupWatermarkUI(mode) {
                 updateWatermarkPreview();
             });
         }
-        
+
         // Initial preview update
         updateWatermarkPreview();
-        
+
         // Initialize watermark settings visibility
         if (watermarkEnabled && watermarkSettings) {
             watermarkSettings.style.display = watermarkEnabled.checked ? 'block' : 'none';
         }
-        
+
         // Initialize background color container visibility
         if (watermarkBackgroundEnabled && watermarkBackgroundColorContainer) {
             watermarkBackgroundColorContainer.style.display = watermarkBackgroundEnabled.checked ? 'block' : 'none';
         }
-        
+
         // Return the function so it can be called when media is loaded
         return { updateWatermarkSizeForMedia, updateWatermarkPreview };
     } catch (error) {
         console.warn('Error setting up watermark UI:', error);
         // Return empty functions to prevent errors
-        return { 
-            updateWatermarkSizeForMedia: () => {}, 
-            updateWatermarkPreview: () => {} 
+        return {
+            updateWatermarkSizeForMedia: () => { },
+            updateWatermarkPreview: () => { }
         };
     }
 }
@@ -1166,7 +1166,7 @@ function setupQualityInfo(mode) {
     try {
         const qualitySelect = document.getElementById(`${mode}Quality`);
         const qualityInfo = document.getElementById(`${mode}QualityInfo`);
-        
+
         if (qualitySelect && qualityInfo) {
             // Update info when quality changes
             qualitySelect.addEventListener('change', () => {
@@ -1174,7 +1174,7 @@ function setupQualityInfo(mode) {
                 const settings = getQualitySettings(quality);
                 qualityInfo.textContent = settings.description;
             });
-            
+
             // Set initial info
             const initialQuality = qualitySelect.value;
             const initialSettings = getQualitySettings(initialQuality);
@@ -1192,31 +1192,31 @@ function setupProcessingControls() {
     const pauseBtn = document.getElementById('pauseBtn');
     const stopBtn = document.getElementById('stopBtn');
     const openFolderBtn = document.getElementById('openFolderBtn');
-    
+
     // Remove existing listeners to prevent duplicates
     if (startBtn) startBtn.replaceWith(startBtn.cloneNode(true));
     if (pauseBtn) pauseBtn.replaceWith(pauseBtn.cloneNode(true));
     if (stopBtn) stopBtn.replaceWith(stopBtn.cloneNode(true));
     if (openFolderBtn) openFolderBtn.replaceWith(openFolderBtn.cloneNode(true));
-    
+
     // Get fresh references
     const newStartBtn = document.getElementById('startBtn');
     const newPauseBtn = document.getElementById('pauseBtn');
     const newStopBtn = document.getElementById('stopBtn');
     const newOpenFolderBtn = document.getElementById('openFolderBtn');
-    
+
     // Add event listeners
     if (newStartBtn) newStartBtn.addEventListener('click', startProcessing);
     if (newPauseBtn) newPauseBtn.addEventListener('click', pauseProcessing);
     if (newStopBtn) newStopBtn.addEventListener('click', stopProcessing);
     if (newOpenFolderBtn) newOpenFolderBtn.addEventListener('click', openOutputFolder);
-    
+
     // Setup output folder selection
     let selectOutputBtn = document.getElementById('selectOutputBtn');
     if (selectOutputBtn) {
         selectOutputBtn.addEventListener('click', selectOutputFolder);
     }
-    
+
     // Prevent default drag behavior on document
     document.addEventListener('dragover', (e) => e.preventDefault());
     document.addEventListener('drop', (e) => e.preventDefault());
@@ -1242,30 +1242,30 @@ async function selectFiles(mode) {
         console.log('selectFiles called with mode:', mode);
         console.log('electronAPI available:', typeof window.electronAPI !== 'undefined');
         console.log('electronAPI.selectFiles available:', typeof window.electronAPI?.selectFiles === 'function');
-        
+
         if (!window.electronAPI) {
             console.error('electronAPI is not available!');
             addStatusMessage('Error: electronAPI not available', 'error');
             return;
         }
-        
+
         if (typeof window.electronAPI.selectFiles !== 'function') {
             console.error('electronAPI.selectFiles is not a function!');
             addStatusMessage('Error: selectFiles function not available', 'error');
             return;
         }
-        
+
         // Set file filters based on mode
-        const filters = mode === 'image' 
+        const filters = mode === 'image'
             ? [
                 { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'heic', 'webp', 'bmp', 'gif', 'tiff', '.tif', 'svg', '.ico', '.jfif', '.avif', '.jxl', '.raw', '.cr2', '.nef', '.arw', '.dng'] },
                 { name: 'All Files', extensions: ['*'] }
-              ]
+            ]
             : [
                 { name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'webm', 'ts', 'mkv', 'flv', 'wmv', 'm4v', '3gp', 'ogv', 'mts', 'm2ts', 'vob', 'asf', 'rm', 'rmvb', 'divx', 'xvid', 'mpg', '.mpeg', 'mxf', 'f4v'] },
                 { name: 'All Files', extensions: ['*'] }
-              ];
-        
+            ];
+
         console.log('Calling electronAPI.selectFiles with filters:', filters);
         const filePaths = await electronAPI.selectFiles(filters);
         console.log('File paths returned:', filePaths);
@@ -1276,7 +1276,7 @@ async function selectFiles(mode) {
             console.log('First file path:', filePaths[0]);
             console.log('First file path type:', typeof filePaths[0]);
         }
-        
+
         if (filePaths && filePaths.length > 0) {
             await addFiles(filePaths, mode);
         } else {
@@ -1292,28 +1292,28 @@ async function selectFiles(mode) {
 async function selectFolder(mode) {
     try {
         console.log('selectFolder called with mode:', mode);
-        
+
         if (!window.electronAPI) {
             console.error('electronAPI is not available!');
             addStatusMessage('Error: electronAPI not available', 'error');
             return;
         }
-        
+
         if (typeof window.electronAPI.selectFolder !== 'function') {
             console.error('electronAPI.selectFolder is not a function!');
             addStatusMessage('Error: selectFolder function not available', 'error');
             return;
         }
-        
+
         console.log('Calling electronAPI.selectFolder');
         const folderPath = await electronAPI.selectFolder();
         console.log('Folder path returned:', folderPath);
-        
+
         if (folderPath) {
             // Read all files from the selected folder
             const filePaths = await electronAPI.readDir(folderPath);
             console.log('Files found in folder:', filePaths);
-            
+
             if (filePaths && filePaths.length > 0) {
                 // Filter files by mode
                 const filteredFiles = filePaths.filter(filePath => {
@@ -1324,9 +1324,9 @@ async function selectFolder(mode) {
                         return ['.mp4', '.mov', '.avi', '.webm', '.ts', '.mkv', '.flv', '.wmv', '.m4v', '.3gp', '.ogv', '.mts', '.m2ts', '.vob', '.asf', '.rm', '.rmvb', '.divx', '.xvid', '.mpg', '.mpeg', '.mxf', '.f4v'].includes(extension);
                     }
                 });
-                
+
                 console.log('Filtered files for mode:', mode, filteredFiles);
-                
+
                 if (filteredFiles.length > 0) {
                     await addFiles(filteredFiles, mode);
                     addStatusMessage(`📁 Added ${filteredFiles.length} files from folder: ${folderPath}`, 'success');
@@ -1349,14 +1349,14 @@ async function addFiles(filePaths, mode) {
     console.log('addFiles called with:', { filePaths, mode });
     console.log('filePaths type:', typeof filePaths);
     console.log('filePaths is array:', Array.isArray(filePaths));
-    
+
     if (!filePaths || filePaths.length === 0) {
         console.warn('No file paths provided to addFiles');
         return;
     }
-    
+
     filePaths = Array.isArray(filePaths) ? filePaths : [filePaths];
-    
+
     // Validate and normalize all file paths
     const validFilePaths = filePaths.filter(filePath => {
         if (!filePath || typeof filePath !== 'string' || !filePath.trim()) {
@@ -1365,28 +1365,28 @@ async function addFiles(filePaths, mode) {
         }
         return true;
     });
-    
+
     if (validFilePaths.length === 0) {
         console.warn('No valid file paths found');
         return;
     }
-    
+
     console.log('Processing', validFilePaths.length, 'valid files');
-    
-            // Convert file paths to file objects if they're just strings
-        const fileObjects = await Promise.all(validFilePaths.map(async (filePath) => {
-            console.log('Processing file path:', filePath);
-            
-            // Normalize the path
-            const normalizedPath = normalizePath(filePath);
-            
-            // Use cross-platform helper functions
-            const fileName = extractFileName(normalizedPath);
-            const fileExtension = extractFileExtension(normalizedPath);
-            
-            console.log('Extracted filename:', fileName);
-            console.log('Extracted extension:', fileExtension);
-        
+
+    // Convert file paths to file objects if they're just strings
+    const fileObjects = await Promise.all(validFilePaths.map(async (filePath) => {
+        console.log('Processing file path:', filePath);
+
+        // Normalize the path
+        const normalizedPath = normalizePath(filePath);
+
+        // Use cross-platform helper functions
+        const fileName = extractFileName(normalizedPath);
+        const fileExtension = extractFileExtension(normalizedPath);
+
+        console.log('Extracted filename:', fileName);
+        console.log('Extracted extension:', fileExtension);
+
         // Try to get file size
         let fileSize = 0;
         try {
@@ -1396,20 +1396,20 @@ async function addFiles(filePaths, mode) {
         } catch (error) {
             console.warn('Could not get file size for:', normalizedPath, error);
         }
-        
+
         // Force file type based on mode to prevent misclassification
         let fileType = mode === 'image' ? 'image' : getFileType(fileExtension);
-        
+
         // Special handling for files that might have incorrect extensions
         if (fileType === 'unknown' && mode === 'video') {
             // Check if the original filename contains video extensions
             const originalName = filePath.toLowerCase();
-            if (originalName.includes('.ts') || originalName.includes('.mp4') || originalName.includes('.mov') || 
+            if (originalName.includes('.ts') || originalName.includes('.mp4') || originalName.includes('.mov') ||
                 originalName.includes('.avi') || originalName.includes('.mkv') || originalName.includes('.webm')) {
                 fileType = 'video';
             }
         }
-        
+
         // DEBUG: Log file type detection for macOS
         console.log('[DEBUG addFiles] File type detection:', {
             mode,
@@ -1418,7 +1418,7 @@ async function addFiles(filePaths, mode) {
             forcedType: fileType,
             fileName
         });
-        
+
         return {
             path: normalizedPath,
             name: fileName,
@@ -1427,19 +1427,19 @@ async function addFiles(filePaths, mode) {
             size: fileSize
         };
     }));
-    
+
     const validFileObjects = fileObjects.filter(Boolean); // Remove null entries
-    
+
     console.log('Created file objects:', validFileObjects);
-    
+
     const newFiles = validFileObjects.filter(f => !selectedFiles.some(existing => existing.path === f.path));
     selectedFiles = selectedFiles.concat(newFiles);
-    
+
     console.log('Updated selectedFiles:', selectedFiles);
-    
+
     // Reset preview index to show first file
     currentPreviewIndex = 0;
-    
+
     updateFileList();
     updateStats();
     updateButtons();
@@ -1451,31 +1451,31 @@ async function addFiles(filePaths, mode) {
 
 function getFileType(extension) {
     const imageExts = [
-        '.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.gif', '.tiff', '.tif', 
-        '.svg', '.ico', '.jfif', '.pjpeg', '.pjp', '.avif', '.jxl', '.raw', '.cr2', 
-        '.nef', '.arw', '.dng', '.orf', '.rw2', '.pef', '.srw', '.raf', '.mrw', 
-        '.kdc', '.dcr', '.x3f', '.mef', '.iiq', '.3fr', '.erf', '.mdc', '.mos', 
-        '.mrw', '.nrw', '.rwz', '.srw', '.arw', '.bay', '.crw', '.cs1', '.dc2', 
-        '.dcr', '.dng', '.erf', '.fff', '.hdr', '.k25', '.kdc', '.mdc', '.mos', 
-        '.mrw', '.nef', '.nrw', '.orf', '.pef', '.raf', '.raw', '.rw2', '.rwl', 
+        '.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.gif', '.tiff', '.tif',
+        '.svg', '.ico', '.jfif', '.pjpeg', '.pjp', '.avif', '.jxl', '.raw', '.cr2',
+        '.nef', '.arw', '.dng', '.orf', '.rw2', '.pef', '.srw', '.raf', '.mrw',
+        '.kdc', '.dcr', '.x3f', '.mef', '.iiq', '.3fr', '.erf', '.mdc', '.mos',
+        '.mrw', '.nrw', '.rwz', '.srw', '.arw', '.bay', '.crw', '.cs1', '.dc2',
+        '.dcr', '.dng', '.erf', '.fff', '.hdr', '.k25', '.kdc', '.mdc', '.mos',
+        '.mrw', '.nef', '.nrw', '.orf', '.pef', '.raf', '.raw', '.rw2', '.rwl',
         '.rwz', '.srw', '.srf', '.sr2', '.x3f'
     ];
     const videoExts = [
-        '.mp4', '.mov', '.avi', '.webm', '.ts', '.TS', '.mkv', '.flv', '.wmv', 
-        '.m4v', '.3gp', '.ogv', '.mts', '.m2ts', '.vob', '.asf', '.rm', '.rmvb', 
-        '.divx', '.xvid', '.mpg', '.mpeg', '.mpe', '.m1v', '.m2v', '.mpv', '.mpv2', 
-        '.m2p', '.m2t', '.m2ts', '.mts', '.ts', '.TS', '.mxf', '.f4v', '.f4p', 
-        '.f4a', '.f4b', '.ogx', '.ogm', '.ogv', '.oga', '.spx', '.opus', '.webm', 
-        '.m4a', '.m4b', '.m4p', '.m4r', '.m4v', '.3g2', '.3gp', '.3gp2', '.3gpp', 
-        '.3gpp2', '.amc', '.amv', '.asf', '.asx', '.avi', '.bik', '.bin', '.divx', 
-        '.drc', '.dv', '.dvr-ms', '.evo', '.fli', '.flv', '.hdmov', '.ifo', '.ivf', 
-        '.m1v', '.m2t', '.m2ts', '.m2v', '.m4v', '.mkv', '.mod', '.mov', '.mp4', 
-        '.mpe', '.mpeg', '.mpg', '.mpl', '.mpls', '.mpv', '.mpv2', '.mts', '.mxf', 
-        '.nsv', '.nuv', '.ogg', '.ogm', '.ogv', '.ogx', '.ps', '.rec', '.rm', '.rmvb', 
-        '.rpl', '.smil', '.smk', '.swf', '.tivo', '.tod', '.tp', '.trp', '.ts', '.TS', 
+        '.mp4', '.mov', '.avi', '.webm', '.ts', '.TS', '.mkv', '.flv', '.wmv',
+        '.m4v', '.3gp', '.ogv', '.mts', '.m2ts', '.vob', '.asf', '.rm', '.rmvb',
+        '.divx', '.xvid', '.mpg', '.mpeg', '.mpe', '.m1v', '.m2v', '.mpv', '.mpv2',
+        '.m2p', '.m2t', '.m2ts', '.mts', '.ts', '.TS', '.mxf', '.f4v', '.f4p',
+        '.f4a', '.f4b', '.ogx', '.ogm', '.ogv', '.oga', '.spx', '.opus', '.webm',
+        '.m4a', '.m4b', '.m4p', '.m4r', '.m4v', '.3g2', '.3gp', '.3gp2', '.3gpp',
+        '.3gpp2', '.amc', '.amv', '.asf', '.asx', '.avi', '.bik', '.bin', '.divx',
+        '.drc', '.dv', '.dvr-ms', '.evo', '.fli', '.flv', '.hdmov', '.ifo', '.ivf',
+        '.m1v', '.m2t', '.m2ts', '.m2v', '.m4v', '.mkv', '.mod', '.mov', '.mp4',
+        '.mpe', '.mpeg', '.mpg', '.mpl', '.mpls', '.mpv', '.mpv2', '.mts', '.mxf',
+        '.nsv', '.nuv', '.ogg', '.ogm', '.ogv', '.ogx', '.ps', '.rec', '.rm', '.rmvb',
+        '.rpl', '.smil', '.smk', '.swf', '.tivo', '.tod', '.tp', '.trp', '.ts', '.TS',
         '.vob', '.vp6', '.vro', '.webm', '.wm', '.wmv', '.wtv', '.xvid'
     ];
-    
+
     if (imageExts.includes(extension)) return 'image';
     if (videoExts.includes(extension)) return 'video';
     return 'unknown';
@@ -1488,7 +1488,7 @@ function clearFiles() {
             console.warn('Cleanup failed during clearFiles:', error);
         });
     }
-    
+
     selectedFiles = [];
     currentPreviewIndex = 0; // Reset preview index
     updateFileList();
@@ -1496,7 +1496,7 @@ function clearFiles() {
     updateButtons();
     hideStatus();
     hideOverallProgress();
-    
+
     // Clear preview windows
     clearPreview('image');
     clearPreview('video');
@@ -1516,7 +1516,7 @@ function handleDragLeave(e) {
 async function handleDrop(e, mode) {
     e.preventDefault();
     e.currentTarget.classList.remove('dragover');
-    
+
     const files = Array.from(e.dataTransfer.files);
     const filePaths = files.map(file => file.path);
     await addFiles(filePaths, mode);
@@ -1525,12 +1525,12 @@ async function handleDrop(e, mode) {
 // UI update functions
 function updateFileList() {
     const fileList = document.getElementById(`${currentMode}FileList`);
-    
+
     if (selectedFiles.length === 0) {
         fileList.innerHTML = '<div class="empty-state">No files selected</div>';
         return;
     }
-    
+
     fileList.innerHTML = selectedFiles.map((file, index) => `
         <div class="file-item ${index === currentPreviewIndex ? 'active' : ''}" onclick="previewFileByClick(${index})" style="cursor: pointer;">
             <div class="file-info">
@@ -1555,9 +1555,9 @@ function updateFileList() {
             </div>
         </div>
     `).join('');
-    
+
     updatePreviewAfterFileChange(currentMode);
-    
+
     // Update navigation button states
     if (currentMode) {
         updateNavigationButtons(currentMode);
@@ -1568,7 +1568,7 @@ function updateStats() {
     document.getElementById('totalFiles').textContent = selectedFiles.length;
     document.getElementById('processedFiles').textContent = processedCount;
     document.getElementById('outputFiles').textContent = outputCount;
-    
+
     const statsGrid = document.getElementById('statsGrid');
     if (selectedFiles.length > 0) {
         statsGrid.classList.add('show');
@@ -1592,13 +1592,13 @@ function resetStats() {
 
 function updateButtons() {
     const hasFiles = selectedFiles.length > 0;
-    
+
     const startBtn = document.getElementById('startBtn');
     const pauseBtn = document.getElementById('pauseBtn');
     const stopBtn = document.getElementById('stopBtn');
     const clearBtn = document.getElementById(currentMode === 'image' ? 'clearImageBtn' : 'clearVideoBtn');
     const selectBtn = document.getElementById(currentMode === 'image' ? 'selectImageBtn' : 'selectVideoBtn');
-    
+
     if (startBtn) startBtn.disabled = !hasFiles || isProcessing;
     if (pauseBtn) pauseBtn.disabled = !isProcessing;
     if (stopBtn) stopBtn.disabled = !isProcessing;
@@ -1616,7 +1616,7 @@ function updateOverallProgress(percent, text) {
     const overallProgress = document.getElementById('overallProgress');
     const overallProgressFill = document.getElementById('overallProgressFill');
     const overallProgressText = document.getElementById('overallProgressText');
-    
+
     if (overallProgress) overallProgress.classList.add('show');
     if (overallProgressFill) overallProgressFill.style.width = `${percent}%`;
     if (overallProgressText) overallProgressText.textContent = text;
@@ -1630,7 +1630,7 @@ function hideOverallProgress() {
 // Processing functions with real progress tracking
 async function startProcessing() {
     if (isProcessing) return;
-    
+
     // Prevent processing if outputDirectory is not set
     if (!outputDirectory) {
         const modeText = currentMode === 'image' ? 'image' : 'video';
@@ -1639,54 +1639,54 @@ async function startProcessing() {
         updateButtons();
         return;
     }
-    
+
     isProcessing = true;
     isPaused = false;
     processedCount = 0;
     outputCount = 0;
     currentBatch = 0;
     startTime = Date.now();
-    
+
     // Clear video duration cache to ensure fresh data
     videoDurationCache.clear();
     console.log('Cleared video duration cache for fresh processing');
-    
+
     // Reset file statuses
     selectedFiles.forEach(file => {
         file.progress = 0;
         file.status = 'waiting';
     });
-    
+
     updateButtons();
     showStatus();
     updateFileList();
-    
+
     // Ensure status panel is visible
     const statusPanel = document.getElementById('statusPanel');
     if (statusPanel) {
         statusPanel.style.display = 'block';
         console.log('Status panel made visible');
     }
-    
+
     // Get settings based on current mode
     const settings = getProcessingSettings();
     totalBatches = settings.duplicates;
-    
+
     // Calculate total processing steps for progress tracking
     const totalSteps = selectedFiles.length * settings.duplicates;
     startProgressTracking(totalSteps);
-    
+
     addStatusMessage('🚀 Starting media processing...', 'info');
     addStatusMessage(`📊 Processing ${selectedFiles.length} ${currentMode}s with ${settings.duplicates} duplicates`, 'info');
     addStatusMessage(`⚙️ Mode: ${settings.mode} | Intensity: ${settings.intensity || 'N/A'}`, 'info');
-    
+
     // Start timer
     startTimer();
     updateOverallProgress(0, 'Starting...');
-    
+
     // Declare outputDir at function scope so it's accessible throughout
     let outputDir;
-    
+
     try {
         // Use the manually selected output directory
         if (outputDirectory) {
@@ -1696,27 +1696,27 @@ async function startProcessing() {
             // This should not happen since we validate outputDirectory in startProcessing()
             throw new Error('No output directory selected. Please select an output folder before processing.');
         }
-        
+
         // Double-check that outputDir is properly set and is an absolute path
         if (!outputDir || !path.isAbsolute(outputDir)) {
             throw new Error(`Invalid output directory: ${outputDir}`);
         }
-        
+
         addStatusMessage(`📂 Output directory: ${outputDir}`, 'info');
-        
+
         // CONVERT FIRST APPROACH: Convert all files to target format immediately
         addStatusMessage('🔄 Converting files to target format...', 'info');
         updateOverallProgress(5, 'Converting files...');
-        
+
         const convertedFiles = new Map(); // Store converted file paths
-        
+
         for (let i = 0; i < selectedFiles.length; i++) {
             if (!isProcessing) break;
-            
+
             const file = selectedFiles[i];
             const conversionProgress = (i / selectedFiles.length) * 10; // 5-15%
             updateOverallProgress(5 + conversionProgress, `Converting ${file.name}...`);
-            
+
             try {
                 // Convert file to target format if needed
                 const convertedPath = await convertFileToTargetFormat(file, outputDir, settings);
@@ -1729,20 +1729,20 @@ async function startProcessing() {
                 // Continue with original file
             }
         }
-        
+
         updateOverallProgress(15, 'Starting batch processing...');
-        
+
         // Process files in batches
         for (let batch = 1; batch <= settings.duplicates; batch++) {
             if (!isProcessing) break;
-            
+
             currentBatch = batch;
-            
+
             // Create unique batch directory with timestamp
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
             addStatusMessage(`\n📁 Processing Batch ${batch} of ${settings.duplicates} (${timestamp})...`, 'info');
             updateOverallProgress(((batch - 1) / settings.duplicates) * 70 + 15, `Processing Batch ${batch} of ${settings.duplicates}`);
-            
+
             // Ensure we're using the absolute path for batch directory creation
             const batchDir = path.resolve(outputDir, 'batch_' + timestamp);
             console.log('Created batch directory path:', batchDir);
@@ -1755,14 +1755,14 @@ async function startProcessing() {
                     // Try to create the directory with more detailed error handling
                     const result = await electronAPI.mkdir(batchDir);
                     console.log('mkdir result:', result);
-                    
+
                     // Small delay to ensure directory is fully created (reduced for performance)
                     await new Promise(resolve => setTimeout(resolve, 50));
-                    
+
                     // Verify the directory was created
                     const verifyExists = await electronAPI.exists(batchDir);
                     console.log('Verification - batch directory exists after creation:', verifyExists);
-                    
+
                     if (!verifyExists) {
                         throw new Error(`Directory creation verification failed: ${batchDir}`);
                     }
@@ -1780,61 +1780,61 @@ async function startProcessing() {
             } else {
                 console.log('Batch directory already exists:', batchDir);
             }
-            
+
             // Process each file in the batch - IMPROVED VERSION WITH BETTER PAUSE HANDLING
             for (let i = 0; i < selectedFiles.length; i++) {
                 if (!isProcessing) break;
-                
+
                 const file = selectedFiles[i];
-                
+
                 // Handle pause - IMPROVED: Don't interrupt current processing
                 while (isPaused && isProcessing) {
                     file.status = 'paused';
                     updateFileList();
                     await sleep(100); // Reduced sleep time for better responsiveness
                 }
-                
+
                 if (!isProcessing) break;
-                
+
                 // Update file status for current batch
                 file.status = `processing (batch ${batch})`;
-                
+
                 // Update step progress for real-time tracking
                 const stepName = `Processing ${file.name} (Batch ${batch})`;
                 updateStepProgress(stepName, 0);
-                
+
                 const fileProgressInBatch = (i / selectedFiles.length) * (1 / settings.duplicates) * 100;
                 const batchProgress = ((batch - 1) / settings.duplicates) * 100;
                 file.progress = batchProgress + fileProgressInBatch;
-                
+
                 updateFileList();
-                
+
                 // IMPROVED: Retry logic for failed files
                 let retryCount = 0;
                 const maxRetries = 2;
                 let success = false;
-                
+
                 while (!success && retryCount <= maxRetries && isProcessing) {
                     try {
                         addStatusMessage(`🔄 Processing file in batch directory: ${batchDir}`, 'info');
                         console.log('Processing file in batch directory:', batchDir);
-                        
+
                         // Update step progress to show processing
                         updateStepProgress(stepName, 25);
-                        
+
                         // Pass the converted file path to processing functions
                         const convertedFilePath = convertedFiles.get(file.path);
                         await processFileInBatch(file, batchDir, batch, i + 1, settings, convertedFilePath);
-                        
+
                         // Update step progress to show completion
                         updateStepProgress(stepName, 100);
                         completeProcessingStep();
-                        
+
                         success = true;
                         addStatusMessage(`✅ Processed: ${file.name} (Batch ${batch} - ${timestamp})`, 'success');
                     } catch (error) {
                         retryCount++;
-                        
+
                         if (retryCount <= maxRetries) {
                             addStatusMessage(`⚠️ Retry ${retryCount}/${maxRetries} for ${file.name}: ${error.message}`, 'warning');
                             await sleep(500); // Reduced wait time before retry
@@ -1845,55 +1845,55 @@ async function startProcessing() {
                         }
                     }
                 }
-                
+
                 if (success) {
                     processedCount++;
                     file.status = 'completed';
                     file.progress = 100;
                 }
-                
+
                 updateFileList();
                 updateStats();
-                
+
                 // Small delay between files to prevent overwhelming the system
                 if (i < selectedFiles.length - 1) {
                     await sleep(100);
                 }
             }
-            
+
             // Batch completed
             addStatusMessage(`✅ Batch ${batch} completed`, 'success');
         }
-        
+
         // Processing completed successfully
         if (isProcessing) {
             // Stop progress tracking
             stopProgressTracking();
-            
+
             addStatusMessage('\n🎉 All processing completed!', 'success');
-            
+
             // Count successful and failed files
             const successFiles = selectedFiles.filter(f => f.status === 'completed');
             const failedFiles = selectedFiles.filter(f => f.status === 'failed');
-            
+
             if (successFiles.length > 0) {
                 addStatusMessage(`✅ Successfully processed: ${successFiles.length} files`, 'success');
             }
-            
+
             if (failedFiles.length > 0) {
                 addStatusMessage(`⚠️ Failed to process: ${failedFiles.length} files`, 'warning');
                 failedFiles.forEach(file => {
                     addStatusMessage(`   • ${file.name}`, 'warning');
                 });
             }
-            
+
             addStatusMessage(`📂 Output saved to: ${outputDirectory || outputDir}`, 'info');
             console.log('Final status - outputDirectory:', outputDirectory, 'outputDir:', outputDir);
-            
+
             // Final cleanup: Remove any remaining temporary conversion directories and files
             await cleanupRemainingTempDirectories(outputDirectory || outputDir);
             await cleanupTempConversionFiles(outputDirectory || outputDir);
-            
+
             const openFolderBtn = document.getElementById('openFolderBtn');
             if (openFolderBtn) {
                 openFolderBtn.disabled = false;
@@ -1901,7 +1901,7 @@ async function startProcessing() {
                 openFolderBtn.setAttribute('data-path', outputDirectory || outputDir);
             }
         }
-        
+
     } catch (error) {
         addStatusMessage(`❌ Processing error: ${error.message}`, 'error');
     } finally {
@@ -1914,15 +1914,15 @@ async function startProcessing() {
 
 function pauseProcessing() {
     if (!isProcessing) return;
-    
+
     isPaused = !isPaused;
     const pauseBtn = document.getElementById('pauseBtn');
-    
+
     if (isPaused) {
         pauseBtn.innerHTML = '▶️ Resume';
         addStatusMessage('⏸️ Processing will pause after current file...', 'warning');
         stopTimer();
-        
+
         // Don't kill process immediately - let current file finish
         // currentProcess will be handled by the processing loop
     } else {
@@ -1934,32 +1934,32 @@ function pauseProcessing() {
 
 function stopProcessing() {
     if (!isProcessing) return;
-    
+
     isProcessing = false;
     isPaused = false;
-    
+
     // Stop progress tracking
     stopProgressTracking();
-    
+
     const pauseBtn = document.getElementById('pauseBtn');
     if (pauseBtn) pauseBtn.innerHTML = '⏸️ Pause';
-    
+
     // Kill current FFmpeg process
     if (currentProcess) {
         currentProcess.kill('SIGTERM');
         currentProcess = null;
     }
-    
-            // Clean up any temporary conversion directories and files that might exist
-        if (outputDirectory) {
-            cleanupRemainingTempDirectories(outputDirectory).catch(error => {
-                console.warn('Cleanup failed during stop:', error);
-            });
-            cleanupTempConversionFiles(outputDirectory).catch(error => {
-                console.warn('Temp conversion cleanup failed during stop:', error);
-            });
-        }
-    
+
+    // Clean up any temporary conversion directories and files that might exist
+    if (outputDirectory) {
+        cleanupRemainingTempDirectories(outputDirectory).catch(error => {
+            console.warn('Cleanup failed during stop:', error);
+        });
+        cleanupTempConversionFiles(outputDirectory).catch(error => {
+            console.warn('Temp conversion cleanup failed during stop:', error);
+        });
+    }
+
     addStatusMessage('⏹️ Processing stopped by user', 'warning');
     stopTimer();
     updateButtons();
@@ -1971,23 +1971,23 @@ function resetProcessing() {
     isPaused = false;
     processedCount = 0;
     outputCount = 0;
-    
+
     const pauseBtn = document.getElementById('pauseBtn');
     if (pauseBtn) pauseBtn.innerHTML = '⏸️ Pause';
-    
+
     const openFolderBtn = document.getElementById('openFolderBtn');
     if (openFolderBtn) openFolderBtn.disabled = true;
-    
-            // Clean up any temporary conversion directories and files
-        if (outputDirectory) {
-            cleanupRemainingTempDirectories(outputDirectory).catch(error => {
-                console.warn('Cleanup failed during reset:', error);
-            });
-            cleanupTempConversionFiles(outputDirectory).catch(error => {
-                console.warn('Temp conversion cleanup failed during reset:', error);
-            });
-        }
-    
+
+    // Clean up any temporary conversion directories and files
+    if (outputDirectory) {
+        cleanupRemainingTempDirectories(outputDirectory).catch(error => {
+            console.warn('Cleanup failed during reset:', error);
+        });
+        cleanupTempConversionFiles(outputDirectory).catch(error => {
+            console.warn('Temp conversion cleanup failed during reset:', error);
+        });
+    }
+
     hideStatus();
     hideOverallProgress();
     resetStats();
@@ -2000,9 +2000,9 @@ async function processFile(file, outputDir, batch, index, settings, convertedFil
         file.progress = percent;
         updateFileList();
     };
-    
+
     updateProgress(10);
-    
+
     try {
         switch (settings.mode) {
             case 'spoof-split':
@@ -2034,14 +2034,14 @@ async function processFile(file, outputDir, batch, index, settings, convertedFil
 async function processSpoof(file, outputDir, settings, updateProgress, convertedFilePath = null, fileIndex = 0) {
     const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1, fileIndex);
     const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
-    
+
     console.log('processSpoof called with file type:', file.type, 'file path:', file.path);
-    
+
     updateProgress(30);
-    
+
     // Use converted file path if available (Convert FIRST approach)
     const inputPath = convertedFilePath || file.path;
-    
+
     if (file.type === 'image') {
         console.log('Processing as IMAGE');
         await processImageSpoof(inputPath, outputPath, effects, settings, updateProgress);
@@ -2049,7 +2049,7 @@ async function processSpoof(file, outputDir, settings, updateProgress, converted
         console.log('Processing as VIDEO');
         await processVideoSpoof(inputPath, outputPath, effects, settings, updateProgress);
     }
-    
+
     outputCount++;
     updateProgress(100);
 }
@@ -2057,11 +2057,11 @@ async function processSpoof(file, outputDir, settings, updateProgress, converted
 async function processSpoofAndSplit(file, outputDir, settings, updateProgress, convertedFilePath = null) {
     // Use converted file path if available (Convert FIRST approach)
     const inputPath = convertedFilePath || file.path;
-    
+
     if (file.type === 'video') {
         // Check video duration first
         const duration = await getVideoDuration(inputPath);
-        
+
         if (duration > 10) {
             // Split video first, then spoof each clip
             await processVideoSplit(file, outputDir, settings, true, updateProgress, convertedFilePath, 0);
@@ -2078,17 +2078,17 @@ async function processSpoofAndSplit(file, outputDir, settings, updateProgress, c
 async function processSplitOnly(file, outputDir, settings, updateProgress, convertedFilePath = null) {
     // Use converted file path if available (Convert FIRST approach)
     const inputPath = convertedFilePath || file.path;
-    
+
     if (file.type === 'video') {
         const duration = await getVideoDuration(inputPath);
-        
+
         if (duration > 10) {
             // Split video into clips
             await processVideoSplit(file, outputDir, settings, false, updateProgress, convertedFilePath, 0);
         } else {
             // For videos under 10 seconds - process with watermark and audio removal
             const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1, 0);
-            
+
             // Check if watermark or audio removal is needed
             if (settings.watermark && settings.watermark.enabled || settings.removeAudio) {
                 // Process with watermark/audio removal
@@ -2097,7 +2097,7 @@ async function processSplitOnly(file, outputDir, settings, updateProgress, conve
                 // Just copy the converted file to final output
                 await electronAPI.copyFile(inputPath, outputPath);
             }
-            
+
             outputCount++;
             updateProgress(100);
         }
@@ -2108,15 +2108,15 @@ async function processSplitOnly(file, outputDir, settings, updateProgress, conve
 
 async function processConvert(file, outputDir, settings, updateProgress, fileIndex = 0) {
     const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1, fileIndex);
-    
+
     updateProgress(30);
-    
+
     if (file.type === 'image') {
         await convertImage(file.path, outputPath, settings);
     } else {
         await convertVideo(file.path, outputPath, settings);
     }
-    
+
     outputCount++;
     updateProgress(100);
 }
@@ -2130,7 +2130,7 @@ async function getVideoDuration(videoPath) {
             console.log('Using cached duration for:', normalizedPath);
             return videoDurationCache.get(normalizedPath);
         }
-        
+
         console.log('Getting video duration with ffprobe for:', normalizedPath);
         const command = [
             '-v', 'quiet',
@@ -2138,17 +2138,17 @@ async function getVideoDuration(videoPath) {
             '-of', 'default=noprint_wrappers=1:nokey=1',
             normalizedPath
         ];
-        
+
         const result = await electronAPI.spawnProcess(ffprobePath, command);
-        
+
         if (result.code === 0) {
             const duration = parseFloat(result.stdout.trim());
             const finalDuration = duration || 90;
-            
+
             // Cache the result for future use
             videoDurationCache.set(normalizedPath, finalDuration);
             console.log('Cached duration for:', normalizedPath, '=', finalDuration);
-            
+
             return finalDuration;
         } else {
             console.warn('FFprobe failed, using default duration:', result.stderr);
@@ -2166,27 +2166,114 @@ async function getVideoDuration(videoPath) {
 
 // Get video display aspect ratio to detect portrait orientation
 // Returns an object with both ratio string (e.g., "9:16") and decimal (e.g., 0.5625)
+// UPDATED: Now handles rotation metadata correctly
 async function getVideoDAR(videoPath) {
     try {
         const normalizedPath = path.normalize(videoPath);
         const command = [
             '-v', 'error',
             '-select_streams', 'v:0',
-            '-show_entries', 'stream=display_aspect_ratio',
-            '-of', 'default=noprint_wrappers=1:nokey=1',
+            '-show_entries', 'stream=width,height,display_aspect_ratio,sample_aspect_ratio',
+            '-show_entries', 'stream_tags=rotate',
+            '-of', 'json',
             normalizedPath
         ];
-        
+
         const result = await electronAPI.spawnProcess(ffprobePath, command);
-        
+
         if (result.code === 0) {
-            const dar = result.stdout.trim();
-            if (dar && dar.includes(':')) {
-                const [num, den] = dar.split(':').map(Number);
-                return {
-                    ratio: dar, // e.g., "9:16"
-                    decimal: num / den // e.g., 0.5625
-                };
+            try {
+                const data = JSON.parse(result.stdout);
+                if (data.streams && data.streams[0]) {
+                    const stream = data.streams[0];
+                    let dar = stream.display_aspect_ratio;
+                    const sar = stream.sample_aspect_ratio;
+                    const width = stream.width;
+                    const height = stream.height;
+
+                    console.log(`Video Analysis: ${width}x${height}, DAR: ${dar}, SAR: ${sar}`);
+
+                    if (dar && dar.includes(':')) {
+                        let [num, den] = dar.split(':').map(Number);
+
+                        // Check for rotation in tags
+                        let rotation = 0;
+                        if (stream.tags && stream.tags.rotate) {
+                            rotation = parseInt(stream.tags.rotate);
+                        }
+
+                        // If rotated 90 or 270 degrees, swap DAR
+                        if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
+                            console.log(`Detected rotation ${rotation}°, swapping DAR from ${num}:${den} to ${den}:${num}`);
+                            [num, den] = [den, num];
+                            dar = `${num}:${den}`;
+                        }
+
+                        // CRITICAL FIX 1: Detect stretched portrait videos (DAR mismatch)
+                        // If actual pixels are landscape (width > height) but DAR suggests portrait (num < den),
+                        // this means the video is STRETCHED and should be portrait
+                        const actualRatio = width / height;
+                        const darRatio = num / den;
+
+                        // Check if there's a mismatch between actual dimensions and DAR
+                        if (width > height && darRatio < 1) {
+                            // Landscape pixels but portrait DAR = stretched portrait video
+                            console.log(`⚠️ STRETCHED PORTRAIT DETECTED (Type 1): ${width}x${height} (landscape) with DAR ${num}:${den} (portrait)`);
+                            console.log(`Correcting to true portrait: 9:16`);
+                            return {
+                                ratio: '9:16',
+                                decimal: 9 / 16
+                            };
+                        } else if (height > width && darRatio > 1) {
+                            // Portrait pixels but landscape DAR = stretched landscape video (rare)
+                            console.log(`⚠️ STRETCHED LANDSCAPE DETECTED: ${width}x${height} (portrait) with DAR ${num}:${den} (landscape)`);
+                            console.log(`Correcting to true landscape: 16:9`);
+                            return {
+                                ratio: '16:9',
+                                decimal: 16 / 9
+                            };
+                        }
+
+                        // CRITICAL FIX 2: Detect non-square pixel stretching (SAR analysis)
+                        // If SAR is not 1:1, pixels are being stretched
+                        // Common case: 1920x1080 with SAR 3:4 = actually 1440x1080 stretched to 1920x1080
+                        if (sar && sar !== '1:1' && sar.includes(':')) {
+                            const [sarNum, sarDen] = sar.split(':').map(Number);
+                            const sarRatio = sarNum / sarDen;
+
+                            // Calculate the "true" visual dimensions accounting for SAR
+                            const visualWidth = width * sarRatio;
+                            const visualRatio = visualWidth / height;
+
+                            console.log(`SAR detected: ${sar} (${sarRatio.toFixed(3)}), Visual ratio: ${visualRatio.toFixed(3)}`);
+
+                            // If visual ratio is portrait (< 1.0), force portrait output
+                            if (visualRatio < 1.0 && actualRatio >= 1.0) {
+                                console.log(`⚠️ STRETCHED PORTRAIT DETECTED (Type 2 - SAR): ${width}x${height} with SAR ${sar}`);
+                                console.log(`Visual dimensions: ${visualWidth.toFixed(0)}x${height}, forcing portrait 9:16`);
+                                return {
+                                    ratio: '9:16',
+                                    decimal: 9 / 16
+                                };
+                            }
+                        }
+
+                        return {
+                            ratio: dar,
+                            decimal: num / den
+                        };
+                    } else if (width && height) {
+                        // No DAR, use actual dimensions
+                        const ratio = width / height;
+                        if (ratio < 1) {
+                            return { ratio: '9:16', decimal: 9 / 16 };
+                        } else {
+                            return { ratio: '16:9', decimal: 16 / 9 };
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing FFprobe JSON:', e);
             }
         }
         return null;
@@ -2198,15 +2285,15 @@ async function getVideoDAR(videoPath) {
 
 function generateSpoofEffects(intensity, enableRotation = true) {
     if (!intensity) return null;
-    
+
     const ranges = {
         light: { rotation: 1, brightness: 3, contrast: [98, 102], saturation: [99, 105], hue: 3 },
         medium: { rotation: 3, brightness: 6, contrast: [95, 105], saturation: [98, 108], hue: 6 },
         heavy: { rotation: 5, brightness: 10, contrast: [90, 110], saturation: [95, 115], hue: 10 }
     };
-    
+
     const range = ranges[intensity] || ranges.medium;
-    
+
     return {
         rotation: enableRotation ? ((Math.random() * range.rotation * 2) - range.rotation) : 0,
         enableRotation: enableRotation,
@@ -2223,14 +2310,14 @@ function generateWatermarkFilter(watermarkSettings) {
     if (!watermarkSettings || !watermarkSettings.enabled || !watermarkSettings.text) {
         return '';
     }
-    
+
     const {
         text, font, size, position, color, opacity, backgroundEnabled, backgroundColor
     } = watermarkSettings;
-    
+
     // Escape special characters in text
     const escapedText = text.replace(/'/g, "\\'").replace(/:/g, "\\:");
-    
+
     // Convert color from hex to RGB
     const hexToRgb = (hex) => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -2240,15 +2327,15 @@ function generateWatermarkFilter(watermarkSettings) {
             b: parseInt(result[3], 16)
         } : { r: 255, g: 255, b: 255 };
     };
-    
+
     const rgb = hexToRgb(color);
     // Format color as hex for FFmpeg (0xRRGGBB format)
     const colorString = `0x${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
     const opacityDecimal = opacity / 100;
-    
+
     // Use the size directly as font size in pixels (no percentage calculation)
     const fontSize = size;
-    
+
     // Position calculation
     let positionString = '';
     switch (position) {
@@ -2282,17 +2369,17 @@ function generateWatermarkFilter(watermarkSettings) {
         default:
             positionString = 'x=(w-text_w)/2:y=(h-text_h)/2';
     }
-    
+
     // Build the drawtext filter with explicit parameters to prevent duplication
     let filter = `drawtext=text='${escapedText}':fontsize=${fontSize}:fontcolor=${colorString}:${positionString}:enable='between(t,0,999999)'`;
-    
+
     // Add background if enabled
     if (backgroundEnabled && backgroundColor) {
         const bgRgb = hexToRgb(backgroundColor);
         const bgColorString = `0x${bgRgb.r.toString(16).padStart(2, '0')}${bgRgb.g.toString(16).padStart(2, '0')}${bgRgb.b.toString(16).padStart(2, '0')}`;
         filter += `:box=1:boxcolor=${bgColorString}@${opacityDecimal}:boxborderw=5`;
     }
-    
+
     return filter;
 }
 
@@ -2302,29 +2389,29 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
     if (!effects) {
         return convertImage(inputPath, outputPath, settings);
     }
-    
+
     updateProgress(50);
-    
+
     return new Promise((resolve, reject) => {
         const brightnessDecimal = effects.brightness / 100;
         const contrastDecimal = effects.contrast / 100;
         const saturationDecimal = effects.saturation / 100;
-        
+
         // Build filter complex - conditionally include rotation
         let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
         if (effects.enableRotation && effects.rotation !== 0) {
             filterComplex += `,rotate=${effects.rotation}*PI/180`;
         }
         filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
-        
+
         // Add watermark if enabled
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
         let command;
-        
+
         // Check if format conversion is needed
         const inputExt = path.parse(inputPath).extension.toLowerCase();
         const needsFormatConversion = inputExt !== outputPath.split('.').pop();
-        
+
         if (watermarkFilter) {
             // For format conversion + effects, use a more structured approach
             if (needsFormatConversion) {
@@ -2344,19 +2431,19 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
             filterComplex += ',format=yuv420p';
             console.log('Format conversion detected - added pixel format conversion');
         }
-        
+
         // For MOV files, ensure proper pixel format to prevent filter issues
         if (inputExt === '.mov' && !needsFormatConversion) {
             // Add pixel format conversion for MOV files to ensure compatibility
             filterComplex += ',format=yuv420p';
             console.log('Added pixel format conversion for MOV file');
         }
-        
+
         // Ensure even dimensions for H.264 compatibility and preserve aspect ratio
         // This fixes Instagram/TikTok display issues where videos appear stretched or cropped
         // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
         filterComplex += `,scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
-        
+
         command = [
             '-y',
             '-i', inputPath,
@@ -2365,9 +2452,9 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
             '-map_metadata', '-1',
             outputPath
         ];
-        
+
         console.log('Full FFmpeg command:', command);
-        
+
         // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
             currentProcess = null;
@@ -2388,41 +2475,41 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
     if (!effects) {
         return convertVideo(inputPath, outputPath, settings);
     }
-    
+
     updateProgress(50);
-    
+
     return new Promise(async (resolve, reject) => {
         // Ensure proper path handling for Windows
         const normalizedInputPath = path.normalize(inputPath);
         const normalizedOutputPath = path.normalize(outputPath);
-        
+
         // Determine output format from file extension
         const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
-        
+
         // Check if original video is portrait (DAR < 1 means height > width)
         const originalDAR = await getVideoDAR(normalizedInputPath);
         const isPortrait = originalDAR !== null && originalDAR.decimal < 1;
         console.log('Original video DAR:', originalDAR ? `${originalDAR.ratio} (${originalDAR.decimal})` : 'unknown', 'Is portrait:', isPortrait);
-        
+
         const brightnessDecimal = effects.brightness / 100;
         const contrastDecimal = effects.contrast / 100;
         const saturationDecimal = effects.saturation / 100;
-        
+
         // Build filter complex - conditionally include rotation
         let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
         if (effects.enableRotation && effects.rotation !== 0) {
             filterComplex += `,rotate=${effects.rotation}*PI/180`;
         }
         filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
-        
+
         // Add watermark if enabled
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
         let command;
-        
+
         // Check if format conversion is needed
         const inputExt = path.parse(normalizedInputPath).extension.toLowerCase();
         const needsFormatConversion = inputExt !== outputExt;
-        
+
         if (watermarkFilter) {
             // For format conversion + effects, use a more structured approach
             if (needsFormatConversion) {
@@ -2442,53 +2529,56 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
             filterComplex += ',format=yuv420p';
             console.log('Format conversion detected - added pixel format conversion');
         }
-        
+
         // For MOV files, ensure proper pixel format to prevent filter issues
         if (inputExt === '.mov' && !needsFormatConversion) {
             // Add pixel format conversion for MOV files to ensure compatibility
             filterComplex += ',format=yuv420p';
             console.log('Added pixel format conversion for MOV file');
         }
-        
-        // Smart aspect ratio preservation: Maintain original DAR after all filters
+
+        // Smart aspect ratio preservation OR Force Orientation
         // This ensures Instagram/TikTok display videos correctly without quality loss
-        if (originalDAR !== null) {
-            // Smart aspect ratio preservation: Maintain original DAR with high quality
-            // The key: scale to match the original DAR, ensuring square pixels (SAR=1:1)
-            // This way pixel dimensions = display dimensions, so it displays correctly everywhere
+
+        let targetOrientation = settings.orientation || 'auto';
+
+        if (targetOrientation === 'portrait') {
+            // Force Portrait (9:16) - crops landscape to portrait center
+            console.log('Forcing PORTRAIT orientation (9:16) with center crop');
+            filterComplex += `,crop=ih*9/16:ih,scale=trunc(iw/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
+        } else if (targetOrientation === 'landscape') {
+            // Force Landscape (16:9)
+            console.log('Forcing LANDSCAPE orientation (16:9)');
+            filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*9/16/2)*2:flags=lanczos,setsar=1:1`;
+        } else if (originalDAR !== null) {
+            // AUTO Mode: Use detected DAR (preserves original orientation)
             const darRatio = originalDAR.decimal;
-            const darRatioString = originalDAR.ratio; // e.g., "9:16"
+            const darRatioString = originalDAR.ratio;
             const [darNum, darDen] = darRatioString.split(':').map(Number);
-            
-            // Scale to match DAR: calculate dimensions that exactly match the DAR
-            // For portrait (9:16): scale to maintain height, calculate width = height * (9/16)
-            // For landscape (16:9): scale to maintain width, calculate height = width * (9/16)
-            // Use the current frame's dimensions but ensure they match the DAR exactly
+
             if (darRatio < 1) {
-                // Portrait: use height as base, calculate width to match DAR exactly
-                // width = height * (darNum/darDen), ensuring even dimensions
+                // Portrait: use height as base, match DAR
                 filterComplex += `,scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
             } else {
-                // Landscape or square: use width as base, calculate height to match DAR exactly
-                // height = width * (darDen/darNum), ensuring even dimensions
+                // Landscape or square: use width as base, match DAR
                 filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
             }
-            console.log('Smart aspect ratio preservation: Original DAR =', darRatioString, `(${darRatio}), Scaling to match DAR with square pixels`);
+            console.log('Smart aspect ratio preservation: Original DAR =', darRatioString, `(${darRatio})`);
         } else {
             // Fallback: If DAR detection failed, just ensure even dimensions
             filterComplex += `,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1:1`;
             console.log('DAR detection failed, using fallback: ensuring even dimensions');
         }
-        
+
         command = [
             '-y',
             '-i', normalizedInputPath,
             '-vf', filterComplex,
             '-map_metadata', '-1'
         ];
-        
+
         console.log('Full FFmpeg command:', command);
-        
+
         // Configure codecs based on output format
         switch (outputExt) {
             case '.mp4':
@@ -2510,7 +2600,7 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
                 // Default to MP4 settings for unknown formats
                 command.push('-c:v', 'libx264', '-preset', 'fast');
         }
-        
+
         if (settings.removeAudio) {
             command.push('-an');
         } else {
@@ -2527,11 +2617,11 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
                     break;
             }
         }
-        
+
         command.push(normalizedOutputPath);
-        
+
         console.log('Processing video spoof:', { input: normalizedInputPath, output: normalizedOutputPath, format: outputExt });
-        
+
         // Additional debugging for MOV files
         if (inputExt === '.mov') {
             console.log('MOV file processing details:', {
@@ -2542,12 +2632,12 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
                 watermarkText: settings.watermark?.text
             });
         }
-        
+
         // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
             currentProcess = null;
             updateProgress(90);
-            
+
             if (result.code === 0) {
                 resolve();
             } else {
@@ -2563,72 +2653,72 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
 
 
 async function processVideoSplit(file, outputDir, settings, applySpoof = false, updateProgress, convertedFilePath = null, fileIndex = 0) {
-   // Use converted file path if available (Convert FIRST approach)
-   const inputPath = convertedFilePath || file.path;
-   const duration = await getVideoDuration(inputPath);
-   console.log('Video splitting:', { filePath: inputPath, duration, applySpoof, settings });
-   addStatusMessage(`Processing video: ${duration.toFixed(2)} seconds total`, 'info');
-   
-   // Determine clip length based on settings
-   const clipLengthSetting = settings.clipLength || '6-8';
-   let clipLength;
-   
-   switch (clipLengthSetting) {
-       case '8':
-           clipLength = 8;
-           break;
-       case '10':
-           clipLength = 10;
-           break;
-       case '15':
-           clipLength = 15;
-           break;
-       default: // '6-8'
-           clipLength = 6 + Math.random() * 2;
-   }
-   
-   // Split video into clips
-   const clips = [];
-   let startTime = 0;
-   let clipNumber = 1;
-   
-   while (startTime < duration) {
-       const endTime = Math.min(startTime + clipLength, duration);
-       
-       if (endTime - startTime < 3) break; // Skip very short clips
-       
-       clips.push({
-           start: startTime,
-           duration: endTime - startTime,
-           number: clipNumber++
-       });
-       
-       startTime = endTime;
-   }
-   
-   console.log('Clips created:', clips.length, clips);
-   addStatusMessage(`Created ${clips.length} clips: ${clips.map(c => `${c.duration.toFixed(1)}s`).join(', ')}`, 'info');
-   
-           // Process each clip
-        for (let i = 0; i < clips.length; i++) {
-            const clip = clips[i];
-            const clipPath = generateOutputPathForBatch(file, outputDir, settings, clip.number, fileIndex);
-            
-            // Update progress based on clip progress
-            const clipProgress = (i / clips.length) * 80 + 10; // 10-90%
-            updateProgress(clipProgress);
-            
-            if (applySpoof) {
-                const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
-                await processVideoClipWithEffects(inputPath, clipPath, clip, effects, settings);
-            } else {
-                await extractVideoClip(inputPath, clipPath, clip, settings);
-            }
-            
-            outputCount++;
+    // Use converted file path if available (Convert FIRST approach)
+    const inputPath = convertedFilePath || file.path;
+    const duration = await getVideoDuration(inputPath);
+    console.log('Video splitting:', { filePath: inputPath, duration, applySpoof, settings });
+    addStatusMessage(`Processing video: ${duration.toFixed(2)} seconds total`, 'info');
+
+    // Determine clip length based on settings
+    const clipLengthSetting = settings.clipLength || '6-8';
+    let clipLength;
+
+    switch (clipLengthSetting) {
+        case '8':
+            clipLength = 8;
+            break;
+        case '10':
+            clipLength = 10;
+            break;
+        case '15':
+            clipLength = 15;
+            break;
+        default: // '6-8'
+            clipLength = 6 + Math.random() * 2;
+    }
+
+    // Split video into clips
+    const clips = [];
+    let startTime = 0;
+    let clipNumber = 1;
+
+    while (startTime < duration) {
+        const endTime = Math.min(startTime + clipLength, duration);
+
+        if (endTime - startTime < 3) break; // Skip very short clips
+
+        clips.push({
+            start: startTime,
+            duration: endTime - startTime,
+            number: clipNumber++
+        });
+
+        startTime = endTime;
+    }
+
+    console.log('Clips created:', clips.length, clips);
+    addStatusMessage(`Created ${clips.length} clips: ${clips.map(c => `${c.duration.toFixed(1)}s`).join(', ')}`, 'info');
+
+    // Process each clip
+    for (let i = 0; i < clips.length; i++) {
+        const clip = clips[i];
+        const clipPath = generateOutputPathForBatch(file, outputDir, settings, clip.number, fileIndex);
+
+        // Update progress based on clip progress
+        const clipProgress = (i / clips.length) * 80 + 10; // 10-90%
+        updateProgress(clipProgress);
+
+        if (applySpoof) {
+            const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
+            await processVideoClipWithEffects(inputPath, clipPath, clip, effects, settings);
+        } else {
+            await extractVideoClip(inputPath, clipPath, clip, settings);
         }
-   
-   updateProgress(100);
+
+        outputCount++;
+    }
+
+    updateProgress(100);
 }
 
 async function processVideoClipWithEffects(inputPath, outputPath, clip, effects, settings) {
@@ -2636,31 +2726,31 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
         // Ensure proper path handling for Windows
         const normalizedInputPath = path.normalize(inputPath);
         const normalizedOutputPath = path.normalize(outputPath);
-        
+
         // Determine output format from file extension
         const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
-        
+
         let command;
-        
+
         if (effects) {
             const brightnessDecimal = effects.brightness / 100;
             const contrastDecimal = effects.contrast / 100;
             const saturationDecimal = effects.saturation / 100;
-            
+
             // Build filter complex - conditionally include rotation
             let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
             if (effects.enableRotation && effects.rotation !== 0) {
                 filterComplex += `,rotate=${effects.rotation}*PI/180`;
             }
             filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
-            
+
             // Add watermark if enabled
             const watermarkFilter = generateWatermarkFilter(settings.watermark);
-            
+
             // Check if format conversion is needed
             const inputExt = path.parse(normalizedInputPath).extension.toLowerCase();
             const needsFormatConversion = inputExt !== outputExt;
-            
+
             if (watermarkFilter) {
                 // For format conversion + effects, use a more structured approach
                 if (needsFormatConversion) {
@@ -2680,37 +2770,36 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                 filterComplex += ',format=yuv420p';
                 console.log('Format conversion detected - added pixel format conversion');
             }
-            
+
             // For MOV files, ensure proper pixel format to prevent filter issues
             if (inputExt === '.mov' && !needsFormatConversion) {
                 // Add pixel format conversion for MOV files to ensure compatibility
                 filterComplex += ',format=yuv420p';
                 console.log('Added pixel format conversion for MOV file');
             }
-            
-            // Smart aspect ratio preservation: Maintain original DAR after all filters
+
+            // Smart aspect ratio preservation OR Force Orientation
             // This ensures Instagram/TikTok display videos correctly without quality loss
             const originalDAR = await getVideoDAR(normalizedInputPath);
-            
-            if (originalDAR !== null) {
+            let targetOrientation = settings.orientation || 'auto';
+
+            if (targetOrientation === 'portrait') {
+                // Force Portrait (9:16)
+                filterComplex += `,scale=trunc(ih*9/16/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
+            } else if (targetOrientation === 'landscape') {
+                // Force Landscape (16:9)
+                filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*9/16/2)*2:flags=lanczos,setsar=1:1`;
+            } else if (originalDAR !== null) {
                 // Smart aspect ratio preservation: Maintain original DAR with high quality
-                // The key: scale to match the original DAR, ensuring square pixels (SAR=1:1)
-                // This way pixel dimensions = display dimensions, so it displays correctly everywhere
                 const darRatio = originalDAR.decimal;
                 const darRatioString = originalDAR.ratio; // e.g., "9:16"
                 const [darNum, darDen] = darRatioString.split(':').map(Number);
-                
-                // Scale to match DAR: calculate dimensions that exactly match the DAR
-                // For portrait (9:16): scale to maintain height, calculate width = height * (9/16)
-                // For landscape (16:9): scale to maintain width, calculate height = width * (9/16)
-                // Use the current frame's dimensions but ensure they match the DAR exactly
+
                 if (darRatio < 1) {
-                    // Portrait: use height as base, calculate width to match DAR exactly
-                    // width = height * (darNum/darDen), ensuring even dimensions
+                    // Portrait: use height as base
                     filterComplex += `,scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
                 } else {
-                    // Landscape or square: use width as base, calculate height to match DAR exactly
-                    // height = width * (darDen/darNum), ensuring even dimensions
+                    // Landscape or square: use width as base
                     filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
                 }
                 console.log('Smart aspect ratio preservation: Original DAR =', darRatioString, `(${darRatio}), Scaling to match DAR with square pixels`);
@@ -2719,7 +2808,7 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                 filterComplex += `,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1:1`;
                 console.log('DAR detection failed, using fallback: ensuring even dimensions');
             }
-            
+
             command = [
                 '-y',
                 '-ss', clip.start.toString(),
@@ -2728,9 +2817,9 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                 '-vf', filterComplex,
                 '-map_metadata', '-1'
             ];
-            
+
             console.log('Full FFmpeg command:', command);
-            
+
             // Configure codecs based on output format
             switch (outputExt) {
                 case '.mp4':
@@ -2755,9 +2844,29 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
             // For no effects, we need to handle watermark separately since we can't use -c copy with -vf
             const watermarkFilter = generateWatermarkFilter(settings.watermark);
             if (watermarkFilter) {
-                // Ensure even dimensions and preserve original display aspect ratio for Instagram/TikTok compatibility
-                // setsar=1:1 removes non-square pixel aspect ratio, setdar=dar preserves original display aspect ratio
-                const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=1:1,setdar=dar`;
+                // Get original DAR to determine correct scaling
+                const originalDAR = await getVideoDAR(normalizedInputPath);
+                let scaleFilter = '';
+
+                if (originalDAR) {
+                    const { decimal: darRatio, ratio: darRatioString } = originalDAR;
+                    const [darNum, darDen] = darRatioString.split(':').map(Number);
+
+                    // Smart aspect ratio preservation: Maintain original DAR with high quality
+                    // Scale to match DAR: calculate dimensions that exactly match the DAR
+                    if (darRatio < 1) {
+                        // Portrait: use height as base
+                        scaleFilter = `scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
+                    } else {
+                        // Landscape or square: use width as base
+                        scaleFilter = `scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
+                    }
+                } else {
+                    // Fallback: Ensure even dimensions
+                    scaleFilter = `scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=1:1`;
+                }
+
+                const finalFilter = `${watermarkFilter},${scaleFilter}`;
                 command = [
                     '-y',
                     '-ss', clip.start.toString(),
@@ -2766,7 +2875,7 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                     '-vf', finalFilter,
                     '-map_metadata', '-1'
                 ];
-                
+
                 // Configure codecs based on output format
                 switch (outputExt) {
                     case '.mp4':
@@ -2791,7 +2900,7 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
             } else {
                 // No effects - check if watermark or audio removal is needed
                 const needsReencoding = settings.watermark?.enabled || settings.removeAudio;
-                
+
                 if (needsReencoding) {
                     // Force re-encoding for watermark or audio removal
                     command = [
@@ -2801,7 +2910,7 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                         '-t', clip.duration.toString(),
                         '-map_metadata', '-1'
                     ];
-                    
+
                     switch (outputExt) {
                         case '.mp4':
                             command.push('-c:v', 'libx264', '-preset', 'fast');
@@ -2829,7 +2938,7 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                             '-t', clip.duration.toString(),
                             '-map_metadata', '-1'
                         ];
-                        
+
                         switch (outputExt) {
                             case '.mp4':
                                 command.push('-c:v', 'libx264', '-preset', 'fast');
@@ -2860,8 +2969,8 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
         }
         if (settings.removeAudio) {
             command.push('-an');
-        } else if (effects || (settings.watermark && settings.watermark.enabled) || 
-                   (outputExt === '.mp4' || outputExt === '.mov' || outputExt === '.avi' || outputExt === '.mkv')) {
+        } else if (effects || (settings.watermark && settings.watermark.enabled) ||
+            (outputExt === '.mp4' || outputExt === '.mov' || outputExt === '.avi' || outputExt === '.mkv')) {
             // Configure audio codec based on output format
             switch (outputExt) {
                 case '.webm':
@@ -2875,11 +2984,11 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
                     break;
             }
         }
-        
+
         command.push(normalizedOutputPath);
-        
+
         console.log('Processing video clip with effects:', { input: normalizedInputPath, output: normalizedOutputPath, clip, format: outputExt });
-        
+
         // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
             currentProcess = null;
@@ -2895,172 +3004,172 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
     });
 }
 async function extractVideoClip(inputPath, outputPath, clip, settings = {}) {
-   return new Promise((resolve, reject) => {
-       // Ensure proper path handling for Windows
-       const normalizedInputPath = path.normalize(inputPath);
-       const normalizedOutputPath = path.normalize(outputPath);
-       
-       // Determine output format from file extension
-       const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
-       
-       const command = [
-           '-y',
-           '-ss', clip.start.toString(),
-           '-i', normalizedInputPath,
-           '-t', clip.duration.toString(),
-           '-map_metadata', '-1'
-       ];
-       
-       // Add watermark if enabled
-       const watermarkFilter = generateWatermarkFilter(settings.watermark);
-       if (watermarkFilter) {
-           // Ensure even dimensions and preserve aspect ratio for Instagram/TikTok compatibility
-           // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
-           const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
-           command.push('-vf', finalFilter);
-       }
-       
-       // Check if we need to force re-encoding due to watermark or audio removal
-       const needsReencoding = settings.watermark?.enabled || settings.removeAudio;
-       
-       if (needsReencoding) {
-           // Force re-encoding for watermark or audio removal
-           switch (outputExt) {
-               case '.mp4':
-                   command.push('-c:v', 'libx264', '-preset', 'fast');
-                   break;
-               case '.webm':
-                   command.push('-c:v', 'libvpx-vp9', '-crf', '30', '-b:v', '0');
-                   break;
-               case '.mov':
-                   command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'mov');
-                   break;
-               case '.avi':
-                   command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'avi');
-                   break;
-               case '.mkv':
-                   command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'matroska');
-                   break;
-               default:
-                   command.push('-c:v', 'libx264', '-preset', 'fast');
-           }
-           
-           // Handle audio
-           if (settings.removeAudio) {
-               command.push('-an');
-           } else {
-               switch (outputExt) {
-                   case '.webm':
-                       command.push('-c:a', 'libopus', '-b:a', '128k');
-                       break;
-                   case '.mkv':
-                       command.push('-c:a', 'aac', '-b:a', '128k');
-                       break;
-                   default:
-                       command.push('-c:a', 'aac', '-b:a', '128k');
-               }
-           }
-       } else {
-           // No watermark or audio removal - can use copy mode
-           command.push('-c:v', 'copy', '-c:a', 'copy');
-       }
-        
-        command.push(normalizedOutputPath);
-        
-       console.log('Extracting video clip:', { input: normalizedInputPath, output: normalizedOutputPath, clip, format: outputExt });
-       addStatusMessage(`Extracting clip ${clip.number}: ${clip.start.toFixed(1)}s to ${(clip.start + clip.duration).toFixed(1)}s (${clip.duration.toFixed(1)}s duration)`, 'info');
-       
-       // Use secure FFmpeg spawning
-       spawnFFmpeg(command).then(result => {
-           currentProcess = null;
-           if (result.code === 0) {
-               resolve();
-           } else {
-               reject(new Error(`FFmpeg clip extraction failed with code ${result.code}`));
-           }
-       }).catch(error => {
-           currentProcess = null;
-           reject(error);
-       });
-   });
-}
-
-async function convertImage(inputPath, outputPath, settings) {
-   return new Promise((resolve, reject) => {
-       // Convert FIRST approach - always convert to target format for consistent processing
-       
-       let command = [
-           '-y',
-           '-i', inputPath,
-           '-pix_fmt', 'yuv420p',
-           '-map_metadata', '-1'
-       ];
-       
-       // Add watermark if enabled
-       const watermarkFilter = generateWatermarkFilter(settings.watermark);
-       if (watermarkFilter) {
-           // Ensure even dimensions and preserve aspect ratio for Instagram/TikTok compatibility
-           // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
-           const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
-           command.push('-vf', finalFilter);
-       }
-       
-       // Add quality settings for image conversion
-       const qualitySettings = getQualitySettings(settings.imageQuality || 'high');
-       const outputExt = path.parse(outputPath).extension.toLowerCase();
-       
-       switch (outputExt) {
-           case '.jpg':
-               command.push('-q:v', qualitySettings.jpgQuality || '2'); // Lower = better quality
-               break;
-           case '.webp':
-               command.push('-quality', qualitySettings.webpQuality || '90'); // 0-100, higher = better
-               break;
-           case '.png':
-               // PNG is lossless, no quality setting needed
-               break;
-       }
-       
-       command.push(outputPath);
-       
-       console.log('Image conversion command:', command);
-       
-       // Use secure FFmpeg spawning
-       spawnFFmpeg(command).then(result => {
-           currentProcess = null;
-           if (result.code === 0) {
-               resolve();
-           } else {
-               reject(new Error(`Image conversion failed with code ${result.code}`));
-           }
-       }).catch(error => {
-           currentProcess = null;
-           reject(error);
-       });
-   });
-}
-
-async function convertVideo(inputPath, outputPath, settings) {
     return new Promise((resolve, reject) => {
         // Ensure proper path handling for Windows
         const normalizedInputPath = path.normalize(inputPath);
         const normalizedOutputPath = path.normalize(outputPath);
-        
+
         // Determine output format from file extension
         const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
-        
+
+        const command = [
+            '-y',
+            '-ss', clip.start.toString(),
+            '-i', normalizedInputPath,
+            '-t', clip.duration.toString(),
+            '-map_metadata', '-1'
+        ];
+
+        // Add watermark if enabled
+        const watermarkFilter = generateWatermarkFilter(settings.watermark);
+        if (watermarkFilter) {
+            // Ensure even dimensions and preserve aspect ratio for Instagram/TikTok compatibility
+            // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
+            const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
+            command.push('-vf', finalFilter);
+        }
+
+        // Check if we need to force re-encoding due to watermark or audio removal
+        const needsReencoding = settings.watermark?.enabled || settings.removeAudio;
+
+        if (needsReencoding) {
+            // Force re-encoding for watermark or audio removal
+            switch (outputExt) {
+                case '.mp4':
+                    command.push('-c:v', 'libx264', '-preset', 'fast');
+                    break;
+                case '.webm':
+                    command.push('-c:v', 'libvpx-vp9', '-crf', '30', '-b:v', '0');
+                    break;
+                case '.mov':
+                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'mov');
+                    break;
+                case '.avi':
+                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'avi');
+                    break;
+                case '.mkv':
+                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'matroska');
+                    break;
+                default:
+                    command.push('-c:v', 'libx264', '-preset', 'fast');
+            }
+
+            // Handle audio
+            if (settings.removeAudio) {
+                command.push('-an');
+            } else {
+                switch (outputExt) {
+                    case '.webm':
+                        command.push('-c:a', 'libopus', '-b:a', '128k');
+                        break;
+                    case '.mkv':
+                        command.push('-c:a', 'aac', '-b:a', '128k');
+                        break;
+                    default:
+                        command.push('-c:a', 'aac', '-b:a', '128k');
+                }
+            }
+        } else {
+            // No watermark or audio removal - can use copy mode
+            command.push('-c:v', 'copy', '-c:a', 'copy');
+        }
+
+        command.push(normalizedOutputPath);
+
+        console.log('Extracting video clip:', { input: normalizedInputPath, output: normalizedOutputPath, clip, format: outputExt });
+        addStatusMessage(`Extracting clip ${clip.number}: ${clip.start.toFixed(1)}s to ${(clip.start + clip.duration).toFixed(1)}s (${clip.duration.toFixed(1)}s duration)`, 'info');
+
+        // Use secure FFmpeg spawning
+        spawnFFmpeg(command).then(result => {
+            currentProcess = null;
+            if (result.code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`FFmpeg clip extraction failed with code ${result.code}`));
+            }
+        }).catch(error => {
+            currentProcess = null;
+            reject(error);
+        });
+    });
+}
+
+async function convertImage(inputPath, outputPath, settings) {
+    return new Promise((resolve, reject) => {
+        // Convert FIRST approach - always convert to target format for consistent processing
+
+        let command = [
+            '-y',
+            '-i', inputPath,
+            '-pix_fmt', 'yuv420p',
+            '-map_metadata', '-1'
+        ];
+
+        // Add watermark if enabled
+        const watermarkFilter = generateWatermarkFilter(settings.watermark);
+        if (watermarkFilter) {
+            // Ensure even dimensions and preserve aspect ratio for Instagram/TikTok compatibility
+            // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
+            const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
+            command.push('-vf', finalFilter);
+        }
+
+        // Add quality settings for image conversion
+        const qualitySettings = getQualitySettings(settings.imageQuality || 'high');
+        const outputExt = path.parse(outputPath).extension.toLowerCase();
+
+        switch (outputExt) {
+            case '.jpg':
+                command.push('-q:v', qualitySettings.jpgQuality || '2'); // Lower = better quality
+                break;
+            case '.webp':
+                command.push('-quality', qualitySettings.webpQuality || '90'); // 0-100, higher = better
+                break;
+            case '.png':
+                // PNG is lossless, no quality setting needed
+                break;
+        }
+
+        command.push(outputPath);
+
+        console.log('Image conversion command:', command);
+
+        // Use secure FFmpeg spawning
+        spawnFFmpeg(command).then(result => {
+            currentProcess = null;
+            if (result.code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`Image conversion failed with code ${result.code}`));
+            }
+        }).catch(error => {
+            currentProcess = null;
+            reject(error);
+        });
+    });
+}
+
+async function convertVideo(inputPath, outputPath, settings) {
+    return new Promise(async (resolve, reject) => {
+        // Ensure proper path handling for Windows
+        const normalizedInputPath = path.normalize(inputPath);
+        const normalizedOutputPath = path.normalize(outputPath);
+
+        // Determine output format from file extension
+        const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
+
         // Convert FIRST approach - always convert to target format for consistent processing
         let command = [
             '-y',
             '-i', normalizedInputPath,
             '-map_metadata', '-1'
         ];
-        
+
         // Smart codec selection: Copy when safe, re-encode when necessary
         const qualitySettings = getQualitySettings(settings.videoQuality || 'high');
         const inputExt = path.parse(normalizedInputPath).extension.toLowerCase();
         const needsReencoding = needsVideoReencoding(normalizedInputPath, outputExt, settings);
-        
+
         if (needsReencoding) {
             // Re-encode with quality settings
             switch (outputExt) {
@@ -3117,16 +3226,37 @@ async function convertVideo(inputPath, outputPath, settings) {
                 }
             }
         }
-        
+
         // Add watermark if enabled
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
         if (watermarkFilter) {
-            // Ensure even dimensions and preserve original display aspect ratio for Instagram/TikTok compatibility
-            // setsar=1:1 removes non-square pixel aspect ratio, setdar=dar preserves original display aspect ratio
-            const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=1:1,setdar=dar`;
+            // Get original DAR to determine correct scaling
+            const originalDAR = await getVideoDAR(normalizedInputPath);
+            let scaleFilter = '';
+
+            if (originalDAR) {
+                const { decimal: darRatio, ratio: darRatioString } = originalDAR;
+                const [darNum, darDen] = darRatioString.split(':').map(Number);
+
+                // Smart aspect ratio preservation: Maintain original DAR with high quality
+                // Scale to match DAR: calculate dimensions that exactly match the DAR
+                if (darRatio < 1) {
+                    // Portrait: use height as base
+                    scaleFilter = `scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
+                } else {
+                    // Landscape or square: use width as base
+                    scaleFilter = `scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
+                }
+                console.log('ConvertVideo Smart scaling:', { originalDAR: darRatioString, scaleFilter });
+            } else {
+                // Fallback: Ensure even dimensions
+                scaleFilter = `scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=1:1`;
+            }
+
+            const finalFilter = `${watermarkFilter},${scaleFilter}`;
             command.push('-vf', finalFilter);
         }
-        
+
         if (settings.removeAudio) {
             command.push('-an');
         } else if (needsReencoding || settings.watermark?.enabled) {
@@ -3147,12 +3277,12 @@ async function convertVideo(inputPath, outputPath, settings) {
             command.push('-c:a', 'copy');
             console.log('Using fast copy mode for audio - no re-encoding needed');
         }
-        
+
         command.push(normalizedOutputPath);
-        
+
         console.log('Converting video:', { input: normalizedInputPath, output: normalizedOutputPath, format: outputExt, needsReencoding });
         console.log('Full output path:', normalizedOutputPath);
-        
+
         // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
             currentProcess = null;
@@ -3171,30 +3301,30 @@ async function convertVideo(inputPath, outputPath, settings) {
 // Check if video needs re-encoding
 function needsVideoReencoding(inputPath, outputExt, settings) {
     const inputExt = path.parse(inputPath).extension.toLowerCase();
-    
+
     // Always re-encode if:
     // 1. Different output format
     if (inputExt !== outputExt) {
         console.log('Re-encoding needed: Different format', inputExt, '→', outputExt);
         return true;
     }
-    
+
     // 2. Watermark is enabled (ALWAYS force re-encoding)
     if (settings.watermark && settings.watermark.enabled) {
         console.log('Re-encoding needed: Watermark enabled');
         return true;
     }
-    
+
     // 3. Audio removal is enabled - but we can use copy mode for video if no watermark
     // (This check is now handled in convertVideo function to allow fast copy when only removing audio)
     // Audio removal alone doesn't require video re-encoding, only remuxing
-    
+
     // 4. Quality preset requires compression (only re-encode for Medium and Small)
     if (settings.videoQuality && (settings.videoQuality === 'medium' || settings.videoQuality === 'small')) {
         console.log('Re-encoding needed: Quality preset requires compression', settings.videoQuality);
         return true;
     }
-    
+
     // 5. Same format, no effects, lossless quality = use copy (ONLY if no watermark/audio removal)
     console.log('No re-encoding needed: Using fast copy mode (no watermark/audio removal)');
     return false;
@@ -3244,117 +3374,121 @@ function getQualitySettings(quality) {
             description: 'Small Size: Aggressive compression, smaller files'
         }
     };
-    
+
     return presets[quality] || presets.high;
 }
 
 // Helper functions
 function getProcessingSettings() {
-   const settings = {
-       mode: null,
-       intensity: null,
-       duplicates: 1,
-       removeAudio: false,
-       clipLength: '6-8'
-   };
-   
-   if (currentMode === 'image') {
-       settings.mode = document.getElementById('imageProcessingMode').value;
-       settings.intensity = document.getElementById('imageIntensity').value;
-       settings.duplicates = settings.mode === 'convert-only' ? 1 : parseInt(document.getElementById('imageDuplicates').value);
-       settings.imageFormat = document.getElementById('imageFormat').value;
-       settings.imageQuality = document.getElementById('imageQuality').value;
-       settings.namingPattern = document.getElementById('imageNamingPattern').value;
-       
-       // Rotation setting for images (only relevant for spoof modes)
-       const imageRotationCheckbox = document.getElementById('imageRotationEnabled');
-       settings.enableRotation = imageRotationCheckbox ? imageRotationCheckbox.checked : true;
-       
-       // Watermark settings for images
-       settings.watermark = {
-           enabled: document.getElementById('imageWatermarkEnabled').checked,
-           text: document.getElementById('imageWatermarkText').value,
-           font: document.getElementById('imageWatermarkFont').value,
-           size: parseInt(document.getElementById('imageWatermarkSize').value),
-           position: document.getElementById('imageWatermarkPosition').value,
-           color: document.getElementById('imageWatermarkColor').value,
-           opacity: parseInt(document.getElementById('imageWatermarkOpacity').value),
-           backgroundEnabled: document.getElementById('imageWatermarkBackgroundEnabled').checked,
-           backgroundColor: document.getElementById('imageWatermarkBackgroundColor').value
-       };
-   } else if (currentMode === 'video') {
-       settings.mode = document.getElementById('videoProcessingMode').value;
-       settings.intensity = document.getElementById('videoIntensity').value;
-       settings.duplicates = settings.mode === 'convert-only' ? 1 : parseInt(document.getElementById('videoDuplicates').value);
-       settings.videoFormat = document.getElementById('videoFormat').value;
-       settings.videoQuality = document.getElementById('videoQuality').value;
-       settings.removeAudio = document.getElementById('removeAudio').checked;
-       settings.clipLength = document.getElementById('clipLength').value;
-       settings.namingPattern = document.getElementById('videoNamingPattern').value;
-       
-       // Rotation setting for videos (only relevant for spoof modes)
-       const videoRotationCheckbox = document.getElementById('videoRotationEnabled');
-       settings.enableRotation = videoRotationCheckbox ? videoRotationCheckbox.checked : true;
-       
-       // Watermark settings for videos
-       settings.watermark = {
-           enabled: document.getElementById('videoWatermarkEnabled').checked,
-           text: document.getElementById('videoWatermarkText').value,
-           font: document.getElementById('videoWatermarkFont').value,
-           size: parseInt(document.getElementById('videoWatermarkSize').value),
-           position: document.getElementById('videoWatermarkPosition').value,
-           color: document.getElementById('videoWatermarkColor').value,
-           opacity: parseInt(document.getElementById('videoWatermarkOpacity').value),
-           backgroundEnabled: document.getElementById('videoWatermarkBackgroundEnabled').checked,
-           backgroundColor: document.getElementById('videoWatermarkBackgroundColor').value
-       };
-   }
-   
-   return settings;
+    const settings = {
+        mode: null,
+        intensity: null,
+        duplicates: 1,
+        removeAudio: false,
+        clipLength: '6-8'
+    };
+
+    if (currentMode === 'image') {
+        settings.mode = document.getElementById('imageProcessingMode').value;
+        settings.intensity = document.getElementById('imageIntensity').value;
+        settings.duplicates = settings.mode === 'convert-only' ? 1 : parseInt(document.getElementById('imageDuplicates').value);
+        settings.imageFormat = document.getElementById('imageFormat').value;
+        settings.imageQuality = document.getElementById('imageQuality').value;
+        settings.namingPattern = document.getElementById('imageNamingPattern').value;
+
+        // Rotation setting for images (only relevant for spoof modes)
+        const imageRotationCheckbox = document.getElementById('imageRotationEnabled');
+        settings.enableRotation = imageRotationCheckbox ? imageRotationCheckbox.checked : true;
+
+        // Watermark settings for images
+        settings.watermark = {
+            enabled: document.getElementById('imageWatermarkEnabled').checked,
+            text: document.getElementById('imageWatermarkText').value,
+            font: document.getElementById('imageWatermarkFont').value,
+            size: parseInt(document.getElementById('imageWatermarkSize').value),
+            position: document.getElementById('imageWatermarkPosition').value,
+            color: document.getElementById('imageWatermarkColor').value,
+            opacity: parseInt(document.getElementById('imageWatermarkOpacity').value),
+            backgroundEnabled: document.getElementById('imageWatermarkBackgroundEnabled').checked,
+            backgroundColor: document.getElementById('imageWatermarkBackgroundColor').value
+        };
+    } else if (currentMode === 'video') {
+        settings.mode = document.getElementById('videoProcessingMode').value;
+        settings.intensity = document.getElementById('videoIntensity').value;
+        settings.duplicates = settings.mode === 'convert-only' ? 1 : parseInt(document.getElementById('videoDuplicates').value);
+        settings.videoFormat = document.getElementById('videoFormat').value;
+        settings.videoQuality = document.getElementById('videoQuality').value;
+        settings.removeAudio = document.getElementById('removeAudio').checked;
+        settings.clipLength = document.getElementById('clipLength').value;
+        settings.namingPattern = document.getElementById('videoNamingPattern').value;
+
+        // Rotation setting for videos (only relevant for spoof modes)
+        const videoRotationCheckbox = document.getElementById('videoRotationEnabled');
+        settings.enableRotation = videoRotationCheckbox ? videoRotationCheckbox.checked : true;
+
+        // Orientation setting for videos
+        const videoOrientationSelect = document.getElementById('videoOrientation');
+        settings.orientation = videoOrientationSelect ? videoOrientationSelect.value : 'auto';
+
+        // Watermark settings for videos
+        settings.watermark = {
+            enabled: document.getElementById('videoWatermarkEnabled').checked,
+            text: document.getElementById('videoWatermarkText').value,
+            font: document.getElementById('videoWatermarkFont').value,
+            size: parseInt(document.getElementById('videoWatermarkSize').value),
+            position: document.getElementById('videoWatermarkPosition').value,
+            color: document.getElementById('videoWatermarkColor').value,
+            opacity: parseInt(document.getElementById('videoWatermarkOpacity').value),
+            backgroundEnabled: document.getElementById('videoWatermarkBackgroundEnabled').checked,
+            backgroundColor: document.getElementById('videoWatermarkBackgroundColor').value
+        };
+    }
+
+    return settings;
 }
 
 async function createOutputDirectory() {
     console.log('createOutputDirectory called, currentMode:', currentMode);
     console.log('selectedFiles:', selectedFiles);
-    
+
     // For both images and videos, use the same logic - auto-create in parent directory
     if (selectedFiles.length > 0) {
         const firstFile = selectedFiles[0];
         console.log('First file:', firstFile);
-        
+
         if (!firstFile || !firstFile.path) {
             throw new Error('Invalid file object - missing path');
         }
-        
+
         const parentDir = getParentDirectory(firstFile.path);
         console.log('Parent directory:', parentDir);
-        
+
         if (!parentDir) {
             throw new Error('Could not determine parent directory for file: ' + firstFile.path);
         }
-        
+
         const outDir = path.join(parentDir, 'MediaSpoofer_Output');
-        
+
         // Ensure the output directory is an absolute path
         const absoluteOutDir = path.resolve(outDir);
         console.log('Output directory:', absoluteOutDir);
-        
+
         try {
             await electronAPI.mkdir(absoluteOutDir);
             outputDirectory = absoluteOutDir;
             addStatusMessage(`📂 Output folder created: ${absoluteOutDir}`, 'info');
             console.log('Final output directory set to:', outputDirectory);
-            
+
             const dirExists = await electronAPI.exists(absoluteOutDir);
             if (!dirExists) {
                 throw new Error(`Failed to verify directory creation: ${absoluteOutDir}`);
             }
-            
+
             const outputFolderInfo = document.getElementById('outputFolderInfo');
             const outputFolderText = document.getElementById('outputFolderText');
             if (outputFolderInfo) outputFolderInfo.style.display = 'block';
             if (outputFolderText) outputFolderText.textContent = `Output folder: ${absoluteOutDir}`;
-            
+
             // Set the data-path attribute for the Open Output button
             const openFolderBtn = document.getElementById('openFolderBtn');
             if (openFolderBtn) {
@@ -3362,7 +3496,7 @@ async function createOutputDirectory() {
                 openFolderBtn.disabled = false;
                 console.log('Set openFolderBtn data-path to:', absoluteOutDir);
             }
-            
+
             // Return the created directory path
             return absoluteOutDir;
         } catch (error) {
@@ -3380,34 +3514,34 @@ async function createOutputDirectory() {
 function addStatusMessage(message, type = 'info') {
     try {
         console.log(`[${type.toUpperCase()}] ${message}`);
-        
+
         const statusContent = document.getElementById('statusContent');
         if (!statusContent) {
             console.warn('statusContent element not found');
             return;
         }
-        
+
         // Create timestamp
         const now = new Date();
         const timestamp = now.toLocaleTimeString();
-        
+
         // Create message element with appropriate styling
         const messageElement = document.createElement('div');
         messageElement.className = `status-line status-${type}`;
         messageElement.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
-        
+
         // Add message to status content
         statusContent.appendChild(messageElement);
-        
+
         // Auto-scroll to bottom
         statusContent.scrollTop = statusContent.scrollHeight;
-        
+
         // Show status panel if it's hidden
         const statusPanel = document.getElementById('statusPanel');
         if (statusPanel && statusPanel.style.display === 'none') {
             statusPanel.style.display = 'block';
         }
-        
+
         // Auto-hide info messages after 5 seconds (optional)
         if (type === 'info') {
             setTimeout(() => {
@@ -3416,7 +3550,7 @@ function addStatusMessage(message, type = 'info') {
                 }
             }, 5000);
         }
-        
+
     } catch (error) {
         console.error('Error in addStatusMessage:', error);
     }
@@ -3456,32 +3590,32 @@ function startProgressTracking(totalSteps) {
     completedSteps = 0;
     progressStartTime = Date.now();
     lastProgressUpdate = 0;
-    
+
     if (progressUpdateInterval) {
         clearInterval(progressUpdateInterval);
     }
-    
+
     progressUpdateInterval = setInterval(() => {
         if (completedSteps >= totalProcessingSteps) {
             stopProgressTracking();
             return;
         }
-        
+
         const now = Date.now();
         if (now - lastProgressUpdate < 100) return; // Update max every 100ms
-        
+
         lastProgressUpdate = now;
         const elapsed = now - progressStartTime;
         const progress = (completedSteps / totalProcessingSteps) * 100;
-        
+
         if (completedSteps > 0) {
             const avgTimePerStep = elapsed / completedSteps;
             const remainingSteps = totalProcessingSteps - completedSteps;
             estimatedTotalTime = avgTimePerStep * remainingSteps;
-            
+
             const remainingTime = Math.max(0, estimatedTotalTime);
             const timeText = remainingTime > 0 ? ` - ${Math.ceil(remainingTime / 1000)}s remaining` : '';
-            
+
             updateOverallProgress(progress, `${Math.round(progress)}%${timeText}`);
         }
     }, 100);
@@ -3497,11 +3631,11 @@ function stopProgressTracking() {
 function updateStepProgress(stepName, percent) {
     currentProcessingStep = stepName;
     currentStepProgress = percent;
-    
+
     const stepProgress = document.getElementById('stepProgress');
     const stepProgressFill = document.getElementById('stepProgressFill');
     const stepProgressText = document.getElementById('stepProgressText');
-    
+
     if (stepProgress) stepProgress.classList.add('show');
     if (stepProgressFill) stepProgressFill.style.width = `${percent}%`;
     if (stepProgressText) stepProgressText.textContent = stepName;
@@ -3516,7 +3650,7 @@ function startTimer() {
     if (timerInterval) {
         clearInterval(timerInterval);
     }
-    
+
     startTime = Date.now();
     timerInterval = setInterval(updateTimer, 1000);
 }
@@ -3530,7 +3664,7 @@ function stopTimer() {
 
 function updateTimer() {
     if (!startTime) return;
-    
+
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
     const timeElapsed = document.getElementById('timeElapsed');
     if (timeElapsed) {
@@ -3549,7 +3683,7 @@ function getParentDirectory(filePath) {
         // Normalize the path first to handle any mixed separators
         const normalizedPath = path.normalize(filePath);
         const parentDir = path.dirname(normalizedPath);
-        
+
         // Ensure we return an absolute path
         if (path.isAbsolute(parentDir)) {
             return parentDir;
@@ -3591,14 +3725,14 @@ function formatFileSize(bytes) {
 async function cleanupRemainingTempDirectories(outputDir) {
     try {
         if (!outputDir) return;
-        
+
         // This function would clean up any temporary conversion directories
         // For now, just log that cleanup was attempted
         console.log('Cleanup attempted for output directory:', outputDir);
-        
+
         // You can implement actual cleanup logic here if needed
         // For example, removing temp files, cleaning up partial conversions, etc.
-        
+
     } catch (error) {
         console.warn('Cleanup failed:', error);
         // Don't throw error - cleanup failure shouldn't break the main flow
@@ -3625,7 +3759,7 @@ function updatePreviewAfterFileChange(mode) {
 
 function navigatePreview(mode, direction) {
     if (selectedFiles.length === 0) return;
-    
+
     switch (direction) {
         case 'prev':
             currentPreviewIndex = currentPreviewIndex > 0 ? currentPreviewIndex - 1 : selectedFiles.length - 1;
@@ -3640,7 +3774,7 @@ function navigatePreview(mode, direction) {
             currentPreviewIndex = selectedFiles.length - 1;
             break;
     }
-    
+
     const file = selectedFiles[currentPreviewIndex];
     showPreview(file.path, mode);
     updateFileList();
@@ -3650,16 +3784,16 @@ function navigatePreview(mode, direction) {
 function removeFile(index) {
     if (index >= 0 && index < selectedFiles.length) {
         selectedFiles.splice(index, 1);
-        
+
         // Adjust preview index if needed
         if (currentPreviewIndex >= selectedFiles.length) {
             currentPreviewIndex = Math.max(0, selectedFiles.length - 1);
         }
-        
+
         updateFileList();
         updateStats();
         updateButtons();
-        
+
         // Show preview for current file if any exist
         if (selectedFiles.length > 0) {
             showPreview(selectedFiles[currentPreviewIndex].path, currentMode);
@@ -3693,7 +3827,7 @@ function generateOutputPathForBatch(file, outputDir, settings, batchNumber = 1, 
         // Get the base filename without extension
         const baseName = path.parse(file.name).name;
         const extension = path.parse(file.name).extension;
-        
+
         // Determine output format based on mode
         let outputFormat = extension;
         if (currentMode === 'image' && settings.imageFormat && settings.imageFormat !== 'original') {
@@ -3701,39 +3835,39 @@ function generateOutputPathForBatch(file, outputDir, settings, batchNumber = 1, 
         } else if (currentMode === 'video' && settings.videoFormat && settings.videoFormat !== 'original') {
             outputFormat = settings.videoFormat.startsWith('.') ? settings.videoFormat : '.' + settings.videoFormat;
         }
-        
+
         // Generate unique filename using custom naming pattern or fallback
         const timestamp = Date.now();
-        
+
         let outputName;
-        
+
         // Generate a unique 5-digit random number for each file
         const randomId = Math.floor(10000 + Math.random() * 90000).toString();
-        
+
         // Check if we have a custom naming pattern
         if (settings.namingPattern && settings.namingPattern.trim() !== '') {
             // Use custom naming pattern with placeholders
             let customName = settings.namingPattern;
-            
+
             // Replace placeholders
             customName = customName.replace(/{number}/g, randomId); // {number} = 5-digit random number
             customName = customName.replace(/{timestamp}/g, timestamp.toString());
             customName = customName.replace(/{random}/g, randomId); // Keep {random} for backward compatibility
             customName = customName.replace(/{original}/g, baseName);
             customName = customName.replace(/{fileindex}/g, (fileIndex + 1).toString());
-            
+
             outputName = `${customName}${outputFormat}`;
-            
+
             console.log(`Custom pattern "${settings.namingPattern}" -> "${outputName}" with random ID: ${randomId}`);
         } else {
             // Default: use random number for uniqueness
             outputName = `file_${randomId}${outputFormat}`;
             console.log(`No custom pattern, using random ID: ${randomId}`);
         }
-        
+
         // Join with output directory
         const finalPath = path.join(outputDir, outputName);
-        
+
         return finalPath;
     } catch (error) {
         console.error('Error generating output path:', error);
@@ -3748,18 +3882,18 @@ function updateNavigationButtons(mode) {
     const prevBtn = document.querySelector(`#${mode}PreviewSection .btn:first-child`);
     const nextBtn = document.querySelector(`#${mode}PreviewSection .btn:last-child`);
     const positionDisplay = document.querySelector(`#${mode}PreviewSection .position-display`);
-    
+
     if (prevBtn && nextBtn) {
         // Disable previous button if at first file
         prevBtn.disabled = selectedFiles.length === 0 || currentPreviewIndex === 0;
-        
+
         // Disable next button if at last file
         nextBtn.disabled = selectedFiles.length === 0 || currentPreviewIndex === selectedFiles.length - 1;
-        
+
         // Update button text to show just Previous/Next
         prevBtn.textContent = '← Previous';
         nextBtn.textContent = 'Next →';
-        
+
         // Update position display
         if (positionDisplay) {
             if (selectedFiles.length > 0) {
@@ -3778,42 +3912,42 @@ async function convertFileToTargetFormat(file, outputDir, settings) {
         // Check if conversion is needed
         const inputExt = path.parse(file.path).extension.toLowerCase();
         let targetExt = inputExt;
-        
+
         // Determine target format based on settings
         if (file.type === 'image' && settings.imageFormat && settings.imageFormat !== 'original') {
             targetExt = settings.imageFormat.startsWith('.') ? settings.imageFormat : '.' + settings.imageFormat;
         } else if (file.type === 'video' && settings.videoFormat && settings.videoFormat !== 'original') {
             targetExt = settings.videoFormat.startsWith('.') ? settings.videoFormat : '.' + settings.videoFormat;
         }
-        
+
         // If no format change needed, return original path
         if (inputExt === targetExt) {
             console.log(`No conversion needed for ${file.name}: ${inputExt} → ${targetExt}`);
             return file.path;
         }
-        
+
         // Create temporary conversion directory
         const tempDir = path.join(outputDir, 'temp_conversion');
-        await electronAPI.mkdir(tempDir).catch(() => {}); // Ignore if already exists
-        
+        await electronAPI.mkdir(tempDir).catch(() => { }); // Ignore if already exists
+
         // Generate output path for converted file
         const baseName = path.parse(file.name).name;
         const convertedPath = path.join(tempDir, `${baseName}_converted${targetExt}`);
-        
+
         console.log(`Converting ${file.name}: ${inputExt} → ${targetExt}`);
         console.log(`Input: ${file.path}`);
         console.log(`Output: ${convertedPath}`);
-        
+
         // Convert file to target format
         if (file.type === 'image') {
             await convertImage(file.path, convertedPath, settings);
         } else {
             await convertVideo(file.path, convertedPath, settings);
         }
-        
+
         console.log(`✅ Successfully converted ${file.name} to ${targetExt}`);
         return convertedPath;
-        
+
     } catch (error) {
         console.error(`❌ Failed to convert ${file.name}:`, error);
         // Return original path if conversion fails
@@ -3830,10 +3964,10 @@ async function cleanupTempConversionFiles(outputDir) {
             const files = await electronAPI.readdir(tempDir);
             for (const file of files) {
                 const filePath = path.join(tempDir, file);
-                await electronAPI.unlink(filePath).catch(() => {}); // Ignore errors
+                await electronAPI.unlink(filePath).catch(() => { }); // Ignore errors
             }
             // Remove temp directory
-            await electronAPI.rmdir(tempDir).catch(() => {}); // Ignore errors
+            await electronAPI.rmdir(tempDir).catch(() => { }); // Ignore errors
             console.log('Cleaned up temporary conversion files');
         }
     } catch (error) {
