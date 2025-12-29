@@ -114,6 +114,28 @@ window.goBack = function () {
     resetProcessing();
 };
 
+// UI Helper for Naming Presets
+console.log('Defining updateNamingPattern function globally...');
+window.updateNamingPattern = function (preset) {
+    const patternInput = document.getElementById('videoNamingPattern');
+    if (!patternInput) return;
+
+    switch (preset) {
+        case 'random':
+            patternInput.value = 'clip_{number}';
+            patternInput.disabled = true; // Let user know it's a fixed preset
+            break;
+        case 'original':
+            patternInput.value = '{original}-{number}';
+            patternInput.disabled = true;
+            break;
+        case 'custom':
+            patternInput.disabled = false;
+            // Don't change value, let user edit
+            break;
+    }
+};
+
 // Polyfill for path operations
 const path = {
     join: (...parts) => parts.join('/').replace(/\/+/g, '/'),
@@ -269,6 +291,7 @@ let ffmpegPath, ffprobePath;
 
 // Video duration cache to avoid redundant ffprobe calls
 const videoDurationCache = new Map();
+const videoDARCache = new Map();
 
 // Initialize FFmpeg paths when the app loads
 async function initializeFFmpegPaths() {
@@ -1482,13 +1505,6 @@ function getFileType(extension) {
 }
 
 function clearFiles() {
-    // Clean up any temporary conversion directories before clearing
-    if (outputDirectory) {
-        cleanupRemainingTempDirectories(outputDirectory).catch(error => {
-            console.warn('Cleanup failed during clearFiles:', error);
-        });
-    }
-
     selectedFiles = [];
     currentPreviewIndex = 0; // Reset preview index
     updateFileList();
@@ -1647,9 +1663,10 @@ async function startProcessing() {
     currentBatch = 0;
     startTime = Date.now();
 
-    // Clear video duration cache to ensure fresh data
+    // Clear video duration and DAR cache to ensure fresh data
     videoDurationCache.clear();
-    console.log('Cleared video duration cache for fresh processing');
+    videoDARCache.clear();
+    console.log('Cleared video duration and DAR caches for fresh processing');
 
     // Reset file statuses
     selectedFiles.forEach(file => {
@@ -1704,33 +1721,7 @@ async function startProcessing() {
 
         addStatusMessage(`📂 Output directory: ${outputDir}`, 'info');
 
-        // CONVERT FIRST APPROACH: Convert all files to target format immediately
-        addStatusMessage('🔄 Converting files to target format...', 'info');
-        updateOverallProgress(5, 'Converting files...');
-
-        const convertedFiles = new Map(); // Store converted file paths
-
-        for (let i = 0; i < selectedFiles.length; i++) {
-            if (!isProcessing) break;
-
-            const file = selectedFiles[i];
-            const conversionProgress = (i / selectedFiles.length) * 10; // 5-15%
-            updateOverallProgress(5 + conversionProgress, `Converting ${file.name}...`);
-
-            try {
-                // Convert file to target format if needed
-                const convertedPath = await convertFileToTargetFormat(file, outputDir, settings);
-                if (convertedPath && convertedPath !== file.path) {
-                    convertedFiles.set(file.path, convertedPath);
-                    addStatusMessage(`✅ Converted: ${file.name}`, 'success');
-                }
-            } catch (error) {
-                addStatusMessage(`⚠️ Conversion failed for ${file.name}: ${error.message}`, 'warning');
-                // Continue with original file
-            }
-        }
-
-        updateOverallProgress(15, 'Starting batch processing...');
+        updateOverallProgress(5, 'Starting batch processing...');
 
         // Process files in batches
         for (let batch = 1; batch <= settings.duplicates; batch++) {
@@ -1741,7 +1732,7 @@ async function startProcessing() {
             // Create unique batch directory with timestamp
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
             addStatusMessage(`\n📁 Processing Batch ${batch} of ${settings.duplicates} (${timestamp})...`, 'info');
-            updateOverallProgress(((batch - 1) / settings.duplicates) * 70 + 15, `Processing Batch ${batch} of ${settings.duplicates}`);
+            updateOverallProgress(((batch - 1) / settings.duplicates) * 80 + 5, `Processing Batch ${batch} of ${settings.duplicates}`);
 
             // Ensure we're using the absolute path for batch directory creation
             const batchDir = path.resolve(outputDir, 'batch_' + timestamp);
@@ -1823,8 +1814,7 @@ async function startProcessing() {
                         updateStepProgress(stepName, 25);
 
                         // Pass the converted file path to processing functions
-                        const convertedFilePath = convertedFiles.get(file.path);
-                        await processFileInBatch(file, batchDir, batch, i + 1, settings, convertedFilePath);
+                        await processFile(file, batchDir, batch, i, settings);
 
                         // Update step progress to show completion
                         updateStepProgress(stepName, 100);
@@ -1890,9 +1880,8 @@ async function startProcessing() {
             addStatusMessage(`📂 Output saved to: ${outputDirectory || outputDir}`, 'info');
             console.log('Final status - outputDirectory:', outputDirectory, 'outputDir:', outputDir);
 
-            // Final cleanup: Remove any remaining temporary conversion directories and files
+            // Final cleanup: Remove any remaining temporary conversion directories
             await cleanupRemainingTempDirectories(outputDirectory || outputDir);
-            await cleanupTempConversionFiles(outputDirectory || outputDir);
 
             const openFolderBtn = document.getElementById('openFolderBtn');
             if (openFolderBtn) {
@@ -1955,9 +1944,6 @@ function stopProcessing() {
         cleanupRemainingTempDirectories(outputDirectory).catch(error => {
             console.warn('Cleanup failed during stop:', error);
         });
-        cleanupTempConversionFiles(outputDirectory).catch(error => {
-            console.warn('Temp conversion cleanup failed during stop:', error);
-        });
     }
 
     addStatusMessage('⏹️ Processing stopped by user', 'warning');
@@ -1983,9 +1969,6 @@ function resetProcessing() {
         cleanupRemainingTempDirectories(outputDirectory).catch(error => {
             console.warn('Cleanup failed during reset:', error);
         });
-        cleanupTempConversionFiles(outputDirectory).catch(error => {
-            console.warn('Temp conversion cleanup failed during reset:', error);
-        });
     }
 
     hideStatus();
@@ -1995,7 +1978,7 @@ function resetProcessing() {
 }
 
 // File processing logic with progress updates
-async function processFile(file, outputDir, batch, index, settings, convertedFilePath = null) {
+async function processFile(file, outputDir, batch, index, settings) {
     const updateProgress = (percent) => {
         file.progress = percent;
         updateFileList();
@@ -2006,14 +1989,14 @@ async function processFile(file, outputDir, batch, index, settings, convertedFil
     try {
         switch (settings.mode) {
             case 'spoof-split':
-                await processSpoofAndSplit(file, outputDir, settings, updateProgress, convertedFilePath);
+                await processSpoofAndSplit(file, outputDir, settings, updateProgress);
                 break;
             case 'spoof-only':
-                await processSpoof(file, outputDir, settings, updateProgress, convertedFilePath, index);
+                await processSpoof(file, outputDir, settings, updateProgress, index);
                 break;
             case 'split-only':
                 if (file.type === 'video') {
-                    await processSplitOnly(file, outputDir, settings, updateProgress, convertedFilePath);
+                    await processSplitOnly(file, outputDir, settings, updateProgress);
                 } else {
                     const outputPath = generateOutputPathForBatch(file, outputDir, settings, batch, index);
                     await electronAPI.copyFile(file.path, outputPath);
@@ -2031,7 +2014,7 @@ async function processFile(file, outputDir, batch, index, settings, convertedFil
 }
 
 // Processing mode implementations
-async function processSpoof(file, outputDir, settings, updateProgress, convertedFilePath = null, fileIndex = 0) {
+async function processSpoof(file, outputDir, settings, updateProgress, fileIndex = 0) {
     const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1, fileIndex);
     const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
 
@@ -2039,52 +2022,85 @@ async function processSpoof(file, outputDir, settings, updateProgress, converted
 
     updateProgress(30);
 
-    // Use converted file path if available (Convert FIRST approach)
-    const inputPath = convertedFilePath || file.path;
-
     if (file.type === 'image') {
         console.log('Processing as IMAGE');
-        await processImageSpoof(inputPath, outputPath, effects, settings, updateProgress);
+        await processImageSpoof(file.path, outputPath, effects, settings, updateProgress);
     } else {
         console.log('Processing as VIDEO');
-        await processVideoSpoof(inputPath, outputPath, effects, settings, updateProgress);
+        await processVideoSpoof(file.path, outputPath, effects, settings, updateProgress);
     }
 
     outputCount++;
     updateProgress(100);
 }
 
-async function processSpoofAndSplit(file, outputDir, settings, updateProgress, convertedFilePath = null) {
-    // Use converted file path if available (Convert FIRST approach)
-    const inputPath = convertedFilePath || file.path;
-
+async function processSpoofAndSplit(file, outputDir, settings, updateProgress) {
     if (file.type === 'video') {
-        // Check video duration first
-        const duration = await getVideoDuration(inputPath);
+        const duration = await getVideoDuration(file.path);
 
-        if (duration > 10) {
-            // Split video first, then spoof each clip
-            await processVideoSplit(file, outputDir, settings, true, updateProgress, convertedFilePath, 0);
-        } else {
-            // Just spoof the video
-            await processSpoof(file, outputDir, settings, updateProgress, convertedFilePath, 0);
+        // Proposal 2: Double-Pass Architecture for Batch Speedup
+        // Optimization: For short videos (under 30s) or few clips, single pass is fine.
+        // But for batch splitting, double pass is faster.
+        // Let's use Double Pass always for consistency and speed on multiple clips.
+
+        const tempMasterName = `temp_master_${Date.now()}.mp4`;
+        const tempMasterPath = path.join(outputDir, tempMasterName);
+
+        addStatusMessage(`Phase 1/2: Helper Engine Initialized (Creating Master Spoof)...`, 'info');
+        updateProgress(5);
+
+        try {
+            // PHASE 1: Create Master Spoof (High Quality)
+            // Determine effects
+            const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
+
+            // Re-use processVideoSpoof to create the master
+            // Pass a progress wrapper to map 0-100 to 0-40 range
+            await processVideoSpoof(file.path, tempMasterPath, effects, settings, (p) => {
+                updateProgress(5 + (p * 0.35)); // 5-40%
+            });
+
+            addStatusMessage(`Phase 2/2: High-Speed Cutter (Splitting Master)...`, 'info');
+
+            // PHASE 2: Fast Split on Master
+            // specific file object that points to master but keeps original name for naming logic
+            const masterFileProxy = {
+                path: tempMasterPath,
+                name: file.name,
+                type: 'video'
+            };
+
+            // Call processVideoSplit with applySpoof = FALSE
+            // This triggers the new "Fast Copy" path in processVideoSplit we just added!
+            await processVideoSplit(masterFileProxy, outputDir, settings, false, (p) => {
+                updateProgress(40 + (p * 0.6)); // 40-100%
+            }, 0);
+
+            // Cleanup
+            await electronAPI.deleteFile(tempMasterPath);
+            console.log('Master temporary file cleaned up');
+
+        } catch (error) {
+            console.error('Double-Pass processing failed:', error);
+            // Fallback to Single-Pass if master creation fails?
+            // Usually better to fail and report.
+            // Try to clean up if exists
+            try { await electronAPI.deleteFile(tempMasterPath); } catch (e) { }
+            throw error;
         }
     } else {
         // For images, just spoof
-        await processSpoof(file, outputDir, settings, updateProgress, convertedFilePath, 0);
+        await processSpoof(file, outputDir, settings, updateProgress, 0);
     }
 }
 
-async function processSplitOnly(file, outputDir, settings, updateProgress, convertedFilePath = null) {
-    // Use converted file path if available (Convert FIRST approach)
-    const inputPath = convertedFilePath || file.path;
-
+async function processSplitOnly(file, outputDir, settings, updateProgress) {
     if (file.type === 'video') {
-        const duration = await getVideoDuration(inputPath);
+        const duration = await getVideoDuration(file.path);
 
         if (duration > 10) {
             // Split video into clips
-            await processVideoSplit(file, outputDir, settings, false, updateProgress, convertedFilePath, 0);
+            await processVideoSplit(file, outputDir, settings, false, updateProgress, 0);
         } else {
             // For videos under 10 seconds - process with watermark and audio removal
             const outputPath = generateOutputPathForBatch(file, outputDir, settings, 1, 0);
@@ -2092,10 +2108,10 @@ async function processSplitOnly(file, outputDir, settings, updateProgress, conve
             // Check if watermark or audio removal is needed
             if (settings.watermark && settings.watermark.enabled || settings.removeAudio) {
                 // Process with watermark/audio removal
-                await processVideoClipWithEffects(inputPath, outputPath, { start: 0, duration: duration, number: 1 }, null, settings);
+                await processVideoClipWithEffects(file.path, outputPath, { start: 0, duration: duration, number: 1 }, null, settings);
             } else {
-                // Just copy the converted file to final output
-                await electronAPI.copyFile(inputPath, outputPath);
+                // Just copy the file to final output
+                await electronAPI.copyFile(file.path, outputPath);
             }
 
             outputCount++;
@@ -2170,11 +2186,19 @@ async function getVideoDuration(videoPath) {
 async function getVideoDAR(videoPath) {
     try {
         const normalizedPath = path.normalize(videoPath);
+
+        // Check cache first
+        if (videoDARCache.has(normalizedPath)) {
+            console.log('Using cached DAR for:', normalizedPath);
+            return videoDARCache.get(normalizedPath);
+        }
+
         const command = [
             '-v', 'error',
             '-select_streams', 'v:0',
             '-show_entries', 'stream=width,height,display_aspect_ratio,sample_aspect_ratio',
             '-show_entries', 'stream_tags=rotate',
+            '-show_entries', 'stream_side_data=rotation',
             '-of', 'json',
             normalizedPath
         ];
@@ -2186,91 +2210,73 @@ async function getVideoDAR(videoPath) {
                 const data = JSON.parse(result.stdout);
                 if (data.streams && data.streams[0]) {
                     const stream = data.streams[0];
+                    let width = parseInt(stream.width);
+                    let height = parseInt(stream.height);
                     let dar = stream.display_aspect_ratio;
                     const sar = stream.sample_aspect_ratio;
-                    const width = stream.width;
-                    const height = stream.height;
 
-                    console.log(`Video Analysis: ${width}x${height}, DAR: ${dar}, SAR: ${sar}`);
-
-                    if (dar && dar.includes(':')) {
-                        let [num, den] = dar.split(':').map(Number);
-
-                        // Check for rotation in tags
-                        let rotation = 0;
-                        if (stream.tags && stream.tags.rotate) {
-                            rotation = parseInt(stream.tags.rotate);
-                        }
-
-                        // If rotated 90 or 270 degrees, swap DAR
-                        if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
-                            console.log(`Detected rotation ${rotation}°, swapping DAR from ${num}:${den} to ${den}:${num}`);
-                            [num, den] = [den, num];
-                            dar = `${num}:${den}`;
-                        }
-
-                        // CRITICAL FIX 1: Detect stretched portrait videos (DAR mismatch)
-                        // If actual pixels are landscape (width > height) but DAR suggests portrait (num < den),
-                        // this means the video is STRETCHED and should be portrait
-                        const actualRatio = width / height;
-                        const darRatio = num / den;
-
-                        // Check if there's a mismatch between actual dimensions and DAR
-                        if (width > height && darRatio < 1) {
-                            // Landscape pixels but portrait DAR = stretched portrait video
-                            console.log(`⚠️ STRETCHED PORTRAIT DETECTED (Type 1): ${width}x${height} (landscape) with DAR ${num}:${den} (portrait)`);
-                            console.log(`Correcting to true portrait: 9:16`);
-                            return {
-                                ratio: '9:16',
-                                decimal: 9 / 16
-                            };
-                        } else if (height > width && darRatio > 1) {
-                            // Portrait pixels but landscape DAR = stretched landscape video (rare)
-                            console.log(`⚠️ STRETCHED LANDSCAPE DETECTED: ${width}x${height} (portrait) with DAR ${num}:${den} (landscape)`);
-                            console.log(`Correcting to true landscape: 16:9`);
-                            return {
-                                ratio: '16:9',
-                                decimal: 16 / 9
-                            };
-                        }
-
-                        // CRITICAL FIX 2: Detect non-square pixel stretching (SAR analysis)
-                        // If SAR is not 1:1, pixels are being stretched
-                        // Common case: 1920x1080 with SAR 3:4 = actually 1440x1080 stretched to 1920x1080
-                        if (sar && sar !== '1:1' && sar.includes(':')) {
-                            const [sarNum, sarDen] = sar.split(':').map(Number);
-                            const sarRatio = sarNum / sarDen;
-
-                            // Calculate the "true" visual dimensions accounting for SAR
-                            const visualWidth = width * sarRatio;
-                            const visualRatio = visualWidth / height;
-
-                            console.log(`SAR detected: ${sar} (${sarRatio.toFixed(3)}), Visual ratio: ${visualRatio.toFixed(3)}`);
-
-                            // If visual ratio is portrait (< 1.0), force portrait output
-                            if (visualRatio < 1.0 && actualRatio >= 1.0) {
-                                console.log(`⚠️ STRETCHED PORTRAIT DETECTED (Type 2 - SAR): ${width}x${height} with SAR ${sar}`);
-                                console.log(`Visual dimensions: ${visualWidth.toFixed(0)}x${height}, forcing portrait 9:16`);
-                                return {
-                                    ratio: '9:16',
-                                    decimal: 9 / 16
-                                };
-                            }
-                        }
-
-                        return {
-                            ratio: dar,
-                            decimal: num / den
-                        };
-                    } else if (width && height) {
-                        // No DAR, use actual dimensions
-                        const ratio = width / height;
-                        if (ratio < 1) {
-                            return { ratio: '9:16', decimal: 9 / 16 };
-                        } else {
-                            return { ratio: '16:9', decimal: 16 / 9 };
+                    // 1. Get Rotation from tags (older) or side data (newer)
+                    let rotation = 0;
+                    if (stream.tags && stream.tags.rotate) {
+                        rotation = parseInt(stream.tags.rotate);
+                    } else if (stream.side_data_list) {
+                        // ROBUST SEARCH: Look for 'rotation' in ANY side data item
+                        const sideData = stream.side_data_list.find(sd => sd.rotation !== undefined);
+                        if (sideData) {
+                            rotation = Math.round(sideData.rotation);
                         }
                     }
+
+                    // 2. Transpose dimensions if rotated (Visual orientation)
+                    if (Math.abs(rotation) === 90 || Math.abs(rotation) === 270) {
+                        console.log(`Detected rotation ${rotation}°, swapping visual dimensions.`);
+                        [width, height] = [height, width];
+                        // If DAR is present, also swap it
+                        if (dar && dar.includes(':')) {
+                            const [num, den] = dar.split(':').map(Number);
+                            dar = `${den}:${num}`;
+                        }
+                    }
+
+                    // 3. Fallback for missing DAR property (Common in MOV)
+                    if (!dar || !dar.includes(':')) {
+                        dar = `${width}:${height}`;
+                    }
+
+                    let [num, den] = dar.split(':').map(Number);
+                    const actualRatio = width / height;
+                    const darRatio = num / den;
+
+                    console.log(`Visual Analysis: ${width}x${height}, Visual DAR: ${dar}, SAR: ${sar}`);
+
+                    // 4. Stretched portrait detection (Type 1: DAR mismatch)
+                    // If visual pixels are landscape but DAR is portrait, it's a stretched portrait video
+                    if (width > height && darRatio < 1.0) {
+                        console.log(`⚠️ STRETCHED PORTRAIT (Type 1): forcing 9:16`);
+                        num = 9; den = 16;
+                    }
+                    // Portrait pixels but landscape DAR
+                    else if (height > width && darRatio > 1.0) {
+                        console.log(`⚠️ STRETCHED LANDSCAPE: forcing 16:9`);
+                        num = 16; den = 9;
+                    }
+
+                    // 5. Stretched portrait detection (Type 2: SAR mismatch)
+                    if (sar && sar !== '1:1' && sar.includes(':')) {
+                        const [sNum, sDen] = sar.split(':').map(Number);
+                        const visualRatio = actualRatio * (sNum / sDen);
+                        if (visualRatio < 1.0 && actualRatio >= 1.0) {
+                            console.log(`⚠️ STRETCHED PORTRAIT (Type 2 - SAR): forcing 9:16`);
+                            num = 9; den = 16;
+                        }
+                    }
+
+                    const finalResult = {
+                        ratio: `${num}:${den}`,
+                        decimal: num / den
+                    };
+                    videoDARCache.set(normalizedPath, finalResult);
+                    return finalResult;
                 }
             } catch (e) {
                 console.error('Error parsing FFprobe JSON:', e);
@@ -2301,7 +2307,9 @@ function generateSpoofEffects(intensity, enableRotation = true) {
         contrast: range.contrast[0] + (Math.random() * (range.contrast[1] - range.contrast[0])),
         saturation: range.saturation[0] + (Math.random() * (range.saturation[1] - range.saturation[0])),
         hue: (Math.random() * range.hue * 2) - range.hue,
-        scale: 1.25 + (Math.random() * 0.1) // 1.25 to 1.35
+        // The Golden Scale: 1.08x total (approx 8% zoom)
+        // This covers up to 5 degrees of rotation without black gaps
+        scale: 1.08 + (Math.random() * 0.02)
     };
 }
 
@@ -2383,6 +2391,131 @@ function generateWatermarkFilter(watermarkSettings) {
     return filter;
 }
 
+/**
+ * Metadata Spoofing Engine
+ */
+function generateMetadataFlags(mode) {
+    // If mode is 'keep', we return empty array (FFmpeg keeps metadata by default)
+    // or explicit map 0. Using empty allows default behavior.
+    if (mode === 'keep') {
+        return ['-map_metadata', '0'];
+    }
+
+    if (mode === 'strip') {
+        return ['-map_metadata', '-1'];
+    }
+
+    // Default: 'spoof' (Organic Randomization)
+    // First, clear original metadata to avoid conflicts
+    const flags = ['-map_metadata', '-1'];
+
+    // 1. Random Creation Date (Last 4 years: 2021-Present)
+    const startYear = new Date().getFullYear() - 4;
+    const end = new Date();
+    const start = new Date(startYear, 0, 1);
+    const randomDate = new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
+
+    // FFmpeg expects ISO 8601 or specific formats. YYYY-MM-DD HH:MM:SS is standard.
+    const dateStr = randomDate.toISOString().replace('T', ' ').split('.')[0];
+    flags.push('-metadata', `creation_time=${dateStr}`);
+
+    // 2. Random Encoder/Device Spoofing
+    const encoders = [
+        'Lavf58.76.100', // Standard FFmpeg/Lavf (Simulates standard encoding)
+        'Lavf59.27.100',
+        'iOS 16.0 (20A362)', // iOS style
+        'Adobe Premiere Pro 2023',
+        'HandBrake 1.6.0',
+        'GoPro HERO10 Black'
+    ];
+    const randomEncoder = encoders[Math.floor(Math.random() * encoders.length)];
+
+    flags.push('-metadata', `encoder=${randomEncoder}`);
+
+    // 3. Technical Tags for Authenticity
+    // 'handler_name' often indicates the stream type (e.g. 'VideoHandler', 'SoundHandler')
+    // We can randomize title or comment too.
+    const randomId = Math.floor(Math.random() * 10000);
+    flags.push('-metadata', `title=MVI_${randomId}`);
+
+    return flags;
+}
+
+/**
+ * Master Filter Engine: Unifies all processing modes (Spoof, Split, Convert)
+ * into a single-pass, crash-proof architecture.
+ */
+function buildMasterFilter(settings, effects, originalDAR) {
+    let targetOrientation = settings.orientation || 'auto';
+    let targetW, targetH;
+
+    // 1. Orientation Lock: Compute base dimensions (Target Canvas)
+    if (targetOrientation === 'portrait') {
+        targetW = 1080; targetH = 1920;
+    } else if (targetOrientation === 'landscape') {
+        targetW = 1920; targetH = 1080;
+    } else if (originalDAR !== null) {
+        // INTELLIGENT AUTO-ORIENTATION: Snap to standard 1080p containers
+        if (originalDAR.decimal < 1) {
+            // Visual Portrait -> Snap to standard 1080x1920
+            targetW = 1080; targetH = 1920;
+        } else {
+            // Visual Landscape/Square -> Snap to standard 1920x1080
+            targetW = 1920; targetH = 1080;
+        }
+    } else {
+        targetW = 1080; targetH = 1920; // Default portrait fallback
+    }
+
+    // Ensure even dimensions for H.264 compatibility
+    targetW = Math.trunc(targetW / 2) * 2;
+    targetH = Math.trunc(targetH / 2) * 2;
+
+    let filterComplex = '';
+
+    if (effects) {
+        // MODE: SPOOFING (Oversize -> Rotate -> Crop -> EQ)
+        // Restores the "Golden Balance": natural zoom + tilt safety
+        const scaleVal = (effects.scale || 1.08);
+        const oversizedW = Math.trunc(targetW * scaleVal / 2) * 2;
+        const oversizedH = Math.trunc(targetH * scaleVal / 2) * 2;
+
+        // Randomized DNA offset (±0.5% of oversized window) to change digital footprint
+        const offX = Math.round((Math.random() * 0.01 - 0.005) * oversizedW);
+        const offY = Math.round((Math.random() * 0.01 - 0.005) * oversizedH);
+
+        filterComplex = `scale=${oversizedW}:${oversizedH}:force_original_aspect_ratio=increase`;
+
+        if (effects.enableRotation && effects.rotation !== 0) {
+            const rotateRad = (effects.rotation * Math.PI / 180).toFixed(6);
+            filterComplex += `,rotate=${rotateRad}`;
+        }
+
+        // Crop back to exact target from center + DNA shift
+        filterComplex += `,crop=${targetW}:${targetH}:(iw-${targetW})/2+${offX}:(ih-${targetH})/2+${offY}`;
+
+        const brightness = (effects.brightness / 100).toFixed(3);
+        const contrast = (effects.contrast / 100).toFixed(3);
+        const saturation = (effects.saturation / 100).toFixed(3);
+        const hue = (effects.hue || 0).toFixed(3);
+        filterComplex += `,eq=brightness=${brightness}:contrast=${contrast}:saturation=${saturation},hue=h=${hue}`;
+    } else {
+        // MODE: CONVERT/SPLIT ONLY (Orientation Lock only)
+        // Ensures the video fits the 1080p/1920p standard box perfectly
+        filterComplex = `scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH}`;
+    }
+
+    // COMMON: Watermark, SAR fix (prevent stretching), and Pixel Format
+    const watermarkFilter = generateWatermarkFilter(settings.watermark);
+    if (watermarkFilter) {
+        filterComplex += `,${watermarkFilter}`;
+    }
+
+    filterComplex += `,setsar=1:1,format=yuv420p`;
+
+    return filterComplex;
+}
+
 
 
 async function processImageSpoof(inputPath, outputPath, effects, settings, updateProgress) {
@@ -2393,63 +2526,16 @@ async function processImageSpoof(inputPath, outputPath, effects, settings, updat
     updateProgress(50);
 
     return new Promise((resolve, reject) => {
-        const brightnessDecimal = effects.brightness / 100;
-        const contrastDecimal = effects.contrast / 100;
-        const saturationDecimal = effects.saturation / 100;
+        // Use the Master Filter Engine
+        const filterComplex = buildMasterFilter(settings, effects, null);
 
-        // Build filter complex - conditionally include rotation
-        let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
-        if (effects.enableRotation && effects.rotation !== 0) {
-            filterComplex += `,rotate=${effects.rotation}*PI/180`;
-        }
-        filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
-
-        // Add watermark if enabled
-        const watermarkFilter = generateWatermarkFilter(settings.watermark);
-        let command;
-
-        // Check if format conversion is needed
-        const inputExt = path.parse(inputPath).extension.toLowerCase();
-        const needsFormatConversion = inputExt !== outputPath.split('.').pop();
-
-        if (watermarkFilter) {
-            // For format conversion + effects, use a more structured approach
-            if (needsFormatConversion) {
-                // Apply effects first, then watermark, then format conversion
-                filterComplex += `,${watermarkFilter}`;
-                // Add format conversion at the end to ensure compatibility
-                filterComplex += ',format=yuv420p';
-                console.log('Format conversion detected - using structured filter chain');
-            } else {
-                // Same format - apply watermark normally
-                filterComplex += `,${watermarkFilter}`;
-            }
-            console.log('Watermark filter added:', watermarkFilter);
-            console.log('Final filter complex:', filterComplex);
-        } else if (needsFormatConversion) {
-            // No watermark but format conversion needed
-            filterComplex += ',format=yuv420p';
-            console.log('Format conversion detected - added pixel format conversion');
-        }
-
-        // For MOV files, ensure proper pixel format to prevent filter issues
-        if (inputExt === '.mov' && !needsFormatConversion) {
-            // Add pixel format conversion for MOV files to ensure compatibility
-            filterComplex += ',format=yuv420p';
-            console.log('Added pixel format conversion for MOV file');
-        }
-
-        // Ensure even dimensions for H.264 compatibility and preserve aspect ratio
-        // This fixes Instagram/TikTok display issues where videos appear stretched or cropped
-        // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
-        filterComplex += `,scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
-
-        command = [
+        const command = [
             '-y',
             '-i', inputPath,
             '-vf', filterComplex,
             '-pix_fmt', 'yuv420p',
-            '-map_metadata', '-1',
+            // Use global metadata flags
+            ...(settings.metadataFlags || ['-map_metadata', '-1']),
             outputPath
         ];
 
@@ -2491,91 +2577,18 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
         const isPortrait = originalDAR !== null && originalDAR.decimal < 1;
         console.log('Original video DAR:', originalDAR ? `${originalDAR.ratio} (${originalDAR.decimal})` : 'unknown', 'Is portrait:', isPortrait);
 
-        const brightnessDecimal = effects.brightness / 100;
-        const contrastDecimal = effects.contrast / 100;
-        const saturationDecimal = effects.saturation / 100;
+        // Use the Master Filter Engine (Single-Pass Everything)
+        const filterComplex = buildMasterFilter(settings, effects, originalDAR);
 
-        // Build filter complex - conditionally include rotation
-        let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
-        if (effects.enableRotation && effects.rotation !== 0) {
-            filterComplex += `,rotate=${effects.rotation}*PI/180`;
-        }
-        filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
-
-        // Add watermark if enabled
-        const watermarkFilter = generateWatermarkFilter(settings.watermark);
-        let command;
-
-        // Check if format conversion is needed
-        const inputExt = path.parse(normalizedInputPath).extension.toLowerCase();
-        const needsFormatConversion = inputExt !== outputExt;
-
-        if (watermarkFilter) {
-            // For format conversion + effects, use a more structured approach
-            if (needsFormatConversion) {
-                // Apply effects first, then watermark, then format conversion
-                filterComplex += `,${watermarkFilter}`;
-                // Add format conversion at the end to ensure compatibility
-                filterComplex += ',format=yuv420p';
-                console.log('Format conversion detected - using structured filter chain');
-            } else {
-                // Same format - apply watermark normally
-                filterComplex += `,${watermarkFilter}`;
-            }
-            console.log('Watermark filter added:', watermarkFilter);
-            console.log('Final filter complex:', filterComplex);
-        } else if (needsFormatConversion) {
-            // No watermark but format conversion needed
-            filterComplex += ',format=yuv420p';
-            console.log('Format conversion detected - added pixel format conversion');
-        }
-
-        // For MOV files, ensure proper pixel format to prevent filter issues
-        if (inputExt === '.mov' && !needsFormatConversion) {
-            // Add pixel format conversion for MOV files to ensure compatibility
-            filterComplex += ',format=yuv420p';
-            console.log('Added pixel format conversion for MOV file');
-        }
-
-        // Smart aspect ratio preservation OR Force Orientation
-        // This ensures Instagram/TikTok display videos correctly without quality loss
-
-        let targetOrientation = settings.orientation || 'auto';
-
-        if (targetOrientation === 'portrait') {
-            // Force Portrait (9:16) - crops landscape to portrait center
-            console.log('Forcing PORTRAIT orientation (9:16) with center crop');
-            filterComplex += `,crop=ih*9/16:ih,scale=trunc(iw/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
-        } else if (targetOrientation === 'landscape') {
-            // Force Landscape (16:9)
-            console.log('Forcing LANDSCAPE orientation (16:9)');
-            filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*9/16/2)*2:flags=lanczos,setsar=1:1`;
-        } else if (originalDAR !== null) {
-            // AUTO Mode: Use detected DAR (preserves original orientation)
-            const darRatio = originalDAR.decimal;
-            const darRatioString = originalDAR.ratio;
-            const [darNum, darDen] = darRatioString.split(':').map(Number);
-
-            if (darRatio < 1) {
-                // Portrait: use height as base, match DAR
-                filterComplex += `,scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
-            } else {
-                // Landscape or square: use width as base, match DAR
-                filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
-            }
-            console.log('Smart aspect ratio preservation: Original DAR =', darRatioString, `(${darRatio})`);
-        } else {
-            // Fallback: If DAR detection failed, just ensure even dimensions
-            filterComplex += `,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1:1`;
-            console.log('DAR detection failed, using fallback: ensuring even dimensions');
-        }
-
-        command = [
+        const command = [
             '-y',
             '-i', normalizedInputPath,
             '-vf', filterComplex,
-            '-map_metadata', '-1'
+            // Use global metadata flags
+            ...(settings.metadataFlags || ['-map_metadata', '-1'])
         ];
+
+        console.log('Single-Pass Video Spoof Filter:', filterComplex);
 
         console.log('Full FFmpeg command:', command);
 
@@ -2623,6 +2636,7 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
         console.log('Processing video spoof:', { input: normalizedInputPath, output: normalizedOutputPath, format: outputExt });
 
         // Additional debugging for MOV files
+        const inputExt = extractFileExtension(normalizedInputPath);
         if (inputExt === '.mov') {
             console.log('MOV file processing details:', {
                 inputFormat: inputExt,
@@ -2652,11 +2666,10 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
 }
 
 
-async function processVideoSplit(file, outputDir, settings, applySpoof = false, updateProgress, convertedFilePath = null, fileIndex = 0) {
-    // Use converted file path if available (Convert FIRST approach)
-    const inputPath = convertedFilePath || file.path;
-    const duration = await getVideoDuration(inputPath);
-    console.log('Video splitting:', { filePath: inputPath, duration, applySpoof, settings });
+async function processVideoSplit(file, outputDir, settings, applySpoof = false, updateProgress, fileIndex = 0) {
+    const duration = await getVideoDuration(file.path);
+    const originalDAR = await getVideoDAR(file.path); // PROBE ONCE Optimization
+    console.log('Video splitting:', { filePath: file.path, duration, applySpoof, settings });
     addStatusMessage(`Processing video: ${duration.toFixed(2)} seconds total`, 'info');
 
     // Determine clip length based on settings
@@ -2699,6 +2712,16 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
     console.log('Clips created:', clips.length, clips);
     addStatusMessage(`Created ${clips.length} clips: ${clips.map(c => `${c.duration.toFixed(1)}s`).join(', ')}`, 'info');
 
+    // Determine fast copy eligibility (Proposal 1: Split Only Speedup)
+    // We can use fast copy if we are NOT spoofing, NOT watermarking, and NOT forcing orientation transformation.
+    const useFastCopy = !applySpoof &&
+        (!settings.watermark || !settings.watermark.enabled) &&
+        (settings.orientation === 'auto');
+
+    if (useFastCopy) {
+        console.log('SplitOnly: Using Fast Stream Copy (Instant Mode)');
+    }
+
     // Process each clip
     for (let i = 0; i < clips.length; i++) {
         const clip = clips[i];
@@ -2708,11 +2731,38 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
         const clipProgress = (i / clips.length) * 80 + 10; // 10-90%
         updateProgress(clipProgress);
 
-        if (applySpoof) {
-            const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
-            await processVideoClipWithEffects(inputPath, clipPath, clip, effects, settings);
+        if (useFastCopy) {
+            // FAST PATH: Stream Copy
+            // Note: -ss before -i is crucial for speed. It snaps to nearest keyframe.
+            const command = [
+                '-y',
+                '-ss', clip.start.toString(),
+                '-i', file.path,
+                '-t', clip.duration.toString(),
+                '-c', 'copy',
+                // apply metadata flags
+                ...(settings.metadataFlags || ['-map_metadata', '-1']),
+                clipPath
+            ];
+
+            // Audio handling for stream copy
+            // If removing audio, we can just use -an
+            if (settings.removeAudio) {
+                // Find index of '-c' 'copy' and replace/append
+                // Actually -an overrides -c:a copy usually, but safely:
+                command.splice(command.indexOf('copy') + 1, 0, '-an');
+            }
+
+            console.log('Fast Split Command:', command.join(' '));
+            await spawnFFmpeg(command);
         } else {
-            await extractVideoClip(inputPath, clipPath, clip, settings);
+            // SLOW PATH: Re-encode (Spoofing / Watermarking / Exact Cuts)
+            if (applySpoof) {
+                const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
+                await processVideoClipWithEffects(file.path, clipPath, clip, effects, settings, originalDAR);
+            } else {
+                await processVideoClipWithEffects(file.path, clipPath, clip, null, settings, originalDAR);
+            }
         }
 
         outputCount++;
@@ -2721,7 +2771,7 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
     updateProgress(100);
 }
 
-async function processVideoClipWithEffects(inputPath, outputPath, clip, effects, settings) {
+async function processVideoClipWithEffects(inputPath, outputPath, clip, effects, settings, originalDAR = null) {
     return new Promise(async (resolve, reject) => {
         // Ensure proper path handling for Windows
         const normalizedInputPath = path.normalize(inputPath);
@@ -2730,266 +2780,43 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
         // Determine output format from file extension
         const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
 
-        let command;
+        // If DAR wasn't passed, probe it once
+        const dar = originalDAR || await getVideoDAR(normalizedInputPath);
 
-        if (effects) {
-            const brightnessDecimal = effects.brightness / 100;
-            const contrastDecimal = effects.contrast / 100;
-            const saturationDecimal = effects.saturation / 100;
+        // Use Master Filter Engine
+        const filterComplex = buildMasterFilter(settings, effects, dar);
 
-            // Build filter complex - conditionally include rotation
-            let filterComplex = `scale=iw*${effects.scale}:ih*${effects.scale}`;
-            if (effects.enableRotation && effects.rotation !== 0) {
-                filterComplex += `,rotate=${effects.rotation}*PI/180`;
-            }
-            filterComplex += `,crop=iw*0.85:ih*0.85,eq=brightness=${brightnessDecimal}:contrast=${contrastDecimal}:saturation=${saturationDecimal},hue=h=${effects.hue}`;
+        const command = [
+            '-y',
+            '-ss', clip.start.toString(),
+            '-i', normalizedInputPath,
+            '-t', clip.duration.toString(),
+            '-vf', filterComplex,
+            // Use global metadata flags
+            ...(settings.metadataFlags || ['-map_metadata', '-1'])
+        ];
 
-            // Add watermark if enabled
-            const watermarkFilter = generateWatermarkFilter(settings.watermark);
-
-            // Check if format conversion is needed
-            const inputExt = path.parse(normalizedInputPath).extension.toLowerCase();
-            const needsFormatConversion = inputExt !== outputExt;
-
-            if (watermarkFilter) {
-                // For format conversion + effects, use a more structured approach
-                if (needsFormatConversion) {
-                    // Apply effects first, then watermark, then format conversion
-                    filterComplex += `,${watermarkFilter}`;
-                    // Add format conversion at the end to ensure compatibility
-                    filterComplex += ',format=yuv420p';
-                    console.log('Format conversion detected - using structured filter chain');
-                } else {
-                    // Same format - apply watermark normally
-                    filterComplex += `,${watermarkFilter}`;
-                }
-                console.log('Watermark filter added:', watermarkFilter);
-                console.log('Final filter complex:', filterComplex);
-            } else if (needsFormatConversion) {
-                // No watermark but format conversion needed
-                filterComplex += ',format=yuv420p';
-                console.log('Format conversion detected - added pixel format conversion');
-            }
-
-            // For MOV files, ensure proper pixel format to prevent filter issues
-            if (inputExt === '.mov' && !needsFormatConversion) {
-                // Add pixel format conversion for MOV files to ensure compatibility
-                filterComplex += ',format=yuv420p';
-                console.log('Added pixel format conversion for MOV file');
-            }
-
-            // Smart aspect ratio preservation OR Force Orientation
-            // This ensures Instagram/TikTok display videos correctly without quality loss
-            const originalDAR = await getVideoDAR(normalizedInputPath);
-            let targetOrientation = settings.orientation || 'auto';
-
-            if (targetOrientation === 'portrait') {
-                // Force Portrait (9:16)
-                filterComplex += `,scale=trunc(ih*9/16/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
-            } else if (targetOrientation === 'landscape') {
-                // Force Landscape (16:9)
-                filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*9/16/2)*2:flags=lanczos,setsar=1:1`;
-            } else if (originalDAR !== null) {
-                // Smart aspect ratio preservation: Maintain original DAR with high quality
-                const darRatio = originalDAR.decimal;
-                const darRatioString = originalDAR.ratio; // e.g., "9:16"
-                const [darNum, darDen] = darRatioString.split(':').map(Number);
-
-                if (darRatio < 1) {
-                    // Portrait: use height as base
-                    filterComplex += `,scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
-                } else {
-                    // Landscape or square: use width as base
-                    filterComplex += `,scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
-                }
-                console.log('Smart aspect ratio preservation: Original DAR =', darRatioString, `(${darRatio}), Scaling to match DAR with square pixels`);
-            } else {
-                // Fallback: If DAR detection failed, just ensure even dimensions
-                filterComplex += `,scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1:1`;
-                console.log('DAR detection failed, using fallback: ensuring even dimensions');
-            }
-
-            command = [
-                '-y',
-                '-ss', clip.start.toString(),
-                '-i', normalizedInputPath,
-                '-t', clip.duration.toString(),
-                '-vf', filterComplex,
-                '-map_metadata', '-1'
-            ];
-
-            console.log('Full FFmpeg command:', command);
-
-            // Configure codecs based on output format
-            switch (outputExt) {
-                case '.mp4':
-                    command.push('-c:v', 'libx264', '-preset', 'fast');
-                    break;
-                case '.webm':
-                    command.push('-c:v', 'libvpx-vp9', '-crf', '30', '-b:v', '0');
-                    break;
-                case '.mov':
-                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'mov');
-                    break;
-                case '.avi':
-                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'avi');
-                    break;
-                case '.mkv':
-                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'matroska');
-                    break;
-                default:
-                    command.push('-c:v', 'libx264', '-preset', 'fast');
-            }
-        } else {
-            // For no effects, we need to handle watermark separately since we can't use -c copy with -vf
-            const watermarkFilter = generateWatermarkFilter(settings.watermark);
-            if (watermarkFilter) {
-                // Get original DAR to determine correct scaling
-                const originalDAR = await getVideoDAR(normalizedInputPath);
-                let scaleFilter = '';
-
-                if (originalDAR) {
-                    const { decimal: darRatio, ratio: darRatioString } = originalDAR;
-                    const [darNum, darDen] = darRatioString.split(':').map(Number);
-
-                    // Smart aspect ratio preservation: Maintain original DAR with high quality
-                    // Scale to match DAR: calculate dimensions that exactly match the DAR
-                    if (darRatio < 1) {
-                        // Portrait: use height as base
-                        scaleFilter = `scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
-                    } else {
-                        // Landscape or square: use width as base
-                        scaleFilter = `scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
-                    }
-                } else {
-                    // Fallback: Ensure even dimensions
-                    scaleFilter = `scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=1:1`;
-                }
-
-                const finalFilter = `${watermarkFilter},${scaleFilter}`;
-                command = [
-                    '-y',
-                    '-ss', clip.start.toString(),
-                    '-i', normalizedInputPath,
-                    '-t', clip.duration.toString(),
-                    '-vf', finalFilter,
-                    '-map_metadata', '-1'
-                ];
-
-                // Configure codecs based on output format
-                switch (outputExt) {
-                    case '.mp4':
-                        command.push('-c:v', 'libx264', '-preset', 'fast');
-                        break;
-                    case '.webm':
-                        command.push('-c:v', 'libvpx-vp9', '-crf', '30', '-b:v', '0');
-                        break;
-                    case '.mov':
-                        command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'mov');
-                        break;
-                    case '.avi':
-                        command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'avi');
-                        break;
-                    case '.mkv':
-                        command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'matroska');
-                        break;
-                    default:
-                        command.push('-c:v', 'libx264', '-preset', 'fast');
-                        break;
-                }
-            } else {
-                // No effects - check if watermark or audio removal is needed
-                const needsReencoding = settings.watermark?.enabled || settings.removeAudio;
-
-                if (needsReencoding) {
-                    // Force re-encoding for watermark or audio removal
-                    command = [
-                        '-y',
-                        '-ss', clip.start.toString(),
-                        '-i', normalizedInputPath,
-                        '-t', clip.duration.toString(),
-                        '-map_metadata', '-1'
-                    ];
-
-                    switch (outputExt) {
-                        case '.mp4':
-                            command.push('-c:v', 'libx264', '-preset', 'fast');
-                            break;
-                        case '.mov':
-                            command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'mov');
-                            break;
-                        case '.avi':
-                            command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'avi');
-                            break;
-                        case '.mkv':
-                            command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'matroska');
-                            break;
-                        default:
-                            command.push('-c:v', 'libx264', '-preset', 'fast');
-                    }
-                } else {
-                    // No effects, no watermark, no audio removal - can use copy for compatible formats
-                    if (outputExt === '.mp4' || outputExt === '.mov' || outputExt === '.avi' || outputExt === '.mkv') {
-                        // For these formats, we need to re-encode to ensure compatibility
-                        command = [
-                            '-y',
-                            '-ss', clip.start.toString(),
-                            '-i', normalizedInputPath,
-                            '-t', clip.duration.toString(),
-                            '-map_metadata', '-1'
-                        ];
-
-                        switch (outputExt) {
-                            case '.mp4':
-                                command.push('-c:v', 'libx264', '-preset', 'fast');
-                                break;
-                            case '.mov':
-                                command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'mov');
-                                break;
-                            case '.avi':
-                                command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'avi');
-                                break;
-                            case '.mkv':
-                                command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'matroska');
-                                break;
-                        }
-                    } else {
-                        // For other formats, use copy
-                        command = [
-                            '-y',
-                            '-ss', clip.start.toString(),
-                            '-i', normalizedInputPath,
-                            '-t', clip.duration.toString(),
-                            '-c', 'copy',
-                            '-map_metadata', '-1'
-                        ];
-                    }
-                }
-            }
-        }
+        // Smart Audio Handling
         if (settings.removeAudio) {
             command.push('-an');
-        } else if (effects || (settings.watermark && settings.watermark.enabled) ||
-            (outputExt === '.mp4' || outputExt === '.mov' || outputExt === '.avi' || outputExt === '.mkv')) {
-            // Configure audio codec based on output format
-            switch (outputExt) {
-                case '.webm':
-                    command.push('-c:a', 'libopus', '-b:a', '128k');
-                    break;
-                case '.mkv':
-                    command.push('-c:a', 'aac', '-b:a', '128k');
-                    break;
-                default:
-                    command.push('-c:a', 'aac', '-b:a', '128k');
-                    break;
-            }
+        } else {
+            command.push('-c:a', 'aac', '-b:a', '128k');
+        }
+
+        // Video Codec Selection
+        switch (outputExt) {
+            case '.webm':
+                command.push('-c:v', 'libvpx-vp9', '-crf', '30', '-b:v', '0', '-c:a', 'libopus');
+                break;
+            case '.mkv':
+                command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'matroska');
+                break;
+            default:
+                command.push('-c:v', 'libx264', '-preset', 'fast');
         }
 
         command.push(normalizedOutputPath);
-
-        console.log('Processing video clip with effects:', { input: normalizedInputPath, output: normalizedOutputPath, clip, format: outputExt });
-
-        // Use secure FFmpeg spawning
+        console.log('Single-Pass Clip Extraction:', command.join(' '));
         spawnFFmpeg(command).then(result => {
             currentProcess = null;
             if (result.code === 0) {
@@ -3003,96 +2830,6 @@ async function processVideoClipWithEffects(inputPath, outputPath, clip, effects,
         });
     });
 }
-async function extractVideoClip(inputPath, outputPath, clip, settings = {}) {
-    return new Promise((resolve, reject) => {
-        // Ensure proper path handling for Windows
-        const normalizedInputPath = path.normalize(inputPath);
-        const normalizedOutputPath = path.normalize(outputPath);
-
-        // Determine output format from file extension
-        const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
-
-        const command = [
-            '-y',
-            '-ss', clip.start.toString(),
-            '-i', normalizedInputPath,
-            '-t', clip.duration.toString(),
-            '-map_metadata', '-1'
-        ];
-
-        // Add watermark if enabled
-        const watermarkFilter = generateWatermarkFilter(settings.watermark);
-        if (watermarkFilter) {
-            // Ensure even dimensions and preserve aspect ratio for Instagram/TikTok compatibility
-            // Scale to even dimensions and preserve original SAR - DAR will be calculated automatically
-            const finalFilter = `${watermarkFilter},scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=sar`;
-            command.push('-vf', finalFilter);
-        }
-
-        // Check if we need to force re-encoding due to watermark or audio removal
-        const needsReencoding = settings.watermark?.enabled || settings.removeAudio;
-
-        if (needsReencoding) {
-            // Force re-encoding for watermark or audio removal
-            switch (outputExt) {
-                case '.mp4':
-                    command.push('-c:v', 'libx264', '-preset', 'fast');
-                    break;
-                case '.webm':
-                    command.push('-c:v', 'libvpx-vp9', '-crf', '30', '-b:v', '0');
-                    break;
-                case '.mov':
-                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'mov');
-                    break;
-                case '.avi':
-                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'avi');
-                    break;
-                case '.mkv':
-                    command.push('-c:v', 'libx264', '-preset', 'fast', '-f', 'matroska');
-                    break;
-                default:
-                    command.push('-c:v', 'libx264', '-preset', 'fast');
-            }
-
-            // Handle audio
-            if (settings.removeAudio) {
-                command.push('-an');
-            } else {
-                switch (outputExt) {
-                    case '.webm':
-                        command.push('-c:a', 'libopus', '-b:a', '128k');
-                        break;
-                    case '.mkv':
-                        command.push('-c:a', 'aac', '-b:a', '128k');
-                        break;
-                    default:
-                        command.push('-c:a', 'aac', '-b:a', '128k');
-                }
-            }
-        } else {
-            // No watermark or audio removal - can use copy mode
-            command.push('-c:v', 'copy', '-c:a', 'copy');
-        }
-
-        command.push(normalizedOutputPath);
-
-        console.log('Extracting video clip:', { input: normalizedInputPath, output: normalizedOutputPath, clip, format: outputExt });
-        addStatusMessage(`Extracting clip ${clip.number}: ${clip.start.toFixed(1)}s to ${(clip.start + clip.duration).toFixed(1)}s (${clip.duration.toFixed(1)}s duration)`, 'info');
-
-        // Use secure FFmpeg spawning
-        spawnFFmpeg(command).then(result => {
-            currentProcess = null;
-            if (result.code === 0) {
-                resolve();
-            } else {
-                reject(new Error(`FFmpeg clip extraction failed with code ${result.code}`));
-            }
-        }).catch(error => {
-            currentProcess = null;
-            reject(error);
-        });
-    });
-}
 
 async function convertImage(inputPath, outputPath, settings) {
     return new Promise((resolve, reject) => {
@@ -3102,7 +2839,8 @@ async function convertImage(inputPath, outputPath, settings) {
             '-y',
             '-i', inputPath,
             '-pix_fmt', 'yuv420p',
-            '-map_metadata', '-1'
+            // Use global metadata flags
+            ...(settings.metadataFlags || ['-map_metadata', '-1'])
         ];
 
         // Add watermark if enabled
@@ -3154,143 +2892,50 @@ async function convertVideo(inputPath, outputPath, settings) {
         // Ensure proper path handling for Windows
         const normalizedInputPath = path.normalize(inputPath);
         const normalizedOutputPath = path.normalize(outputPath);
-
-        // Determine output format from file extension
         const outputExt = path.parse(normalizedOutputPath).extension.toLowerCase();
 
-        // Convert FIRST approach - always convert to target format for consistent processing
-        let command = [
-            '-y',
-            '-i', normalizedInputPath,
-            '-map_metadata', '-1'
+        // 1. Smart Re-encoding Decision
+        let needsReencoding = needsVideoReencoding(normalizedInputPath, outputExt, settings);
+
+        // Force re-encode if orientation lock is active (Portrait/Landscape)
+        const isForcedOrientation = settings.orientation === 'portrait' || settings.orientation === 'landscape';
+        if (isForcedOrientation) needsReencoding = true;
+
+        let command = ['-y', '-i', normalizedInputPath,
+            // Use global metadata flags
+            ...(settings.metadataFlags || ['-map_metadata', '-1'])
         ];
 
-        // Smart codec selection: Copy when safe, re-encode when necessary
-        const qualitySettings = getQualitySettings(settings.videoQuality || 'high');
-        const inputExt = path.parse(normalizedInputPath).extension.toLowerCase();
-        const needsReencoding = needsVideoReencoding(normalizedInputPath, outputExt, settings);
-
         if (needsReencoding) {
-            // Re-encode with quality settings
-            switch (outputExt) {
-                case '.mp4':
-                    command.push('-c:v', 'libx264', '-preset', qualitySettings.preset, '-crf', qualitySettings.crf, '-movflags', '+faststart');
-                    break;
-                case '.webm':
-                    command.push('-c:v', 'libvpx-vp9', '-crf', qualitySettings.webmCrf, '-b:v', '0');
-                    break;
-                case '.mov':
-                    command.push('-c:v', 'libx264', '-preset', qualitySettings.preset, '-crf', qualitySettings.crf, '-f', 'mov');
-                    break;
-                case '.avi':
-                    command.push('-c:v', 'libx264', '-preset', qualitySettings.preset, '-crf', qualitySettings.crf, '-f', 'avi');
-                    break;
-                case '.mkv':
-                    command.push('-c:v', 'libx264', '-preset', qualitySettings.preset, '-crf', qualitySettings.crf, '-f', 'matroska');
-                    break;
-                default:
-                    command.push('-c:v', 'libx264', '-preset', qualitySettings.preset, '-crf', qualitySettings.crf, '-movflags', '+faststart');
+            console.log('ConvertOnly: Re-encoding required for filters/orientation.');
+            const dar = await getVideoDAR(normalizedInputPath);
+            const filterComplex = buildMasterFilter(settings, null, dar);
+            command.push('-vf', filterComplex);
+
+            // Configure Video/Audio Codecs
+            if (outputExt === '.webm') {
+                command.push('-c:v', 'libvpx-vp9', '-crf', '30', '-b:v', '0');
+                if (!settings.removeAudio) command.push('-c:a', 'libopus', '-b:a', '128k');
+            } else {
+                command.push('-c:v', 'libx264', '-preset', 'fast');
+                if (!settings.removeAudio) command.push('-c:a', 'aac', '-b:a', '128k');
             }
         } else {
-            // Check if we can use copy mode
-            if (!settings.watermark?.enabled && !settings.removeAudio) {
-                // Fast copy - no quality loss, maximum speed
-                command.push('-c:v', 'copy');
-                console.log('Using fast copy mode - no re-encoding needed');
-            } else if (settings.removeAudio && !settings.watermark?.enabled) {
-                // Audio removal only - can use fast copy for video, just remove audio
-                // This is MUCH faster than re-encoding the entire video
-                command.push('-c:v', 'copy');
-                console.log('Using fast copy mode for video - only removing audio (no re-encoding)');
-            } else {
-                // Force re-encoding if watermark is enabled (audio removal with watermark needs re-encoding)
-                console.log('Forcing re-encoding due to watermark');
-                switch (outputExt) {
-                    case '.mp4':
-                        command.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23');
-                        break;
-                    case '.webm':
-                        command.push('-c:v', 'libvpx-vp9', '-crf', '25', '-b:v', '0');
-                        break;
-                    case '.mov':
-                        command.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-f', 'mov');
-                        break;
-                    case '.avi':
-                        command.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-f', 'avi');
-                        break;
-                    case '.mkv':
-                        command.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-f', 'matroska');
-                        break;
-                    default:
-                        command.push('-c:v', 'libx264', '-preset', 'fast', '-crf', '23');
-                }
-            }
-        }
-
-        // Add watermark if enabled
-        const watermarkFilter = generateWatermarkFilter(settings.watermark);
-        if (watermarkFilter) {
-            // Get original DAR to determine correct scaling
-            const originalDAR = await getVideoDAR(normalizedInputPath);
-            let scaleFilter = '';
-
-            if (originalDAR) {
-                const { decimal: darRatio, ratio: darRatioString } = originalDAR;
-                const [darNum, darDen] = darRatioString.split(':').map(Number);
-
-                // Smart aspect ratio preservation: Maintain original DAR with high quality
-                // Scale to match DAR: calculate dimensions that exactly match the DAR
-                if (darRatio < 1) {
-                    // Portrait: use height as base
-                    scaleFilter = `scale=trunc(ih*${darNum}/${darDen}/2)*2:trunc(ih/2)*2:flags=lanczos,setsar=1:1`;
-                } else {
-                    // Landscape or square: use width as base
-                    scaleFilter = `scale=trunc(iw/2)*2:trunc(iw*${darDen}/${darNum}/2)*2:flags=lanczos,setsar=1:1`;
-                }
-                console.log('ConvertVideo Smart scaling:', { originalDAR: darRatioString, scaleFilter });
-            } else {
-                // Fallback: Ensure even dimensions
-                scaleFilter = `scale='trunc(iw/2)*2:trunc(ih/2)*2',setsar=1:1`;
-            }
-
-            const finalFilter = `${watermarkFilter},${scaleFilter}`;
-            command.push('-vf', finalFilter);
+            console.log('ConvertOnly: Using Fast Stream Copy (Remuxing).');
+            command.push('-c:v', 'copy');
+            if (!settings.removeAudio) command.push('-c:a', 'copy');
         }
 
         if (settings.removeAudio) {
             command.push('-an');
-        } else if (needsReencoding || settings.watermark?.enabled) {
-            // Re-encode audio with quality settings
-            switch (outputExt) {
-                case '.webm':
-                    command.push('-c:a', 'libopus', '-b:a', '128k');
-                    break;
-                case '.mkv':
-                    command.push('-c:a', 'aac', '-b:a', '128k');
-                    break;
-                default:
-                    command.push('-c:a', 'aac', '-b:a', '128k');
-                    break;
-            }
-        } else {
-            // Fast copy audio - no quality loss, maximum speed
-            command.push('-c:a', 'copy');
-            console.log('Using fast copy mode for audio - no re-encoding needed');
         }
 
         command.push(normalizedOutputPath);
 
-        console.log('Converting video:', { input: normalizedInputPath, output: normalizedOutputPath, format: outputExt, needsReencoding });
-        console.log('Full output path:', normalizedOutputPath);
-
-        // Use secure FFmpeg spawning
         spawnFFmpeg(command).then(result => {
             currentProcess = null;
-            if (result.code === 0) {
-                resolve();
-            } else {
-                reject(new Error(`Video conversion failed`));
-            }
+            if (result.code === 0) resolve();
+            else reject(new Error(`Video conversion failed`));
         }).catch(error => {
             currentProcess = null;
             reject(new Error(`Video conversion failed: ${error.message}`));
@@ -3442,6 +3087,12 @@ function getProcessingSettings() {
             backgroundEnabled: document.getElementById('videoWatermarkBackgroundEnabled').checked,
             backgroundColor: document.getElementById('videoWatermarkBackgroundColor').value
         };
+
+        // Metadata Strategy (New)
+        const metadataModeSelect = document.getElementById('metadataMode');
+        settings.metadataMode = metadataModeSelect ? metadataModeSelect.value : 'spoof';
+        // Generate global flags once for consistency
+        settings.metadataFlags = generateMetadataFlags(settings.metadataMode);
     }
 
     return settings;
@@ -3815,11 +3466,6 @@ function openOutputFolder() {
 }
 
 // Processing functions
-async function processFileInBatch(file, batchDir, batch, index, settings, convertedFilePath = null) {
-    // This function handles the actual file processing in batch mode
-    // It's a wrapper around the existing processFile function
-    return await processFile(file, batchDir, batch, index, settings, convertedFilePath);
-}
 
 // Add missing generateOutputPathForBatch function
 function generateOutputPathForBatch(file, outputDir, settings, batchNumber = 1, fileIndex = 0) {
@@ -3906,71 +3552,7 @@ function updateNavigationButtons(mode) {
     }
 }
 
-// Convert FIRST approach: Convert files to target format immediately
-async function convertFileToTargetFormat(file, outputDir, settings) {
-    try {
-        // Check if conversion is needed
-        const inputExt = path.parse(file.path).extension.toLowerCase();
-        let targetExt = inputExt;
-
-        // Determine target format based on settings
-        if (file.type === 'image' && settings.imageFormat && settings.imageFormat !== 'original') {
-            targetExt = settings.imageFormat.startsWith('.') ? settings.imageFormat : '.' + settings.imageFormat;
-        } else if (file.type === 'video' && settings.videoFormat && settings.videoFormat !== 'original') {
-            targetExt = settings.videoFormat.startsWith('.') ? settings.videoFormat : '.' + settings.videoFormat;
-        }
-
-        // If no format change needed, return original path
-        if (inputExt === targetExt) {
-            console.log(`No conversion needed for ${file.name}: ${inputExt} → ${targetExt}`);
-            return file.path;
-        }
-
-        // Create temporary conversion directory
-        const tempDir = path.join(outputDir, 'temp_conversion');
-        await electronAPI.mkdir(tempDir).catch(() => { }); // Ignore if already exists
-
-        // Generate output path for converted file
-        const baseName = path.parse(file.name).name;
-        const convertedPath = path.join(tempDir, `${baseName}_converted${targetExt}`);
-
-        console.log(`Converting ${file.name}: ${inputExt} → ${targetExt}`);
-        console.log(`Input: ${file.path}`);
-        console.log(`Output: ${convertedPath}`);
-
-        // Convert file to target format
-        if (file.type === 'image') {
-            await convertImage(file.path, convertedPath, settings);
-        } else {
-            await convertVideo(file.path, convertedPath, settings);
-        }
-
-        console.log(`✅ Successfully converted ${file.name} to ${targetExt}`);
-        return convertedPath;
-
-    } catch (error) {
-        console.error(`❌ Failed to convert ${file.name}:`, error);
-        // Return original path if conversion fails
-        return file.path;
-    }
-}
-
-// Cleanup temporary conversion files
-async function cleanupTempConversionFiles(outputDir) {
-    try {
-        const tempDir = path.join(outputDir, 'temp_conversion');
-        if (await electronAPI.exists(tempDir)) {
-            // Remove all files in temp directory
-            const files = await electronAPI.readdir(tempDir);
-            for (const file of files) {
-                const filePath = path.join(tempDir, file);
-                await electronAPI.unlink(filePath).catch(() => { }); // Ignore errors
-            }
-            // Remove temp directory
-            await electronAPI.rmdir(tempDir).catch(() => { }); // Ignore errors
-            console.log('Cleaned up temporary conversion files');
-        }
-    } catch (error) {
-        console.warn('Failed to cleanup temp conversion files:', error);
-    }
+// Utility: Sleep for a duration
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }

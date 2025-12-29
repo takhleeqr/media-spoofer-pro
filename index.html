@@ -1383,8 +1383,8 @@
                         <div class="setting-item">
                             <label>Resulting Orientation</label>
                             <select id="videoOrientation">
-                                <option value="auto">Auto (Detect from Source)</option>
-                                <option value="portrait" selected>Force Portrait (9:16)</option>
+                                <option value="auto" selected>Auto (Detect from Source)</option>
+                                <option value="portrait">Force Portrait (9:16)</option>
                                 <option value="landscape">Force Landscape (16:9)</option>
                             </select>
                             <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">Use "Force Portrait" to fix
@@ -1416,9 +1416,33 @@
                     <div class="bulk-rename-section">
                         <h4>🏷️ Bulk Rename</h4>
                         <div class="setting-item">
-                            <label>Naming Pattern</label>
+                            <label>Naming Style</label>
+                            <select id="videoNamingPreset" onchange="updateNamingPattern(this.value)">
+                                <option value="random">Random ID (clip_83921)</option>
+                                <option value="original">Original Name (video-1)</option>
+                                <option value="custom" selected>Custom Pattern</option>
+                            </select>
+                        </div>
+                        <div class="setting-item" id="customPatternContainer">
+                            <label>Pattern Template</label>
                             <input type="text" id="videoNamingPattern" placeholder="e.g., brand_video_001"
                                 value="clip_{number}">
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">Available: {original},
+                                {number}, {timestamp}</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h4>💾 Metadata & Privacy</h4>
+                        <div class="setting-item">
+                            <label>Metadata Strategy</label>
+                            <select id="metadataMode">
+                                <option value="spoof" selected>Organic (Random Dates/Devices)</option>
+                                <option value="strip">Remove All (Strip for Privacy)</option>
+                                <option value="keep">Keep Original (No Changes)</option>
+                            </select>
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">"Organic" makes files look
+                                like authentic recordings.</p>
                         </div>
                     </div>
 
