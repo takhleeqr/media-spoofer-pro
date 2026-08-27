@@ -11,6 +11,7 @@ on:
     branches: [ main ]
   release:
     types: [ published ]
+  workflow_dispatch: {}   # allow manual "Run workflow" from the Actions tab
 
 jobs:
   build-windows:
