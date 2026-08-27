@@ -1,4 +1,8 @@
-name: Build and Release
+name: Build Windows
+
+# Builds the Windows app natively on a Windows runner (no Wine/cross-compile,
+# which is what made the old cross-platform build flaky). Produces a downloadable
+# installer artifact on every push, and attaches it to GitHub Releases.
 
 on:
   push:
@@ -9,234 +13,63 @@ on:
     types: [ published ]
 
 jobs:
-  build-all-platforms:
-    runs-on: ubuntu-latest  # Always available, no queue delays!
-    permissions:
-      contents: read
-    
+  build-windows:
+    runs-on: windows-latest
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Install Wine for Windows builds
-      run: |
-        echo "Installing Wine for Windows builds on Ubuntu..."
-        sudo dpkg --add-architecture i386
-        sudo apt-get update
-        sudo apt-get install -y wine wine32 wine64 libwine libwine:i386 fonts-wine
-        echo "Wine installation completed!"
-        
-    - name: Install macOS development tools
-      run: |
-        echo "Installing macOS development tools for universal binary creation..."
-        sudo apt-get update
-        sudo apt-get install -y clang llvm-dev libc++-dev libc++abi-dev
-        echo "macOS development tools installed!"
-      
-    - name: Configure Mac build to avoid license issues
-      run: |
-        echo "Configuring Mac build to avoid license issues..."
-        # Remove any license references that might cause issues
-        echo "Mac build configured!"
-      
-    - name: Download FFmpeg for all platforms
-      run: |
-        echo "Setting up FFmpeg for cross-platform builds..."
-        
-        # Create platform-specific directories
-        mkdir -p ffmpeg-mac ffmpeg-win
-        
-        # Download macOS FFmpeg (works for both Intel and ARM64)
-        echo "Downloading FFmpeg for macOS..."
-        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg-mac.zip
-        unzip -q ffmpeg-mac.zip -d ffmpeg-mac/
-        
-        echo "Downloading ffprobe for macOS..."
-        curl -L -f "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe-mac.zip
-        unzip -q ffprobe-mac.zip -d ffprobe-mac/
-        
-        # Download Windows FFmpeg
-        echo "Downloading FFmpeg for Windows..."
-        curl -L -f "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o ffmpeg-win.zip
-        unzip -q ffmpeg-win.zip -d ffmpeg-win/
-        
-        # Copy macOS binaries to root (will be packaged with Mac builds)
-        cp ffmpeg-mac/ffmpeg ./ffmpeg
-        cp ffprobe-mac/ffprobe ./ffprobe
-        chmod +x ffmpeg ffprobe
-        
-        # Copy Windows binaries to root (will be packaged with Windows builds)
-        find ffmpeg-win -name "ffmpeg.exe" -exec cp {} ./ffmpeg.exe \;
-        find ffmpeg-win -name "ffprobe.exe" -exec cp {} ./ffprobe.exe \;
-        
-        echo "FFmpeg setup completed for all platforms!"
-        echo "macOS binaries:"
-        ls -la ffmpeg ffprobe
-        echo "Windows binaries:"
-        ls -la ffmpeg.exe ffprobe.exe
-        
-        # Cleanup
-        rm -rf ffmpeg-mac.zip ffprobe-mac.zip ffmpeg-win.zip ffmpeg-mac/ ffprobe-mac/ ffmpeg-win/
-        
-    - name: Build Intel Mac app (x64)
-      run: |
-        echo "Building Intel Mac app (x64) from Ubuntu..."
-        echo "Current directory: $(pwd)"
-        echo "FFmpeg binaries ready:"
-        ls -la ffmpeg*
-        
-        # Build Intel Mac version using cross-compilation
-        npm run build-mac-intel
-        
-        echo "Intel Mac build completed!"
-      env:
-        ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-        
-    - name: Build ARM64 Mac app
-      run: |
-        echo "Building ARM64 Mac app from Ubuntu..."
-        echo "Current directory: $(pwd)"
-        
-        # Build ARM64 Mac version using cross-compilation
-        npm run build-mac-arm
-        
-        echo "ARM64 Mac build completed!"
-      env:
-        ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-        
-    - name: Build Windows app
-      run: |
-        echo "Building Windows app from Ubuntu..."
-        echo "Current directory: $(pwd)"
-        echo "FFmpeg files ready:"
-        ls -la ffmpeg*
-        
-        # Build Windows version
-        npm run build-win
-        
-        echo "Windows build completed!"
-      env:
-        ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-        WINE: wine
-        
-    - name: Package Mac builds separately
-      run: |
-        echo "Packaging Mac builds separately (no universal binary on Ubuntu)..."
-        
-        # List what we have
-        echo "Available builds:"
-        ls -la dist/
-        
-        # Create a simple package structure
-        mkdir -p dist/mac-packages
-        
-        # Copy Intel build
-        if [ -d "dist/mac-x64" ]; then
-          echo "Packaging Intel Mac build..."
-          cd dist/mac-x64
-          zip -r "../mac-packages/MediaSpooferPro-macOS-Intel.zip" .
-          cd ../..
-        fi
-        
-        # Copy ARM64 build
-        if [ -d "dist/mac-arm64" ]; then
-          echo "Packaging ARM64 Mac build..."
-          cd dist/mac-arm64
-          zip -r "../mac-packages/MediaSpooferPro-macOS-ARM64.zip" .
-          cd ../..
-        fi
-        
-        echo "Mac packages created successfully!"
-        echo "Final build artifacts:"
-        ls -la dist/
-        ls -la dist/mac-packages/
-        
-    - name: Upload all build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: MediaSpooferPro-All-Platforms
-        path: dist/
-        
-  release:
-    needs: [build-all-platforms]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-    permissions:
-      contents: write
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: MediaSpooferPro-All-Platforms
-        path: dist/
-        
-    - name: Create release assets
-      run: |
-        echo "Preparing release assets..."
-        ls -la dist/
-        
-        # Copy Intel Mac package
-        if [ -f "dist/mac-packages/MediaSpooferPro-macOS-Intel.zip" ]; then
-          echo "Found Intel Mac package"
-          cp "dist/mac-packages/MediaSpooferPro-macOS-Intel.zip" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-Intel.zip"
-        fi
-        
-        # Copy ARM64 Mac package
-        if [ -f "dist/mac-packages/MediaSpooferPro-macOS-ARM64.zip" ]; then
-          echo "Found ARM64 Mac package"
-          cp "dist/mac-packages/MediaSpooferPro-macOS-ARM64.zip" "MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-ARM64.zip"
-        fi
-        
-        # Find Windows EXE
-        for file in dist/*.exe; do
-          if [ -f "$file" ]; then
-            echo "Found Windows EXE: $file"
-            cp "$file" "MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe"
-          fi
-        done
-        
-        echo "Release assets prepared:"
-        ls -la MediaSpooferPro-*
-        
-    - name: Upload Intel Mac release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-Intel.zip
-        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-Intel.zip
-        asset_content_type: application/zip
-        
-    - name: Upload ARM64 Mac release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-ARM64.zip
-        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-macOS-ARM64.zip
-        asset_content_type: application/zip
-        
-    - name: Upload Windows release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
-        asset_name: MediaSpooferPro-${{ github.event.release.tag_name }}-Windows.exe
-        asset_content_type: application/octet-stream 
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check renderer.js
+          node --check main.js
+          node --check preload.js
+          node --check frame-extractor.js
+
+      - name: Download FFmpeg (Windows)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
+          Write-Host "Downloading FFmpeg from $url"
+          Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg-tmp -Force
+          $ff = Get-ChildItem -Path ffmpeg-tmp -Recurse -Filter ffmpeg.exe  | Select-Object -First 1
+          $fp = Get-ChildItem -Path ffmpeg-tmp -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          if (-not $ff -or -not $fp) { throw "ffmpeg.exe/ffprobe.exe not found in the download" }
+          Copy-Item $ff.FullName ./ffmpeg.exe  -Force
+          Copy-Item $fp.FullName ./ffprobe.exe -Force
+          Remove-Item ffmpeg.zip, ffmpeg-tmp -Recurse -Force
+          Write-Host "FFmpeg ready:"
+          Get-Item ffmpeg.exe, ffprobe.exe | Select-Object Name, Length
+
+      - name: Build Windows installer
+        run: npm run build-win
+        env:
+          # publish is disabled in package.json build config; token kept for safety.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Morph-Windows-Installer
+          path: dist/*.exe
+          if-no-files-found: error
+
+      - name: Attach installer to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
