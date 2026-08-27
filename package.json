@@ -1,6 +1,6 @@
 {
   "name": "media-spoofer-pro",
-  "version": "1.0.0",
+  "version": "7.1.24",
   "description": "Professional media transformation for social platforms",
   "main": "main.js",
   "scripts": {
@@ -21,15 +21,15 @@
     "image",
     "processing"
   ],
-  "author": "Pony Agency",
+  "author": "Thrive",
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.ponyagency.mediaspoofer",
-    "productName": "Media Spoofer Pro",
+    "appId": "com.thrive.morph",
+    "productName": "Morph",
     "directories": {
       "output": "dist"
     },
@@ -44,21 +44,23 @@
       "!ffmpeg*",
       "!ffprobe*"
     ],
-    "extraResources": [
-      "ffmpeg.exe",
-      "ffprobe.exe",
-      "ffmpeg",
-      "ffprobe"
-    ],
     "win": {
       "target": "nsis",
       "icon": "logo.png",
-      "publish": null
+      "publish": null,
+      "extraResources": [
+        "ffmpeg.exe",
+        "ffprobe.exe"
+      ]
     },
     "mac": {
-      "target": "zip",
+      "target": "dmg",
       "icon": "logo.png",
       "publish": null,
+      "extraResources": [
+        "ffmpeg",
+        "ffprobe"
+      ],
       "defaultArch": "universal",
       "minimumSystemVersion": "10.15.0",
       "hardenedRuntime": true,
@@ -67,19 +69,32 @@
       "entitlementsInherit": null,
       "category": "public.app-category.utilities",
       "darkModeSupport": true,
-      "electronLanguages": ["en"],
+      "electronLanguages": [
+        "en"
+      ],
       "extendInfo": {
         "NSHighResolutionCapable": true,
         "LSMinimumSystemVersion": "10.15.0",
         "CFBundleDocumentTypes": [
           {
             "CFBundleTypeName": "Video",
-            "CFBundleTypeExtensions": ["mp4", "mov", "avi", "webm"],
+            "CFBundleTypeExtensions": [
+              "mp4",
+              "mov",
+              "avi",
+              "webm"
+            ],
             "CFBundleTypeRole": "Viewer"
           },
           {
             "CFBundleTypeName": "Image",
-            "CFBundleTypeExtensions": ["jpg", "jpeg", "png", "heic", "webp"],
+            "CFBundleTypeExtensions": [
+              "jpg",
+              "jpeg",
+              "png",
+              "heic",
+              "webp"
+            ],
             "CFBundleTypeRole": "Viewer"
           }
         ]
@@ -90,5 +105,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true
     }
+  },
+  "dependencies": {
+    "sharp": "^0.35.3"
   }
 }

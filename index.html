@@ -4,7 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaSpoofer - Media Processing Tool</title>
+    <title>Morph</title>
+
+    <script>
+        // Apply the saved theme BEFORE first paint so there's no light/dark flash.
+        // Default is light (the user prefers light); dark is opt-in via the toggle.
+        (function () {
+            try {
+                var t = localStorage.getItem('morph-theme');
+                if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+            } catch (e) { }
+        })();
+    </script>
 
     <style>
         * {
@@ -17,7 +28,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 10px;
         }
 
         .app-container {
@@ -25,15 +36,15 @@
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 30px;
+            border-radius: 16px;
+            padding: 15px 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            min-height: calc(100vh - 40px);
+            min-height: calc(100vh - 20px);
         }
 
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
         }
 
         .header-logo {
@@ -53,9 +64,9 @@
 
         .header h1 {
             color: #2d3748;
-            font-size: 2.5rem;
+            font-size: 1.8rem;
             font-weight: 700;
-            margin-bottom: 10px;
+            margin-bottom: 4px;
             background: linear-gradient(135deg, #667eea, #764ba2);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -63,8 +74,8 @@
 
         .header p {
             color: #718096;
-            font-size: 1.1rem;
-            margin-bottom: 5px;
+            font-size: 0.85rem;
+            margin-bottom: 2px;
         }
 
         .powered-by {
@@ -76,9 +87,9 @@
         /* Overall progress bar for batches */
         .overall-progress {
             background: white;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
             display: none;
         }
@@ -89,8 +100,9 @@
 
         .overall-progress h4 {
             color: #4a5568;
-            margin-bottom: 15px;
+            margin-bottom: 8px;
             text-align: center;
+            font-size: 0.9rem;
         }
 
         .overall-progress-bar {
@@ -153,139 +165,31 @@
             margin-top: 4px;
         }
 
-        /* Rest of your existing CSS stays the same... */
-        /* Mode Selection Screen */
-        .mode-selection {
-            display: flex;
-            justify-content: center;
-            gap: 40px;
-            margin: 60px 0;
-        }
-
-        .mode-card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px 30px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            border: 3px solid transparent;
-            min-width: 250px;
-        }
-
-        .mode-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-            border-color: #667eea;
-        }
-
-        .mode-icon {
-            font-size: 4rem;
-            margin-bottom: 20px;
-        }
-
-        .mode-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #2d3748;
-            margin-bottom: 10px;
-        }
-
-        .mode-description {
-            color: #718096;
-            font-size: 1rem;
-            line-height: 1.5;
-        }
-
-        /* Main App Interface */
-        .main-interface {
-            display: none;
-        }
-
-        .main-interface.active {
-            display: block;
-        }
-
-        .mode-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-        }
-
-        .current-mode {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .current-mode-icon {
-            font-size: 2rem;
-        }
-
-        .current-mode-text h2 {
-            color: #2d3748;
-            font-size: 1.5rem;
-            margin-bottom: 5px;
-        }
-
-        .current-mode-text p {
-            color: #718096;
-            font-size: 0.9rem;
-        }
-
-        .back-button {
-            padding: 10px 20px;
-            background: #edf2f7;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            color: #4a5568;
-            transition: all 0.3s ease;
-        }
-
-        .back-button:hover {
-            background: #e2e8f0;
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-
         .section {
             background: white;
-            border-radius: 15px;
-            padding: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
         }
 
         .section h3 {
             color: #2d3748;
-            font-size: 1.3rem;
-            margin-bottom: 20px;
+            font-size: 1rem;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 6px;
         }
 
         .drop-zone {
-            border: 3px dashed #cbd5e0;
-            border-radius: 15px;
-            padding: 40px;
+            border: 2px dashed #cbd5e0;
+            border-radius: 10px;
+            padding: 15px;
             text-align: center;
             transition: all 0.3s ease;
             cursor: pointer;
             background: #f7fafc;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
 
         .drop-zone:hover {
@@ -301,29 +205,29 @@
         }
 
         .upload-icon {
-            font-size: 3rem;
-            margin-bottom: 15px;
+            font-size: 1.5rem;
+            margin-bottom: 4px;
             color: #a0aec0;
         }
 
         .settings-group {
             background: #f7fafc;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
         }
 
         .settings-group h4 {
             color: #4a5568;
-            margin-bottom: 15px;
-            font-size: 1.1rem;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
         }
 
         .setting-item {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-bottom: 15px;
+            gap: 4px;
+            margin-bottom: 8px;
         }
 
         .setting-item:last-child {
@@ -339,10 +243,10 @@
         .setting-item select,
         .setting-item input[type="number"],
         .setting-item input[type="text"] {
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 1rem;
+            padding: 6px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.85rem;
             transition: border-color 0.3s ease;
         }
 
@@ -361,11 +265,11 @@
         .checkbox-item {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px;
+            gap: 8px;
+            padding: 6px 8px;
             background: white;
-            border-radius: 8px;
-            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
             transition: all 0.3s ease;
         }
 
@@ -388,48 +292,70 @@
 
         .file-list {
             background: #f7fafc;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px 0;
-            max-height: 300px;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 200px;
             overflow-y: auto;
-            border: 2px solid #e2e8f0;
+            border: 1px solid #e2e8f0;
         }
 
         .file-item {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 12px;
+            padding: 6px 8px;
             background: white;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            transition: all 0.2s ease;
         }
 
         .file-item:last-child {
             margin-bottom: 0;
         }
 
+        .file-item:hover {
+            border-color: #3b82f6;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+        }
+
+        .file-item.active {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #f0f4ff 0%, #f8faff 100%);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+
+        .file-item.active .file-name {
+            color: #1e40af;
+            font-weight: 700;
+        }
+
         .file-info {
             display: flex;
             align-items: center;
-            gap: 12px;
             flex: 1;
+            min-width: 0;
         }
 
-        /* Old file icon styles removed - using new icon system */
-
-        /* Old file icon styles removed - using new icon system */
+        .file-icon {
+            font-size: 24px;
+            margin-right: 12px;
+            color: #3b82f6;
+        }
 
         .file-details {
             flex: 1;
+            min-width: 0; /* allow the name to truncate instead of overflowing */
         }
 
         .file-name {
             font-weight: 600;
             color: #2d3748;
             margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .file-size {
@@ -437,9 +363,15 @@
             font-size: 0.9rem;
         }
 
+        .file-actions {
+            display: flex;
+            align-items: center;
+            margin: 0 12px;
+        }
+
         .progress-container {
-            width: 150px;
-            margin-left: 15px;
+            flex: 1;
+            margin-left: 12px;
         }
 
         .progress-bar {
@@ -472,29 +404,23 @@
             animation: shimmer 1.5s infinite;
         }
 
-        .progress-text {
-            font-size: 0.8rem;
-            color: #718096;
-            text-align: center;
-        }
-
         .process-section {
             grid-column: 1 / -1;
         }
 
         .buttons {
             display: flex;
-            gap: 15px;
+            gap: 8px;
             justify-content: center;
             flex-wrap: wrap;
-            margin-top: 20px;
+            margin-top: 10px;
         }
 
         .btn {
-            padding: 15px 25px;
+            padding: 8px 16px;
             border: none;
-            border-radius: 10px;
-            font-size: 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -537,6 +463,27 @@
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        .btn-sm {
+            padding: 6px 8px;
+            font-size: 12px;
+            border-radius: 6px;
+            min-width: auto;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         }
 
         /* Preview Navigation Styles */
@@ -670,9 +617,9 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 15px;
-            margin: 20px 0;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 8px;
+            margin: 10px 0;
             opacity: 0;
             transition: opacity 0.5s ease;
         }
@@ -825,6 +772,25 @@
             color: #742a2a;
         }
 
+        /* Visible keyboard focus on all interactive controls (F5) */
+        .btn:focus-visible,
+        .tab-btn:focus-visible,
+        .drop-zone:focus-visible,
+        button:focus-visible,
+        [role="button"]:focus-visible {
+            outline: 3px solid #667eea;
+            outline-offset: 2px;
+        }
+
+        /* Respect users who prefer reduced motion (S7) */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+            }
+        }
+
         .pattern-examples ul {
             list-style: none;
             padding: 0;
@@ -864,26 +830,6 @@
             opacity: 1;
         }
 
-        @media (max-width: 1024px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-
-            .mode-selection {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .buttons {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .btn {
-                width: 200px;
-            }
-        }
-
         /* ADD THESE NEW LINES HERE */
         #imageDuplicatesGroup,
         #videoDuplicatesGroup {
@@ -894,7 +840,7 @@
             display: none !important;
         }
 
-        /* ADD THESE NEW LINES */
+        /* Footer */
         .footer {
             text-align: center;
             padding: 20px 30px;
@@ -929,192 +875,942 @@
             color: #4a5568;
         }
 
-        /* File List Enhancements */
-        .file-item {
+        /* ============================================
+           UNIFIED INTERFACE: Side-by-side settings
+           ============================================ */
+        .settings-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .upload-section {
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 1024px) {
+            .settings-row {
+                grid-template-columns: 1fr;
+            }
+
+            .buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                width: 200px;
+            }
+        }
+
+        /* ── Tab Navigation ─────────────────────────────── */
+        .tab-nav {
             display: flex;
-            align-items: center;
-            padding: 12px;
-            background: white;
-            border: 1px solid #e5e7eb;
+            gap: 4px;
+            margin-bottom: 14px;
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 4px;
+            border: 1px solid #e2e8f0;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 9px 16px;
+            border: none;
             border-radius: 8px;
-            margin-bottom: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: transparent;
+            color: #718096;
             transition: all 0.2s ease;
         }
-
-        .file-item:hover {
-            border-color: #3b82f6;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+        .tab-btn:hover { background: #edf2f7; color: #4a5568; }
+        .tab-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 12px rgba(102,126,234,0.3);
         }
+        .tab-panel { display: none; }
 
-        .file-item.active {
-            border-color: #3b82f6;
-            background: linear-gradient(135deg, #f0f4ff 0%, #f8faff 100%);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        /* ── Frame Extractor ─────────────────────────────── */
+        .fx-estimate-box {
+            background: linear-gradient(135deg,rgba(102,126,234,0.08),rgba(118,75,162,0.08));
+            border: 1px solid rgba(102,126,234,0.2);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            color: #4a5568;
+            margin-bottom: 10px;
         }
-
-        .file-item.active .file-name {
-            color: #1e40af;
+        #fxBatchBar {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        #fxBatchStats {
+            flex: 1;
+            font-size: 0.82rem;
+            color: #718096;
+            font-weight: 500;
+        }
+        .fx-video-group { margin-bottom: 18px; }
+        .fx-video-label {
+            font-weight: 700;
+            color: #4a5568;
+            font-size: 0.9rem;
+            padding: 6px 0 8px 2px;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 10px;
+        }
+        .fx-grid-inner {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+        }
+        .fx-thumb {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid #e2e8f0;
+            background: #000;
+            aspect-ratio: 16/9;
+            transition: all 0.2s ease;
+        }
+        .fx-thumb:hover { border-color: #667eea; box-shadow: 0 4px 12px rgba(102,126,234,0.2); transform: translateY(-2px); }
+        .fx-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .fx-thumb-delete { border-color: #fc8181 !important; }
+        .fx-thumb-delete img { opacity: 0.5; }
+        .fx-thumb-keep { border-color: #68d391 !important; }
+        .fx-thumb-active { border-color: #667eea !important; box-shadow: 0 0 0 3px rgba(102,126,234,0.4); }
+        .fx-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
             font-weight: 700;
         }
-
-        .file-info {
-            display: flex;
-            align-items: center;
-            flex: 1;
-            min-width: 0;
-        }
-
-        .file-icon {
-            font-size: 24px;
-            margin-right: 12px;
-            color: #3b82f6;
-        }
-
-        .file-actions {
-            display: flex;
-            align-items: center;
-            margin: 0 12px;
-        }
-
-        .btn-sm {
-            padding: 6px 8px;
-            font-size: 12px;
-            border-radius: 6px;
-            min-width: auto;
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        .fx-badge-del { background: #fc8181; color: white; }
+        .fx-badge-keep { background: #68d391; color: white; }
+        .fx-thumb-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.6);
             color: white;
+            font-size: 0.7rem;
+            padding: 3px 5px;
+            text-align: center;
+        }
+        .fx-thumb-actions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%,-50%);
+            display: none;
+            gap: 6px;
+        }
+        .fx-thumb:hover .fx-thumb-actions { display: flex; }
+        .fx-act-btn {
             border: none;
-            transition: all 0.2s ease;
-            font-size: 14px;
+            border-radius: 6px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 700;
+            transition: transform 0.15s;
         }
+        .fx-act-btn:hover { transform: scale(1.1); }
+        .fx-keep-btn { background: #68d391; color: white; }
+        .fx-del-btn  { background: #fc8181; color: white; }
 
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-            transform: scale(1.05);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        /* Lightbox */
+        #fxLightbox {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 20px 16px 28px;
+            overflow: auto;
+            gap: 10px;
         }
-
-        .progress-container {
-            flex: 1;
-            margin-left: 12px;
+        #fxLightboxImg {
+            max-width: 90vw;
+            max-height: calc(100vh - 190px);
+            border-radius: 8px;
+            object-fit: contain;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            display: block;
+            margin: 0 auto;
+        }
+        .fx-lb-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: min(100%, 980px);
+        }
+        #fxLightboxInfo {
+            color: #cbd5e0;
+            font-size: 0.85rem;
+            text-align: center;
+            max-width: min(100%, 980px);
+        }
+        .fx-lb-hint {
+            color: #718096;
+            font-size: 0.75rem;
+            text-align: center;
+            max-width: min(100%, 980px);
         }
     </style>
 </head>
 
 <body>
+    <style>
+      /* ===================== APP SHELL REDESIGN ===================== */
+      /* Morph brand palette (violet) — distinct from Thrive's green */
+      :root{ --tv:#6a5af9; --tv2:#5646e6; --tvs:#edebff; --tvl:#d8d4fb;
+             --sh-bg:#f5f5fa; --sh-surface:#ffffff; --sh-line:#e7e6f0; --sh-line2:#d8d6e6;
+             --sh-ink:#181722; --sh-ink2:#4c4a60; --sh-mut:#82829a; }
+      html,body{height:100%;}
+      body{ background:var(--sh-bg) !important; margin:0 !important; color:var(--sh-ink);
+            font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif !important; }
+      /* kill the old centered-card-on-gradient shell */
+      .app-container{ max-width:none !important; width:100% !important; margin:0 !important; padding:0 !important;
+            background:transparent !important; box-shadow:none !important; border-radius:0 !important;
+            min-height:100vh; display:flex; flex-direction:column; }
+      .header{ display:none !important; }
+
+      /* Top app bar */
+      .appbar{ display:flex; align-items:center; gap:14px; padding:12px 22px; background:var(--sh-surface);
+               border-bottom:1px solid var(--sh-line); position:sticky; top:0; z-index:40; }
+      .appbar .brand{ display:flex; align-items:center; gap:11px; }
+      .appbar .brand .nm{ font-weight:750; font-size:1.05rem; letter-spacing:-.01em; }
+      .appbar .brand .nm span{ color:var(--sh-mut); font-weight:600; }
+      .appbar .by{ margin-left:auto; display:flex; align-items:center; gap:7px; color:var(--sh-mut); font-size:.82rem; font-weight:500; }
+      .appbar .by b{ color:var(--sh-ink); font-weight:700; }
+
+      /* Two-pane workspace */
+      #unifiedInterface{ flex:1; display:grid; grid-template-columns:360px minmax(0,1fr);
+            grid-template-areas:"stats stats" "files options" "run run" "log log";
+            gap:16px; align-items:start; padding:18px 22px 40px; max-width:1280px; margin:0 auto; width:100%; }
+      @media(max-width:900px){ #unifiedInterface{ grid-template-columns:1fr; grid-template-areas:"stats" "files" "options" "run" "log"; } }
+      #statsGrid{ grid-area:stats; }
+      /* NOT sticky: a sticky left column floats over the full-width log row below
+         it and covers the logs while you scroll. Let it scroll with the page so
+         the activity log underneath is always fully visible. */
+      .upload-section{ grid-area:files; align-self:start; }
+      #composeUI{ grid-area:options; }
+      #legacySettings{ grid-area:options; }
+      #fxPanel{ grid-area:options; }
+      /* Full-width log row at the very bottom, opaque so nothing shows through. */
+      #activityLogSection{ grid-area:log; position:relative; z-index:1; background:var(--sh-surface); }
+
+      /* Flat panels (replace the old heavy cards) */
+      #unifiedInterface .section{ background:var(--sh-surface) !important; border:1px solid var(--sh-line) !important;
+            border-radius:14px !important; box-shadow:0 1px 2px rgba(20,28,44,.04) !important; padding:16px !important; margin:0 !important; }
+      #unifiedInterface .section h3{ font-size:.72rem !important; letter-spacing:.1em; text-transform:uppercase;
+            color:var(--sh-mut) !important; font-weight:700 !important; margin:0 0 12px !important; background:none !important; -webkit-text-fill-color:currentColor !important; }
+      #unifiedInterface .section h4{ color:var(--sh-ink2) !important; }
+
+      /* Drop zone */
+      #unifiedInterface .drop-zone{ border:1.5px dashed var(--sh-line2) !important; border-radius:12px !important;
+            background:var(--sh-bg) !important; padding:20px 12px !important; }
+      #unifiedInterface .drop-zone:hover{ border-color:var(--tv) !important; background:var(--tvs) !important; }
+      #unifiedInterface .upload-icon{ color:var(--tv); }
+      #unifiedInterface .drop-zone h4{ font-size:.95rem; }
+
+      /* Buttons — neutral, with the primary in brand violet; SVG icons inline */
+      #unifiedInterface .btn{ border-radius:10px !important; font-weight:600 !important; display:inline-flex !important;
+            align-items:center; justify-content:center; gap:8px; padding:10px 16px !important; font-size:.88rem !important; }
+      #unifiedInterface .btn svg{ width:17px; height:17px; flex:none; }
+      #unifiedInterface .btn-secondary{ background:var(--sh-surface) !important; border:1px solid var(--sh-line2) !important; color:var(--sh-ink) !important; }
+      #unifiedInterface .btn-secondary:hover:not(:disabled){ border-color:var(--tv) !important; color:var(--tv) !important; }
+      #unifiedInterface .btn-secondary svg{ color:var(--sh-mut); }
+      #unifiedInterface .btn-secondary:hover:not(:disabled) svg{ color:var(--tv); }
+      #unifiedInterface .btn-primary{ background:var(--tv) !important; border:none !important; color:#fff !important; box-shadow:0 4px 14px rgba(106,90,249,.32) !important; padding:10px 22px !important; }
+      #unifiedInterface .btn-primary:hover:not(:disabled){ background:var(--tv2) !important; }
+      #unifiedInterface .btn-success{ background:var(--sh-surface) !important; border:1px solid var(--sh-line2) !important; color:var(--tv) !important; }
+      #unifiedInterface .btn-success svg{ color:var(--tv); }
+      #unifiedInterface .btn:disabled{ opacity:.5 !important; }
+      #unifiedInterface .btn-primary:disabled{ background:#c7c3ee !important; color:#fff !important; box-shadow:none !important; opacity:1 !important; }
+      /* Icon color helpers */
+      #unifiedInterface .drop-zone .ic-up{ width:34px; height:34px; color:var(--tv); }
+      #unifiedInterface .section h3 .h-ic{ width:15px; height:15px; vertical-align:-2px; margin-right:7px; color:var(--sh-mut); }
+
+      /* Run dock — a cohesive control panel in the flow of the centered grid,
+         same width as the workspace (no more full-bleed bar glued to the window). */
+      #processSection{ grid-area:run; }
+      #processSection > h3{ display:none !important; }
+      .run-dock{ display:flex; flex-direction:column; gap:14px; }
+
+      /* Destination row */
+      .run-dest{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px;
+            background:var(--sh-bg); border:1px solid var(--sh-line); }
+      .run-dest-ic{ width:22px; height:22px; color:var(--tv); flex:none; }
+      .run-dest-body{ display:flex; flex-direction:column; min-width:0; margin-right:auto; }
+      .run-dest-label{ font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--sh-mut); font-weight:700; }
+      .run-dest-path{ font-size:.9rem; color:var(--sh-ink); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+            direction:rtl; text-align:left; }
+      .run-dest-btn{ flex:none; padding:8px 14px !important; font-size:.84rem !important; }
+
+      /* Progress row — strip the old white-card look; blend into the dock */
+      #processSection #overallProgress{ background:transparent !important; box-shadow:none !important; padding:0 !important; margin:0 !important; }
+      #overallProgress .run-prog-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px; }
+      #overallProgress .run-pct{ font-size:1.35rem; font-weight:750; color:var(--sh-ink); font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+      #overallProgress .run-meta{ font-size:.82rem; color:var(--sh-mut); font-weight:600; font-variant-numeric:tabular-nums; text-align:right; }
+      #overallProgress .overall-progress-bar{ height:10px !important; border-radius:99px !important; background:var(--sh-line) !important; overflow:hidden; }
+      #overallProgress .overall-progress-fill{ height:100% !important; border-radius:99px !important;
+            background:linear-gradient(90deg,var(--tv),var(--tv2)) !important; transition:width .4s ease; }
+
+      /* Action row */
+      .run-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+      .run-actions #startBtn{ flex:1; min-width:180px; }
+      .run-actions #startHint{ width:100%; color:var(--tv); font-size:.85rem; font-weight:600; }
+      @media(max-width:620px){ .run-dest{ flex-wrap:wrap; } .run-dest-body{ order:-1; width:100%; } }
+
+      /* Keep-original-name checkbox row */
+      .cx-keepname{ display:flex; align-items:center; gap:9px; margin-top:10px; cursor:pointer; font-size:.9rem; font-weight:600; color:var(--sh-ink); }
+      .cx-keepname input{ width:16px; height:16px; accent-color:var(--tv); cursor:pointer; flex:none; }
+
+      /* Crop card inputs + live preview overlay */
+      .cx-crop-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
+      #cropOverlay .crop-band{ position:absolute; background:rgba(8,10,18,.60); }
+      #cropKeep{ position:absolute; border:1.5px solid #6a5af9; box-shadow:0 0 0 1px rgba(255,255,255,.55), 0 0 0 100vmax rgba(0,0,0,0) ; border-radius:1px; }
+      /* endorsement mark spacing */
+      .appbar .by{ gap:6px; }
+      .appbar .by .by-txt b{ color:var(--sh-ink); font-weight:700; }
+
+      /* File list rows */
+      #unifiedInterface .file-list{ background:transparent !important; border:0 !important; margin-top:12px !important; }
+
+      /* Align the compose accent to the Morph violet */
+      .cx{ --ac:#6a5af9; --acs:#edebff; --acl:#d8d4fb; }
+      .cx .cx-sn{ background:#6a5af9; }
+      .cx-sum{ background:linear-gradient(180deg,#edebff,#fff); }
+
+      /* Stats row (relocated to the top of the workspace) */
+      #unifiedInterface .stats-grid{ display:grid !important; grid-template-columns:repeat(4,1fr) !important; gap:12px !important; margin:0 !important; background:none !important; border:0 !important; padding:0 !important; }
+      @media(max-width:640px){ #unifiedInterface .stats-grid{ grid-template-columns:repeat(2,1fr) !important; } }
+      #unifiedInterface .stat-card{ background:var(--sh-surface) !important; border:1px solid var(--sh-line) !important; border-radius:12px !important; padding:14px 16px !important; box-shadow:0 1px 2px rgba(20,28,44,.04) !important; text-align:center !important; }
+      #unifiedInterface .stat-value{ color:var(--tv) !important; font-weight:750 !important; font-size:1.55rem !important; font-variant-numeric:tabular-nums; }
+      #unifiedInterface .stat-label{ color:var(--sh-mut) !important; font-size:.7rem !important; letter-spacing:.07em; text-transform:uppercase; font-weight:600 !important; margin-top:3px; }
+
+      /* Preview navigation */
+      #unifiedInterface .preview-navigation{ display:flex !important; align-items:center; justify-content:center; gap:10px; margin-top:12px; }
+      #unifiedInterface .preview-navigation .btn{ background:var(--sh-surface) !important; border:1px solid var(--sh-line2) !important; color:var(--sh-ink2) !important; padding:7px 14px !important; box-shadow:none !important; font-size:.82rem !important; }
+      #unifiedInterface .preview-navigation .btn:hover:not(:disabled){ border-color:var(--tv) !important; color:var(--tv) !important; }
+      #unifiedInterface .position-display{ font-size:.8rem !important; color:var(--sh-mut) !important; font-weight:700 !important; min-width:48px; text-align:center; background:var(--sh-bg); border:1px solid var(--sh-line); border-radius:8px; padding:7px 10px; }
+
+      /* File rows */
+      #unifiedInterface .file-item{ background:var(--sh-surface) !important; border:1px solid var(--sh-line) !important; border-radius:12px !important; padding:9px 11px !important; margin-bottom:8px !important; box-shadow:none !important; }
+      #unifiedInterface .file-item.active{ border-color:var(--tv) !important; box-shadow:0 0 0 2px var(--tvs) !important; }
+      #unifiedInterface .file-icon{ background:var(--sh-bg) !important; border-radius:9px !important; color:var(--tv) !important; display:grid; place-items:center; }
+      #unifiedInterface .file-icon svg{ width:20px; height:20px; }
+      #unifiedInterface .file-item .btn-danger{ background:transparent !important; border:1px solid var(--sh-line2) !important; color:var(--sh-mut) !important; box-shadow:none !important; padding:7px !important; border-radius:8px !important; }
+      #unifiedInterface .file-item .btn-danger svg{ width:15px; height:15px; }
+      #unifiedInterface .file-item .btn-danger:hover:not(:disabled){ border-color:#e5484d !important; color:#e5484d !important; background:#fff1f1 !important; }
+      #unifiedInterface .progress-bar{ background:var(--sh-line) !important; }
+      #unifiedInterface .progress-fill{ background:var(--tv) !important; }
+      #unifiedInterface .empty-state{ color:var(--sh-mut) !important; }
+    </style>
+
     <div class="app-container">
+        <div class="appbar">
+            <div class="brand">
+                <svg width="30" height="30" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <defs><linearGradient id="mgbar" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7d6cff"/><stop offset="1" stop-color="#5a49e8"/></linearGradient></defs>
+                    <rect x="0" y="0" width="52" height="52" rx="15" fill="url(#mgbar)"/>
+                    <circle cx="21" cy="26" r="9.5" fill="none" stroke="#fff" stroke-width="3.2"/>
+                    <circle cx="32" cy="26" r="9.5" fill="#fff"/>
+                </svg>
+                <div class="nm">Morph</div>
+            </div>
+            <button class="theme-toggle" id="themeToggle" type="button" title="Switch light / dark" aria-label="Switch light or dark theme">
+                <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>
+                <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8z"/></svg>
+            </button>
+            <div class="by" title="Made by Thrive">
+                <svg width="18" height="18" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="0" y="0" width="52" height="52" rx="15" fill="#12a56b"/>
+                    <path d="M26 40 V22" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>
+                    <path d="M26 24 C26 15 33 10 41 11 C41 20 34 25 26 24 Z" fill="#fff"/>
+                    <path d="M26 28 C26 20 20 15 12 16 C12 24 18 29 26 28 Z" fill="#bff0da"/>
+                </svg>
+                <span class="by-txt"><b>thrive</b></span>
+            </div>
+        </div>
         <div class="header">
             <h1>🎬 Media Spoofer Pro</h1>
             <p>Professional media transformation for social platforms</p>
         </div>
 
-        <!-- Mode Selection Screen -->
-        <div class="mode-selection" id="modeSelection">
-            <div class="mode-card" id="imageModeCard" onclick="window.selectMode('image')">
-                <div class="mode-icon">📷</div>
-                <div class="mode-title">Process Images</div>
-                <div class="mode-description">Transform photos with visual effects, format conversion, and bulk renaming
+        <!-- ========== UNIFIED INTERFACE ========== -->
+        <div id="unifiedInterface">
+
+            <!-- Upload Section -->
+            <div class="section upload-section">
+                <h3><svg class="h-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg>Files</h3>
+                <div class="drop-zone" id="mediaDropZone" tabindex="0" role="button" aria-label="Add media files — drop files here or press Enter to browse">
+                    <div class="upload-icon"><svg class="ic-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M4 15v2.5A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5V15"/></svg></div>
+                    <h4>Drop files here or click to browse</h4>
+                    <p>Supports: JPG, PNG, HEIC, WebP, MP4, MOV, AVI, MKV, WebM and more</p>
                 </div>
-            </div>
 
-            <div class="mode-card" id="videoModeCard" onclick="window.selectMode('video')">
-                <div class="mode-icon">🎬</div>
-                <div class="mode-title">Process Videos</div>
-                <div class="mode-description">Split videos, apply effects, convert formats, and bulk rename clips</div>
-            </div>
-        </div>
-
-        <!-- Image Processing Interface -->
-        <div class="main-interface" id="imageInterface">
-            <div class="mode-header">
-                <div class="current-mode">
-                    <div class="current-mode-icon">📷</div>
-                    <div class="current-mode-text">
-                        <h2>Image Processing</h2>
-                        <p>Upload and transform your images</p>
-                    </div>
+                <div class="buttons">
+                    <button class="btn btn-secondary" id="selectFilesBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
+                        Select Files
+                    </button>
+                    <button class="btn btn-secondary" id="selectFolderBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                        Select Folder
+                    </button>
+                    <button class="btn btn-secondary" id="clearFilesBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-14"/></svg>
+                        Clear All
+                    </button>
                 </div>
-                <button class="back-button" id="imageBackBtn">← Back to Mode Selection</button>
-            </div>
 
-            <div class="main-content">
-                <!-- File Input Section -->
-                <div class="section">
-                    <h3>📁 Upload Images</h3>
-                    <div class="drop-zone" id="imageDropZone">
-                        <div class="upload-icon">📤</div>
-                        <h4>Drop images here or click to browse</h4>
-                        <p>Supports: JPG, JPEG, PNG, HEIC, WebP</p>
-                    </div>
-
-                    <div class="buttons">
-                        <button class="btn btn-secondary" id="selectImageBtn">
-                            📂 Select Images
-                        </button>
-                        <button class="btn btn-secondary" id="selectImageFolderBtn">
-                            📁 Select Folder
-                        </button>
-                        <button class="btn btn-secondary" id="clearImageBtn">
-                            🗑️ Clear All
-                        </button>
-                    </div>
-
-                    <!-- Preview Section -->
-                    <div class="section" id="imagePreviewSection" style="display: none;">
-                        <h3>👁️ Preview</h3>
-                        <div class="preview-container"
-                            style="display: flex; justify-content: center; align-items: center; margin: 20px 0;">
-                            <div class="preview-wrapper"
-                                style="position: relative; width: 320px; height: 480px; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.2);">
-                                <img id="image-preview"
-                                    style="display: none; width: 100%; height: 100%; object-fit: contain;" />
-                                <div id="image-text-watermark"
-                                    style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;">
-                                </div>
+                <!-- Preview Section (unified: shows image OR video depending on file type) -->
+                <div class="section" id="previewSection" style="display: none; margin-top: 10px;">
+                    <h3><svg class="h-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Preview</h3>
+                    <div class="preview-container"
+                        style="display: flex; justify-content: center; align-items: center; margin: 8px 0;">
+                        <div class="preview-wrapper"
+                            style="position: relative; width: 240px; height: 360px; background: #222; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                            <img id="image-preview"
+                                style="display: none; width: 100%; height: 100%; object-fit: contain;" />
+                            <video id="video-preview"
+                                style="display: none; width: 100%; height: 100%; object-fit: contain;" controls></video>
+                            <div id="image-text-watermark"
+                                style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;">
+                            </div>
+                            <div id="video-text-watermark"
+                                style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;">
+                            </div>
+                            <!-- Live crop overlay: dims the trimmed edges, outlines what stays -->
+                            <div id="cropOverlay" style="position:absolute; inset:0; display:none; pointer-events:none;">
+                                <div class="crop-band" id="cropBandTop"></div>
+                                <div class="crop-band" id="cropBandBottom"></div>
+                                <div class="crop-band" id="cropBandLeft"></div>
+                                <div class="crop-band" id="cropBandRight"></div>
+                                <div id="cropKeep"></div>
                             </div>
                         </div>
-
-                        <!-- Navigation Buttons -->
-                        <div class="preview-navigation">
-                            <button class="btn" onclick="navigatePreview('image', 'prev')">
-                                ← Previous
-                            </button>
-                            <div class="position-display"></div>
-                            <button class="btn" onclick="navigatePreview('image', 'next')">
-                                Next →
-                            </button>
-                        </div>
                     </div>
 
-                    <div class="file-list" id="imageFileList">
-                        <div class="empty-state">No images selected</div>
+                    <!-- Navigation Buttons -->
+                    <div class="preview-navigation">
+                        <button class="btn" id="previewPrevBtn" onclick="navigatePreview('media', 'prev')">
+                            ← Previous
+                        </button>
+                        <div class="position-display"></div>
+                        <button class="btn" id="previewNextBtn" onclick="navigatePreview('media', 'next')">
+                            Next →
+                        </button>
                     </div>
                 </div>
 
-                <!-- Image Settings Panel -->
-                <div class="section">
-                    <h3>⚙️ Image Settings</h3>
+                <div class="file-list" id="mediaFileList">
+                    <div class="empty-state">No files selected</div>
+                </div>
+            </div>
+
+            <!-- Stats row — relocated to the top of the workspace by setupComposeUI() -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalFiles">0</div>
+                    <div class="stat-label">Total Files</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="processedFiles">0</div>
+                    <div class="stat-label">Processed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="outputFiles">0</div>
+                    <div class="stat-label">Output Files</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="timeElapsed">0s</div>
+                    <div class="stat-label">Time Elapsed</div>
+                </div>
+            </div>
+
+            <!-- ========== PROCESSING CONTROLS ========== -->
+            <div class="section process-section" id="processSection">
+                <h3>🚀 Processing</h3>
+
+                <div class="run-dock">
+                    <!-- Destination row: where files are saved + open it -->
+                    <div class="run-dest">
+                        <svg class="run-dest-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                        <div class="run-dest-body">
+                            <span class="run-dest-label">Saving to</span>
+                            <span class="run-dest-path" id="outputFolderText">No folder chosen yet</span>
+                        </div>
+                        <button class="btn btn-secondary run-dest-btn" id="selectOutputBtn" title="Pick where the finished files are saved">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5 12 11l2.5 2.5"/></svg>
+                            Change folder
+                        </button>
+                        <button class="btn btn-secondary run-dest-btn" id="openFolderBtn" disabled title="Open this folder in File Explorer">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 14h6M13 11l3 3-3 3"/></svg>
+                            Open folder
+                        </button>
+                    </div>
+
+                    <!-- Progress row: live combined %, elapsed and time-left -->
+                    <div class="overall-progress" id="overallProgress">
+                        <div class="run-prog-head">
+                            <span class="run-pct" id="overallProgressPct">Ready</span>
+                            <span class="run-meta" id="overallProgressMeta"></span>
+                        </div>
+                        <div class="overall-progress-bar">
+                            <div class="overall-progress-fill" id="overallProgressFill"></div>
+                        </div>
+                        <div class="overall-progress-text" id="overallProgressText" style="display:none;"></div>
+                    </div>
+
+                    <!-- Action row: the primary controls, right where the options end -->
+                    <div class="run-actions">
+                        <span id="startHint" style="display:none;"></span>
+                        <button class="btn btn-primary" id="startBtn" disabled>
+                            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>
+                            Start Processing
+                        </button>
+                        <button class="btn btn-secondary" id="pauseBtn" disabled>
+                            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+                            Pause
+                        </button>
+                        <button class="btn btn-secondary" id="stopBtn" disabled>
+                            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                            Stop
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== COMPOSE WORKSPACE (new UI) ========== -->
+            <style>
+              .cx{--s:#fff;--s2:#f7f8fc;--ink:#1b2030;--ink2:#4b5266;--mut:#818a9e;--ln:#e7e9f2;--ln2:#d7dae8;
+                  --ac:#5b5be6;--acs:#eeeefe;--acl:#cfd0f8;--good:#12925a;--goods:#e4f6ec;--warn:#b7791f;--r:14px;
+                  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+              .cx *{box-sizing:border-box}
+              .cx-step{margin-bottom:18px}
+              .cx-sh{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+              .cx-sn{width:24px;height:24px;border-radius:8px;background:var(--ac);color:#fff;font-weight:700;font-size:.82rem;display:grid;place-items:center;flex:none}
+              .cx-sh h3{font-size:1.06rem;font-weight:650;margin:0;letter-spacing:-.01em}
+              .cx-sh .h{margin-left:auto;font-size:.8rem;color:var(--mut)}
+              .cx-seg{display:flex;gap:10px;flex-wrap:wrap}
+              .cx-seg .o{flex:1;min-width:150px;border:1.5px solid var(--ln);border-radius:12px;padding:13px 14px;background:var(--s);cursor:pointer;transition:.15s;display:flex;gap:11px;align-items:flex-start}
+              .cx-seg .o:hover{border-color:var(--ln2)}
+              .cx-seg .o.on{border-color:var(--ac);background:var(--acs);box-shadow:0 0 0 1px var(--acl) inset}
+              .cx-seg .o svg{width:22px;height:22px;color:var(--ac);flex:none;margin-top:1px}
+              .cx-seg .o .t{font-weight:640;font-size:.92rem}
+              .cx-seg .o .d{font-size:.76rem;color:var(--mut);margin-top:2px;line-height:1.35}
+              .cx-opts{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+              @media(max-width:760px){.cx-opts{grid-template-columns:1fr}}
+              .cx-c{border:1px solid var(--ln);border-radius:12px;background:var(--s);overflow:hidden;transition:border-color .15s,box-shadow .15s}
+              .cx-c.on{border-color:var(--acl);box-shadow:0 1px 2px rgba(20,28,50,.05)}
+              .cx-c.full{grid-column:1/-1}
+              .cx-ch{display:flex;align-items:center;gap:11px;padding:12px 13px;cursor:pointer;user-select:none}
+              .cx-ci{width:32px;height:32px;border-radius:9px;background:var(--s2);display:grid;place-items:center;flex:none;color:var(--ink2)}
+              .cx-c.on .cx-ci{background:var(--acs);color:var(--ac)}
+              .cx-ci svg{width:18px;height:18px}
+              .cx-ct{flex:1;min-width:0}
+              .cx-ct .n{font-weight:640;font-size:.9rem}
+              .cx-ct .s{font-size:.75rem;color:var(--mut);margin-top:1px}
+              .cx-tag{font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:var(--s2);color:var(--mut);margin-left:6px}
+              .cx-tag.v{background:var(--goods);color:var(--good)}
+              .cx-sw{width:40px;height:23px;border-radius:100px;background:var(--ln2);position:relative;flex:none;transition:.18s}
+              .cx-sw::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.18s}
+              .cx-c.on .cx-sw{background:var(--ac)}.cx-c.on .cx-sw::after{left:19px}
+              .cx-b{display:none;padding:0 13px 13px;border-top:1px solid var(--ln)}
+              .cx-c.on .cx-b{display:block;padding-top:11px}
+              .cx-c.static .cx-sw{display:none}.cx-c.static .cx-b{display:block}
+              .cx-r{display:flex;align-items:center;gap:9px;margin-top:9px;flex-wrap:wrap}
+              .cx-r .l{font-size:.78rem;color:var(--ink2);min-width:82px}
+              .cx-in{border:1px solid var(--ln2);background:var(--s2);border-radius:8px;padding:7px 9px;font:inherit;font-size:.82rem;color:var(--ink);flex:1;min-width:90px}
+              select.cx-in{cursor:pointer}
+              .cx-in.sm{flex:none;width:72px}
+              .cx-note{font-size:.76rem;color:var(--mut);margin-top:8px;line-height:1.4}
+              .cx-sum{margin-top:16px;border:1px solid var(--ln);background:linear-gradient(180deg,var(--acs),var(--s));border-radius:12px;padding:13px 15px}
+              .cx-sum .k{font-size:.66rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:5px}
+              .cx-sum p{margin:0;font-size:.92rem;color:var(--ink)}
+              .cx-sum b{color:var(--ac)}
+              .cx-fxnote{display:none;margin-top:10px;font-size:.82rem;color:var(--ink2);background:var(--goods);border:1px solid #bfe6cf;border-radius:10px;padding:9px 12px}
+              .cx-platform{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+              .cx-platform .l{font-size:.78rem;color:var(--ink2);font-weight:600}
+              .cx-platform select{max-width:220px}
+            </style>
+
+            <!-- ============================================================
+                 HIGH-END VISUAL LAYER — refined tokens, elevation, tasteful
+                 motion, and a light/dark toggle. Placed last so it wins.
+                 Everything is token-driven, so dark mode just re-maps colors.
+                 ============================================================ -->
+            <style id="morphHiEnd">
+              /* Refined LIGHT tokens + elevation scale + accent ring */
+              :root{
+                --sh-bg:#f3f3fb; --sh-surface:#ffffff; --sh-surface2:#f7f7fc;
+                --sh-line:#ecebf5; --sh-line2:#dcd9ec;
+                --sh-ink:#15141f; --sh-ink2:#4a4860; --sh-mut:#8785a0;
+                --tv:#6a5af9; --tv2:#5646e6; --tvs:#edebff; --tvl:#d5d0fb;
+                --sh-ring:rgba(106,90,249,.30);
+                --sh-sh-sm:0 1px 2px rgba(24,20,52,.05), 0 2px 5px -2px rgba(24,20,52,.05);
+                --sh-sh-md:0 6px 18px -6px rgba(24,20,52,.14), 0 3px 8px -3px rgba(24,20,52,.07);
+                --sh-sh-lg:0 20px 44px -14px rgba(24,20,52,.24), 0 8px 18px -10px rgba(24,20,52,.12);
+                --mo:cubic-bezier(.4,0,.2,1);
+              }
+
+              /* DARK theme — flip the tokens; all token-based styles follow */
+              :root[data-theme="dark"]{
+                --sh-bg:#0d0c15; --sh-surface:#181724; --sh-surface2:#131220;
+                --sh-line:#282540; --sh-line2:#393455;
+                --sh-ink:#f3f2fa; --sh-ink2:#c6c3dc; --sh-mut:#918eac;
+                --tv:#8b7dff; --tv2:#7a6bff; --tvs:rgba(139,125,255,.16); --tvl:rgba(139,125,255,.42);
+                --sh-ring:rgba(139,125,255,.42);
+                --sh-sh-sm:0 1px 2px rgba(0,0,0,.45);
+                --sh-sh-md:0 8px 22px -8px rgba(0,0,0,.6), 0 3px 8px -3px rgba(0,0,0,.45);
+                --sh-sh-lg:0 24px 52px -16px rgba(0,0,0,.7), 0 10px 22px -12px rgba(0,0,0,.55);
+                color-scheme:dark;
+              }
+              /* Dark: remap the compose-card palette in one place */
+              :root[data-theme="dark"] .cx{
+                --s:#181724; --s2:#131220; --ink:#f3f2fa; --ink2:#c6c3dc; --mut:#918eac;
+                --ln:#282540; --ln2:#393455; --ac:#8b7dff; --acs:rgba(139,125,255,.16); --acl:rgba(139,125,255,.5);
+                --good:#3ddc97; --goods:rgba(61,220,151,.14); --warn:#e0b64a;
+              }
+              :root[data-theme="dark"] .cx-fxnote{ border-color:rgba(61,220,151,.32) }
+              :root[data-theme="dark"] .preview-wrapper{ background:#0a0912 !important }
+              :root[data-theme="dark"] .footer{ background:transparent !important; border-top-color:var(--sh-line) !important }
+              :root[data-theme="dark"] .company-name{ color:var(--sh-ink2) }
+              /* Dark: file list + activity-log text (were hardcoded light-theme colors) */
+              :root[data-theme="dark"] .file-name{ color:var(--sh-ink) }
+              :root[data-theme="dark"] .file-size,
+              :root[data-theme="dark"] #unifiedInterface .empty-state{ color:var(--sh-mut) }
+              :root[data-theme="dark"] .status-message.info{ background:rgba(74,158,255,.14); border-left-color:#4a9eff; color:#bcd9ff }
+              :root[data-theme="dark"] .status-message.success{ background:rgba(61,220,151,.13); border-left-color:#3ddc97; color:#a7f0c9 }
+              :root[data-theme="dark"] .status-message.warning{ background:rgba(224,182,74,.13); border-left-color:#e0b64a; color:#f0d99a }
+              :root[data-theme="dark"] .status-message.error{ background:rgba(255,107,107,.15); border-left-color:#ff6b6b; color:#ffb3b3 }
+
+              /* Smooth the theme switch itself */
+              body,.appbar,#unifiedInterface .section,.cx-c,.cx-seg .o,.stat-card,.run-dest,.cx-in,.cx-ci,.theme-toggle{
+                transition:background-color .35s var(--mo),border-color .35s var(--mo),color .3s var(--mo),box-shadow .25s var(--mo);
+              }
+
+              /* Elevation + rounder panels */
+              #unifiedInterface .section{ box-shadow:var(--sh-sh-sm) !important; border-radius:16px !important; }
+              #unifiedInterface .stat-card{ box-shadow:var(--sh-sh-sm) !important; border-radius:14px !important; }
+              .cx-c{ box-shadow:var(--sh-sh-sm); }
+              .appbar{ box-shadow:var(--sh-sh-sm); }
+
+              /* Hover micro-interactions (lifts) */
+              .cx-c:not(.static){ transition:border-color .2s var(--mo),box-shadow .2s var(--mo),transform .2s var(--mo); }
+              .cx-c:not(.static):hover{ transform:translateY(-2px); box-shadow:var(--sh-sh-md); border-color:var(--tvl); }
+              .cx-seg .o{ transition:transform .2s var(--mo),box-shadow .2s var(--mo),border-color .2s var(--mo),background-color .2s var(--mo); }
+              .cx-seg .o:hover{ transform:translateY(-2px); box-shadow:var(--sh-sh-md); }
+              .cx-seg .o.on{ box-shadow:0 0 0 1.5px var(--ac) inset, var(--sh-sh-sm); }
+              #unifiedInterface .stat-card{ transition:transform .2s var(--mo),box-shadow .2s var(--mo); }
+              #unifiedInterface .stat-card:hover{ transform:translateY(-2px); box-shadow:var(--sh-sh-md); }
+
+              /* Buttons — lift + press */
+              #unifiedInterface .btn{ transition:transform .15s var(--mo),box-shadow .2s var(--mo),background-color .2s,border-color .2s,color .2s !important; }
+              #unifiedInterface .btn:not(:disabled):hover{ transform:translateY(-1px); }
+              #unifiedInterface .btn:not(:disabled):active{ transform:translateY(0) scale(.985); }
+              #unifiedInterface .btn-primary:not(:disabled):hover{ box-shadow:0 10px 24px rgba(106,90,249,.44) !important; }
+
+              /* Switch — springy toggle + soft glow when on */
+              .cx-sw,.cx-sw::after{ transition:.28s cubic-bezier(.34,1.56,.64,1) !important; }
+              .cx-c.on .cx-sw{ box-shadow:0 0 0 3px var(--acs); }
+
+              /* Live progress bar shimmer */
+              #overallProgress .overall-progress-fill{ position:relative; overflow:hidden; }
+              #overallProgress .overall-progress-fill::after{
+                content:""; position:absolute; inset:0;
+                background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.38) 50%,transparent 80%);
+                transform:translateX(-100%); animation:mShimmer 1.7s var(--mo) infinite;
+              }
+
+              /* Drop-zone icon gently bobs on hover */
+              #unifiedInterface .drop-zone:hover .ic-up,
+              #unifiedInterface .drop-zone:hover .upload-icon{ animation:mBob 1.2s var(--mo) infinite; }
+
+              /* Entrance — panels fade + rise once on load (staggered) */
+              @keyframes mIn{ from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:none} }
+              @keyframes mShimmer{ to{ transform:translateX(100%) } }
+              @keyframes mBob{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+              #statsGrid,.upload-section,#processSection,#composeUI,#activityLogSection{ animation:mIn .5s var(--mo) both; }
+              #statsGrid{ animation-delay:.02s } .upload-section{ animation-delay:.06s }
+              #processSection{ animation-delay:.10s } #composeUI{ animation-delay:.10s } #activityLogSection{ animation-delay:.14s }
+
+              /* Theme toggle button in the appbar */
+              .theme-toggle{ display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px;
+                border-radius:11px; border:1px solid var(--sh-line2); background:var(--sh-surface); color:var(--sh-ink2);
+                cursor:pointer; margin-left:auto; padding:0; }
+              .theme-toggle:hover{ color:var(--tv); border-color:var(--tv); transform:translateY(-1px); box-shadow:var(--sh-sh-sm); }
+              .theme-toggle:active{ transform:translateY(0) scale(.95); }
+              .theme-toggle svg{ width:19px; height:19px; transition:transform .4s var(--mo); }
+              .theme-toggle:hover svg{ transform:rotate(18deg); }
+              .theme-toggle .moon{ display:none } .theme-toggle .sun{ display:block }
+              :root[data-theme="dark"] .theme-toggle .moon{ display:block } :root[data-theme="dark"] .theme-toggle .sun{ display:none }
+              .appbar .by{ margin-left:14px !important; }
+
+              /* ---- Buttery scrolling: while the page is actively scrolling, stop
+                     hover-lifts and transitions from repainting under the cursor.
+                     Restored ~140ms after scrolling stops. ---- */
+              .appbar{ transform:translateZ(0); }                 /* own compositor layer → no repaint on scroll */
+              #unifiedInterface{ will-change:auto; }
+              body.is-scrolling *{ transition:none !important; }
+              body.is-scrolling #unifiedInterface{ pointer-events:none; } /* no hover recalc mid-scroll */
+              body.is-scrolling .cx-c:hover,
+              body.is-scrolling .cx-seg .o:hover,
+              body.is-scrolling .stat-card:hover,
+              body.is-scrolling #unifiedInterface .btn:hover{ transform:none !important; box-shadow:var(--sh-sh-sm) !important; }
+
+              /* ---- Preview that adapts to the video's real shape (portrait OR
+                     landscape). JS sets the exact width/height on .preview-wrapper
+                     from the media dimensions; these are the sizing bounds. ---- */
+              .preview-wrapper{ max-width:100%; max-height:440px;
+                    transition:width .18s var(--mo), height .18s var(--mo); transform:translateZ(0); }
+              .preview-container{ min-height:120px; }
+
+              @media (prefers-reduced-motion: reduce){
+                *,*::before,*::after{ animation:none !important; transition:none !important; }
+                .cx-c:hover,.cx-seg .o:hover,.stat-card:hover,#unifiedInterface .btn:hover,.theme-toggle:hover{ transform:none !important; }
+              }
+            </style>
+
+            <div class="cx" id="composeUI">
+              <div class="cx-step">
+                <div class="cx-sh"><span class="cx-sn">1</span><h3>What comes out?</h3><span class="h">pick one</span></div>
+                <div class="cx-seg" id="cxOutput">
+                  <div class="o on" data-out="one">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+                    <div><div class="t">One file each</div><div class="d">One output per input</div></div>
+                  </div>
+                  <div class="o" data-out="split">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M20 4 8.6 15.4M14 12l6 8M8 8l3 3"/></svg>
+                    <div><div class="t">Split into clips</div><div class="d">6–8s clips from each video</div></div>
+                  </div>
+                  <div class="o" data-out="frames">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                    <div><div class="t">Extract frames</div><div class="d">Save frames as images</div></div>
+                  </div>
+                  <div class="o" data-out="audio">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>
+                    <div><div class="t">Extract audio</div><div class="d">Save the sound as MP3</div></div>
+                  </div>
+                  <div class="o" data-out="thumb">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-4-3 2.5"/></svg>
+                    <div><div class="t">Cover thumbnail</div><div class="d">Grab one frame as an image</div></div>
+                  </div>
+                  <div class="o" data-out="gif">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 10v4M8 10h-.01M12 10v4M16 10v4h-2"/></svg>
+                    <div><div class="t">Animated GIF</div><div class="d">Turn video into a GIF</div></div>
+                  </div>
+                </div>
+                <div class="cx-fxnote" id="cxFxNote">Frame options are below — scroll to the "Frame Extraction Settings" panel.</div>
+                <div class="cx-platform" id="cxPlatformRow">
+                  <span class="l">Optimize for</span>
+                  <select class="cx-in" id="cxPlatform">
+                    <option value="none" selected>Nothing (keep original shape)</option>
+                    <option value="tiktok">TikTok — 9:16</option>
+                    <option value="reels">Instagram Reels — 9:16</option>
+                    <option value="shorts">YouTube Shorts — 9:16</option>
+                    <option value="youtube">YouTube — 16:9</option>
+                  </select>
+                  <span class="cx-note" style="margin:0">Sets the shape &amp; format for that platform.</span>
+                </div>
+              </div>
+
+              <div class="cx-step" id="cxOptionsStep">
+                <div class="cx-sh"><span class="cx-sn">2</span><h3>What should we do to it?</h3><span class="h">stack any</span></div>
+                <div class="cx-opts">
+
+                  <div class="cx-c on" data-card="unique">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19"/><circle cx="12" cy="12" r="3"/></svg></span>
+                      <div class="cx-ct"><div class="n">Make unique</div><div class="s">Spoof so each copy looks new</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Strength</span><select class="cx-in" id="cxIntensity"><option value="light">Light — barely visible</option><option value="medium" selected>Medium — recommended</option><option value="heavy">Heavy — hardest to detect</option></select></div>
+                      <div class="cx-r"><span class="l">Copies each</span><input class="cx-in sm" id="cxCopies" type="number" min="1" max="100" value="1"></div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="shrink">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 9 4 4M9 9V5M9 9H5M15 9l5-5M15 9V5M15 9h4M9 15l-5 5M9 15v4M9 15H5M15 15l5 5M15 15v4M15 15h4"/></svg></span>
+                      <div class="cx-ct"><div class="n">Shrink / compress <span class="cx-tag v">video</span></div><div class="s">Smaller files, still sharp</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Speed</span><select class="cx-in" id="cxSpeed"><option value="fast" selected>Fast — graphics chip</option><option value="quality">Smaller — slower (CPU)</option></select></div>
+                      <div class="cx-r"><span class="l">Squeeze</span><select class="cx-in" id="cxSqueeze"><option value="0">Gentle</option><option value="1">Light</option><option value="2" selected>Balanced</option><option value="3">Strong</option><option value="4">Max</option></select></div>
+                      <div class="cx-r"><span class="l">Resolution</span><select class="cx-in" id="cxRes"><option value="keep" selected>Keep original</option><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option></select></div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="mirror">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M6 8l-3 4 3 4M18 8l3 4-3 4"/></svg></span>
+                      <div class="cx-ct"><div class="n">Mirror / flip <span class="cx-tag v">video</span></div><div class="s">Flip left–right (great for reposts)</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b"><div class="cx-r"><span class="l">Direction</span><select class="cx-in" id="cxMirror"><option value="h" selected>Horizontal</option><option value="v">Vertical</option></select></div></div>
+                  </div>
+
+                  <div class="cx-c" data-card="rotate">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg></span>
+                      <div class="cx-ct"><div class="n">Rotate <span class="cx-tag v">video</span></div><div class="s">Turn 90° or 180°</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b"><div class="cx-r"><span class="l">Angle</span><select class="cx-in" id="cxRotate"><option value="90" selected>90° right</option><option value="270">90° left</option><option value="180">180°</option></select></div></div>
+                  </div>
+
+                  <div class="cx-c" data-card="crop">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/></svg></span>
+                      <div class="cx-ct"><div class="n">Crop edges <span class="cx-tag v">video</span></div><div class="s">Trim off sides — changes size, no bars</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-crop-grid">
+                        <div class="cx-r"><span class="l">Top (px)</span><input class="cx-in sm cx-crop" id="cxCropTop" type="number" min="0" step="2" value="0"></div>
+                        <div class="cx-r"><span class="l">Bottom (px)</span><input class="cx-in sm cx-crop" id="cxCropBottom" type="number" min="0" step="2" value="0"></div>
+                        <div class="cx-r"><span class="l">Left (px)</span><input class="cx-in sm cx-crop" id="cxCropLeft" type="number" min="0" step="2" value="0"></div>
+                        <div class="cx-r"><span class="l">Right (px)</span><input class="cx-in sm cx-crop" id="cxCropRight" type="number" min="0" step="2" value="0"></div>
+                      </div>
+                      <div class="cx-note" id="cxCropInfo">Add a video, then type pixels to trim — the preview shows what stays.</div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="speed">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 19l9-7-9-7v14z"/><path d="M2 19l9-7-9-7v14z"/></svg></span>
+                      <div class="cx-ct"><div class="n">Speed <span class="cx-tag v">video</span></div><div class="s">Slow-mo or fast</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b"><div class="cx-r"><span class="l">Playback</span><select class="cx-in" id="cxSpeedVal"><option value="0.5">0.5× — slow-mo</option><option value="0.75">0.75×</option><option value="1" selected>1× — normal</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2× — fast</option></select></div></div>
+                  </div>
+
+                  <div class="cx-c" data-card="trim">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.1 8.1 20 18M8.1 15.9 20 6"/></svg></span>
+                      <div class="cx-ct"><div class="n">Trim <span class="cx-tag v">video</span></div><div class="s">Cut start / end (one file)</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Start (sec)</span><input class="cx-in sm" id="cxTrimStart" type="number" min="0" step="0.1" value="0"></div>
+                      <div class="cx-r"><span class="l">End (sec)</span><input class="cx-in sm" id="cxTrimEnd" type="number" min="0" step="0.1" placeholder="end"></div>
+                      <div class="cx-note">Leave End blank to keep to the end.</div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="loop">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
+                      <div class="cx-ct"><div class="n">Loop <span class="cx-tag v">video</span></div><div class="s">Repeat the clip (one file)</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b"><div class="cx-r"><span class="l">Extra loops</span><input class="cx-in sm" id="cxLoopCount" type="number" min="1" value="1"></div><div class="cx-note">Repeats the video this many extra times.</div></div>
+                  </div>
+
+                  <div class="cx-c" data-card="mute">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H2v6h4l5 4V5zM22 9l-6 6M16 9l6 6"/></svg></span>
+                      <div class="cx-ct"><div class="n">Remove audio <span class="cx-tag v">video</span></div><div class="s">Mute the video</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b"><div class="cx-note">The video keeps everything else — only the sound is removed.</div></div>
+                  </div>
+
+                  <div class="cx-c" data-card="reframe">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2v4H2M18 2v4h4M6 22v-4H2M18 22v-4h4M6 6h12v12H6z"/></svg></span>
+                      <div class="cx-ct"><div class="n">Reframe / orientation <span class="cx-tag v">video</span></div><div class="s">Auto keeps the original shape</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b"><div class="cx-r"><span class="l">Shape</span><select class="cx-in" id="cxOrient">
+                      <option value="auto" selected>Auto (keep source)</option>
+                      <option value="portrait-blur">Portrait — blurred fill</option>
+                      <option value="portrait">Portrait — bars</option>
+                      <option value="landscape-blur">Landscape — blurred fill</option>
+                      <option value="landscape">Landscape — bars</option></select></div></div>
+                  </div>
+
+                  <div class="cx-c" data-card="watermark">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg></span>
+                      <div class="cx-ct"><div class="n">Watermark</div><div class="s">Add text over the media</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Text</span><input class="cx-in" id="cxWmText" type="text" placeholder="@yourhandle" value="@yourhandle"></div>
+                      <div class="cx-r"><span class="l">Position</span><select class="cx-in" id="cxWmPos"><option value="bottom-right" selected>Bottom right</option><option value="bottom-left">Bottom left</option><option value="bottom-center">Bottom center</option><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="center">Center</option></select></div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="logo">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg></span>
+                      <div class="cx-ct"><div class="n">Logo overlay <span class="cx-tag v">video</span></div><div class="s">Stamp a PNG logo on the video</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><button type="button" class="cx-in" id="cxLogoPick" style="cursor:pointer">Choose logo image…</button></div>
+                      <div class="cx-r"><span class="l">File</span><span id="cxLogoName" style="font-size:.78rem;color:var(--mut)">none chosen</span></div>
+                      <div class="cx-r"><span class="l">Position</span><select class="cx-in" id="cxLogoPos"><option value="bottom-right" selected>Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-left">Top left</option><option value="center">Center</option></select></div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="music">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></span>
+                      <div class="cx-ct"><div class="n">Replace audio <span class="cx-tag v">video</span></div><div class="s">Swap in a music track</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><button type="button" class="cx-in" id="cxMusicPick" style="cursor:pointer">Choose music file…</button></div>
+                      <div class="cx-r"><span class="l">File</span><span id="cxMusicName" style="font-size:.78rem;color:var(--mut)">none chosen</span></div>
+                      <div class="cx-note">The original sound is removed and replaced with this track.</div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c static" data-card="metadata">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><path d="M14 10h4M14 13h4M5 16c1-2 5-2 6 0"/></svg></span>
+                      <div class="cx-ct"><div class="n">Metadata</div><div class="s">Fake real phone info</div></div></div>
+                    <div class="cx-b"><div class="cx-r"><span class="l">Mode</span><select class="cx-in" id="cxMeta"><option value="spoof" selected>Realistic device</option><option value="keep">Keep original</option><option value="strip">Remove all</option></select></div></div>
+                  </div>
+
+                  <div class="cx-c static full" data-card="format">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 8 12 3 3 8l9 5 9-5zM3 8v8l9 5 9-5V8"/></svg></span>
+                      <div class="cx-ct"><div class="n">Format &amp; naming</div><div class="s">Output type and file names</div></div></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Format</span><select class="cx-in" id="cxFormat"><option value="original" selected>Keep original</option><option value="mp4">MP4</option><option value="mov">MOV</option><option value="webm">WebM</option></select>
+                        <span class="l" style="min-width:52px">Name</span><input class="cx-in" id="cxNaming" type="text" value="{original}_{number}"></div>
+                      <label class="cx-keepname"><input type="checkbox" id="cxKeepName"> <span>Keep the original file name (don’t rename)</span></label>
+                      <div class="cx-note">Split clips still get a number added (e.g. <b>_001</b>), and extra copies get <b>-2</b>, <b>-3</b> so nothing is overwritten.</div>
+                    </div>
+                  </div>
+
+                </div>
+                <div class="cx-sum"><div class="k">What you'll get</div><p id="cxSummary">One file per input.</p></div>
+              </div>
+            </div>
+
+            <!-- ========== SETTINGS: legacy controls (hidden — driven by compose UI) ========== -->
+            <div class="settings-row" id="legacySettings" style="display:none">
+                <!-- ===== Photo Settings (Left) ===== -->
+                <div class="section" id="photoSettingsSection">
+                    <h3>📷 Photo Settings</h3>
 
                     <div class="settings-group">
                         <h4>Processing Mode</h4>
                         <div class="setting-item">
                             <label>Processing Type</label>
                             <select id="imageProcessingMode">
-                                <option value="spoof-only">Spoof</option>
-                                <option value="convert-only">Convert</option>
+                                <option value="spoof-only">Make unique (spoof)</option>
+                                <option value="convert-only">Convert only</option>
                             </select>
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">"Make unique" subtly alters
+                                each photo so platforms treat every copy as a brand-new image. "Convert" just changes
+                                the file format.</p>
                         </div>
 
                         <div class="setting-item" id="imageIntensityGroup">
                             <label>Effect Intensity</label>
                             <select id="imageIntensity">
-                                <option value="light">Light Effects</option>
-                                <option value="medium">Medium Effects</option>
-                                <option value="heavy" selected>Heavy Effects</option>
+                                <option value="light">Light — barely visible</option>
+                                <option value="medium" selected>Medium — recommended</option>
+                                <option value="heavy">Heavy — hardest to detect</option>
                             </select>
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">How much each copy is altered.
+                                Higher = harder for platforms to spot a repost, with a slightly more visible change.</p>
                         </div>
 
                         <div class="setting-item" id="imageDuplicatesGroup">
@@ -1140,7 +1836,7 @@
                                 <option value="jpg" selected>JPG (Fastest)</option>
                                 <option value="original">Original (No Conversion)</option>
                                 <option value="png">PNG (Best Quality)</option>
-                                <option value="webm">WebP (Smallest Size)</option>
+                                <option value="webp">WebP (Smallest Size)</option>
                             </select>
                         </div>
 
@@ -1155,6 +1851,16 @@
                             </select>
 
                         </div>
+                        <div class="setting-item">
+                            <label>Metadata Strategy</label>
+                            <select id="imageMetadataMode">
+                                <option value="strip" selected>Remove All (Strip for Privacy)</option>
+                                <option value="spoof">Realistic device</option>
+                                <option value="keep">Keep Original (No Changes)</option>
+                            </select>
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">For photos, "Remove All" is
+                                the safe default. (Adding full fake camera info works best on videos, not photos.)</p>
+                        </div>
                     </div>
 
                     <div class="bulk-rename-section">
@@ -1163,6 +1869,8 @@
                             <label>Naming Pattern</label>
                             <input type="text" id="imageNamingPattern" placeholder="e.g., brand_image_001"
                                 value="photo_{number}">
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">Available tokens:
+                                {original}, {number}, {timestamp}. Leave blank to keep original names.</p>
                         </div>
                     </div>
 
@@ -1246,100 +1954,37 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Video Processing Interface -->
-        <div class="main-interface" id="videoInterface">
-            <div class="mode-header">
-                <div class="current-mode">
-                    <div class="current-mode-icon">🎬</div>
-                    <div class="current-mode-text">
-                        <h2>Video Processing</h2>
-                        <p>Upload and transform your videos</p>
-                    </div>
-                </div>
-                <button class="back-button" id="videoBackBtn">← Back to Mode Selection</button>
-            </div>
-
-            <div class="main-content">
-                <!-- File Input Section -->
-                <div class="section">
-                    <h3>📁 Upload Videos</h3>
-                    <div class="drop-zone" id="videoDropZone">
-                        <div class="upload-icon">📤</div>
-                        <h4>Drop videos here or click to browse</h4>
-                        <p>Supports: MP4, MOV, AVI, WebM</p>
-                    </div>
-
-                    <div class="buttons">
-                        <button class="btn btn-secondary" id="selectVideoBtn">
-                            📂 Select Videos
-                        </button>
-                        <button class="btn btn-secondary" id="selectVideoFolderBtn">
-                            📁 Select Folder
-                        </button>
-                        <button class="btn btn-secondary" id="clearVideoBtn">
-                            🗑️ Clear All
-                        </button>
-                    </div>
-
-                    <!-- Preview Section -->
-                    <div class="section" id="videoPreviewSection" style="display: none;">
-                        <h3>👁️ Preview</h3>
-                        <div class="preview-container"
-                            style="display: flex; justify-content: center; align-items: center; margin: 20px 0;">
-                            <div class="preview-wrapper"
-                                style="position: relative; width: 320px; height: 480px; background: #222; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.2);">
-                                <video id="video-preview"
-                                    style="display: none; width: 100%; height: 100%; object-fit: contain;"
-                                    controls></video>
-                                <div id="video-text-watermark"
-                                    style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Navigation Buttons -->
-                        <div class="preview-navigation">
-                            <button class="btn" onclick="navigatePreview('video', 'prev')">
-                                ← Previous
-                            </button>
-                            <div class="position-display"></div>
-                            <button class="btn" onclick="navigatePreview('video', 'next')">
-                                Next →
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="file-list" id="videoFileList">
-                        <div class="empty-state">No videos selected</div>
-                    </div>
-                </div>
-
-                <!-- Video Settings Panel -->
-                <div class="section">
-                    <h3>⚙️ Video Settings</h3>
+                <!-- ===== Video Settings (Right) ===== -->
+                <div class="section" id="videoSettingsSection">
+                    <h3>🎬 Video Settings</h3>
 
                     <div class="settings-group">
                         <h4>Processing Mode</h4>
                         <div class="setting-item">
                             <label>Processing Type</label>
                             <select id="videoProcessingMode">
-                                <option value="spoof-split">Spoof + Split</option>
-                                <option value="spoof-only" selected>Spoof</option>
-                                <option value="split-only">Split</option>
-                                <option value="convert-only">Convert</option>
+                                <option value="spoof-split">Make unique + Split into clips</option>
+                                <option value="spoof-only" selected>Make unique (spoof)</option>
+                                <option value="split-only">Split into clips</option>
+                                <option value="convert-only">Convert only</option>
+                                <option value="mute">Remove audio only (mute)</option>
+                                <option value="extract-frames">Extract Frames</option>
+
                             </select>
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">"Make unique" alters the video
+                                so each copy looks new to the platform. "Split" cuts it into short clips.</p>
                         </div>
 
                         <div class="setting-item" id="videoIntensityGroup">
                             <label>Effect Intensity</label>
                             <select id="videoIntensity">
-                                <option value="light">Light Effects</option>
-                                <option value="medium">Medium Effects</option>
-                                <option value="heavy" selected>Heavy Effects</option>
+                                <option value="light">Light — barely visible</option>
+                                <option value="medium" selected>Medium — recommended</option>
+                                <option value="heavy">Heavy — hardest to detect</option>
                             </select>
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">How much each copy is altered.
+                                Higher = harder to detect as a repost, with a slightly more visible change.</p>
                         </div>
 
                         <div class="setting-item" id="videoDuplicatesGroup">
@@ -1350,7 +1995,8 @@
                         <div class="setting-item" id="videoRotationGroup">
                             <div class="checkbox-group">
                                 <div class="checkbox-item">
-                                    <input type="checkbox" id="videoRotationEnabled" checked>
+                                    <!-- DEFAULT CHANGED: Apply Rotation is OFF -->
+                                    <input type="checkbox" id="videoRotationEnabled">
                                     <label for="videoRotationEnabled">Apply Rotation During Spoofing</label>
                                 </div>
                             </div>
@@ -1381,14 +2027,58 @@
                         </div>
 
                         <div class="setting-item">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="compressEnabled">
+                                <label for="compressEnabled">Shrink / compress video (smaller files)</label>
+                            </div>
+                            <div id="compressControls" style="display:none; margin-top:8px; padding-left:4px; border-left:2px solid #e2e5ee;">
+                                <label>Speed</label>
+                                <select id="compressSpeed">
+                                    <option value="fast" selected>Fast — use graphics chip</option>
+                                    <option value="quality">Smaller — slower (uses processor)</option>
+                                </select>
+                                <label style="margin-top:8px;">Squeeze (how hard to shrink)</label>
+                                <select id="compressLevel">
+                                    <option value="0">Gentle (best quality)</option>
+                                    <option value="1">Light</option>
+                                    <option value="2" selected>Balanced (recommended)</option>
+                                    <option value="3">Strong</option>
+                                    <option value="4">Max (smallest file)</option>
+                                </select>
+                                <label style="margin-top:8px;">Resolution</label>
+                                <select id="resolution">
+                                    <option value="keep" selected>Keep original (best)</option>
+                                    <option value="1080">1080p</option>
+                                    <option value="720">720p</option>
+                                    <option value="480">480p</option>
+                                </select>
+                                <p style="font-size:0.8rem; color:#718096; margin-top:6px;">Uses your laptop's graphics chip
+                                    to shrink fast without softening the picture. "Keep original" gives the best quality
+                                    and still reduces size.</p>
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
+                            <label>Mirror / Flip</label>
+                            <select id="videoMirror">
+                                <option value="none" selected>Off</option>
+                                <option value="h">Flip horizontal (great for reposts)</option>
+                                <option value="v">Flip vertical</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-item">
                             <label>Resulting Orientation</label>
                             <select id="videoOrientation">
-                                <option value="auto" selected>Auto (Detect from Source)</option>
-                                <option value="portrait">Force Portrait (9:16)</option>
-                                <option value="landscape">Force Landscape (16:9)</option>
+                                <option value="auto" selected>Auto (Keep Source Shape)</option>
+                                <option value="portrait-blur">Force Portrait — Blurred fill (9:16)</option>
+                                <option value="portrait">Force Portrait — Bars (9:16)</option>
+                                <option value="landscape-blur">Force Landscape — Blurred fill (16:9)</option>
+                                <option value="landscape">Force Landscape — Bars (16:9)</option>
                             </select>
-                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">Use "Force Portrait" to fix
-                                sideways or squashed landscape files.</p>
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">"Auto" keeps each video's
+                                original shape (recommended). "Blurred fill" fills the frame with a blurred background;
+                                "Bars" adds plain black bars. Neither crops the video.</p>
                         </div>
 
                         <div class="setting-item" id="clipLengthGroup">
@@ -1405,10 +2095,6 @@
                             <div class="checkbox-item">
                                 <input type="checkbox" id="removeAudio">
                                 <label for="removeAudio">Remove Audio from Videos</label>
-                            </div>
-                            <div class="checkbox-item">
-                                <input type="checkbox" id="detectDuplicates" checked>
-                                <label for="detectDuplicates">Skip Duplicate Files</label>
                             </div>
                         </div>
                     </div>
@@ -1437,12 +2123,13 @@
                         <div class="setting-item">
                             <label>Metadata Strategy</label>
                             <select id="metadataMode">
-                                <option value="spoof" selected>Organic (Random Dates/Devices)</option>
-                                <option value="strip">Remove All (Strip for Privacy)</option>
+                                <option value="spoof" selected>Realistic device (recommended for AI clips)</option>
                                 <option value="keep">Keep Original (No Changes)</option>
+                                <option value="strip">Remove All (Strip for Privacy)</option>
                             </select>
-                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">"Organic" makes files look
-                                like authentic recordings.</p>
+                            <p style="font-size: 0.8rem; color: #718096; margin-top: 4px;">"Realistic device" gives the
+                                file matching iPhone/Pixel/Samsung camera info and removes hidden editing traces — so an
+                                AI-made or edited clip looks like it came straight off a real phone.</p>
                         </div>
                     </div>
 
@@ -1476,7 +2163,7 @@
                             </div>
 
                             <div class="setting-item">
-                                <label>Size (pixels)</label>
+                                <label>Size (px)</label>
                                 <input type="number" id="videoWatermarkSize" min="8" max="200" value="48"
                                     class="number-input" style="width: 80px;">
                             </div>
@@ -1527,111 +2214,150 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- ════ Frame Extractor (collapsible) ════ -->
+                    <div style="margin-top:14px;">
+                        <div id="fxPanel" style="display:none;margin-top:12px;">
+
+                            <!-- Extraction Settings only — files & output come from the parent system -->
+                            <div class="settings-group">
+                                <h4>⚙️ Frame Extraction Settings</h4>
+                                <div class="setting-item">
+                                    <label>Frame Count Mode</label>
+                                    <select id="fxFrameCountMode" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;width:100%;">
+                                        <option value="auto">Auto (Smart Formula)</option>
+                                        <option value="manual">Manual</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
+                                    <label>Manual Frame Count (per video)</label>
+                                    <input type="number" id="fxManualCount" value="30" min="1" max="500" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;">
+                                </div>
+                                <div class="setting-item">
+                                    <label>Extraction Method</label>
+                                    <select id="fxMethod" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;width:100%;">
+                                        <option value="even">Evenly Spaced (Recommended)</option>
+                                        <option value="interval">Every N Seconds</option>
+                                        <option value="scene">Scene Change Detection</option>
+                                        <option value="keyframes">Keyframes Only (Fast)</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item" id="fxIntervalGroup" style="display:none;">
+                                    <label>Interval (seconds)</label>
+                                    <input type="number" id="fxInterval" value="5" min="1" max="60" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;">
+                                </div>
+                                <div class="setting-item" id="fxSceneGroup" style="display:none;">
+                                    <label>Scene Threshold (0.1–0.9)</label>
+                                    <input type="range" id="fxSceneThreshold" min="0.1" max="0.9" step="0.05" value="0.3" class="slider">
+                                </div>
+                                <div class="setting-item">
+                                    <label>Output Format</label>
+                                    <select id="fxFormat" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;width:100%;">
+                                        <option value="jpg">JPG (Recommended)</option>
+                                        <option value="png">PNG (Lossless)</option>
+                                        <option value="webp">WebP</option>
+                                    </select>
+                                </div>
+                                <div class="setting-item">
+                                    <label>JPEG Quality: <span id="fxQualityVal">90%</span></label>
+                                    <input type="range" id="fxQuality" min="60" max="100" value="90" class="slider" oninput="document.getElementById('fxQualityVal').textContent=this.value+'%'">
+                                </div>
+                                <div class="setting-item">
+                                    <label>Output Resolution</label>
+                                    <select id="fxResolution" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;width:100%;">
+                                        <option value="original">Original</option>
+                                        <option value="1080p">1080p</option>
+                                        <option value="720p">720p</option>
+                                        <option value="480p">480p</option>
+                                    </select>
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                    <div class="setting-item">
+                                        <label>Skip First (sec)</label>
+                                        <input type="number" id="fxSkipStart" value="0" min="0" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;">
+                                    </div>
+                                    <div class="setting-item">
+                                        <label>Skip Last (sec)</label>
+                                        <input type="number" id="fxSkipEnd" value="0" min="0" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;">
+                                    </div>
+                                </div>
+                                <div class="fx-estimate-box" style="margin-top:8px;">📊 <span id="fxEstimateText">Load videos above to see estimate</span></div>
+                            </div>
+
+                            <!-- Batch Action Bar (appears after extraction) -->
+                        <div id="fxBatchBar">
+                <span id="fxBatchStats">0 frames</span>
+                <button class="btn btn-sm btn-success" id="fxKeepAllBtn">⭐ Star All</button>
+                <button class="btn btn-sm btn-secondary" id="fxInvertBtn">🔄 Toggle Stars</button>
+                <button class="btn btn-sm btn-danger" id="fxDeleteAllBtn">🗑️ Delete All</button>
+            </div>
+
+                            <!-- Review Grid (appears after extraction) -->
+                            <div id="fxReviewGrid" style="margin-top:10px;"></div>
+
+                        </div><!-- /fxPanel -->
+                    </div><!-- /fxPanel wrapper -->
+                    <!-- ════ End Frame Extractor ════ -->
+
+
                 </div>
             </div>
         </div>
 
-        <!-- Processing Section (Shared) -->
-        <div class="section process-section" id="processSection" style="display: none;">
-            <h3>🚀 Processing</h3>
-
-            <!-- Overall Progress Bar -->
-            <div class="overall-progress" id="overallProgress">
-                <h4>Overall Progress</h4>
-                <div class="overall-progress-bar">
-                    <div class="overall-progress-fill" id="overallProgressFill"></div>
-                </div>
-                <div class="overall-progress-text" id="overallProgressText">Ready to start...</div>
-            </div>
-
-            <div class="stats-grid" id="statsGrid">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalFiles">0</div>
-                    <div class="stat-label">Total Files</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="processedFiles">0</div>
-                    <div class="stat-label">Processed</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="outputFiles">0</div>
-                    <div class="stat-label">Output Files</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="timeElapsed">0s</div>
-                    <div class="stat-label">Time Elapsed</div>
-                </div>
-            </div>
-
-            <div class="buttons">
-                <button class="btn btn-secondary" id="selectOutputBtn">
-                    📁 Select Output Folder
-                </button>
-                <button class="btn btn-primary" id="startBtn" disabled>
-                    ▶️ Start Processing
-                </button>
-                <button class="btn btn-secondary" id="pauseBtn" disabled>
-                    ⏸️ Pause
-                </button>
-                <button class="btn btn-secondary" id="stopBtn" disabled>
-                    ⏹️ Stop
-                </button>
-                <button class="btn btn-success" id="openFolderBtn" disabled>
-                    📁 Open Output
-                </button>
-            </div>
-            <div id="outputFolderInfo"
-                style="text-align: center; margin-top: 10px; color: #718096; font-size: 0.9rem; display: none;">
-                <span id="outputFolderText"></span>
-            </div>
-
-            <div class="status-panel" id="statusPanel" style="display: none;">
-                <h4>📋 Processing Log</h4>
-                <div id="statusContent"
-                    style="max-height: 200px; overflow-y: auto; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; font-family: monospace; font-size: 0.9rem;">
-                </div>
+        <!-- Activity Log Section (separate, stays below settings) -->
+        <div class="section" id="activityLogSection" style="display: none; margin-top: 10px;">
+            <h3><svg class="h-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Activity</h3>
+            <div id="statusContent"
+                style="max-height: 200px; overflow-y: auto; background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.8rem;">
             </div>
         </div>
+
+
+        <!-- Lightbox overlay (global) -->
+        <div id="fxLightbox">
+            <img id="fxLightboxImg" src="" alt="Frame Preview">
+            <div id="fxLightboxInfo"></div>
+            <div class="fx-lb-bar">
+                <button class="btn btn-secondary" onclick="fxLightboxPrev()">&#8592; Prev</button>
+                <button class="btn btn-success" id="fxLbKeep" onclick="fxLightboxKeep()">⭐ Favourite</button>
+                <button class="btn btn-danger" id="fxLbDelete" onclick="fxLightboxDelete()">🗑 Delete Permanently</button>
+                <button class="btn btn-secondary" onclick="fxLightboxNext()">Next &#8594;</button>
+                <button class="btn btn-secondary" onclick="fxCloseLightbox()">&#10005; Close</button>
+            </div>
+            <div class="fx-lb-hint">&#8592; &#8594; navigate &nbsp;&middot;&nbsp; K = keep &nbsp;&middot;&nbsp; D = delete &nbsp;&middot;&nbsp; Esc = close</div>
+        </div>
+
 
         <!-- Footer inside app-container -->
-        <div class="footer">
+        <div class="footer" id="appFooter">
             <div class="footer-content">
-                <span>Powered by</span>
-                <img src="logo.png" alt="Pony Agency" class="footer-logo" id="footerLogo">
-                <span class="company-name">Pony Agency</span>
+                <span><b>Morph</b> — a</span>
+                <svg width="15" height="15" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="vertical-align:-2px">
+                    <rect x="0" y="0" width="52" height="52" rx="15" fill="#12a56b"/>
+                    <path d="M26 40 V22" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>
+                    <path d="M26 24 C26 15 33 10 41 11 C41 20 34 25 26 24 Z" fill="#fff"/>
+                    <path d="M26 28 C26 20 20 15 12 16 C12 24 18 29 26 28 Z" fill="#bff0da"/>
+                </svg>
+                <span><span class="company-name">Thrive</span> app</span>
             </div>
         </div>
 
     </div> <!-- Closes app-container -->
 
     <script src="renderer.js"></script>
+    <script src="frame-extractor.js"></script>
     <script>
-        // Check if logo exists and show it in footer
-        document.addEventListener('DOMContentLoaded', function () {
-            const footerLogo = document.getElementById('footerLogo');
-
-            // Try multiple possible logo names
-            const logoNames = ['logo.png', 'logo.jpg', 'logo.jpeg', 'icon.png'];
-
-            function tryNextLogo(index) {
-                if (index >= logoNames.length) {
-                    footerLogo.style.display = 'none';
-                    return;
-                }
-
-                const img = new Image();
-                img.onload = function () {
-                    footerLogo.src = logoNames[index];
-                    footerLogo.classList.add('show');
-                };
-                img.onerror = function () {
-                    tryNextLogo(index + 1);
-                };
-                img.src = logoNames[index];
-            }
-
-            tryNextLogo(0);
-        });
+        // Light/dark toggle — flips data-theme on <html> and remembers the choice.
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                if (isDark) document.documentElement.removeAttribute('data-theme');
+                else document.documentElement.setAttribute('data-theme', 'dark');
+                try { localStorage.setItem('morph-theme', isDark ? 'light' : 'dark'); } catch (e) { }
+            });
+        })();
     </script>
 </body>
 

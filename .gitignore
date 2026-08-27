@@ -109,3 +109,11 @@ temp-ffmpeg/
 MediaSpoofer_Output/
 null/
 undefined/
+# Session debug/scratch artifacts (local only)
+crash.log
+fix-encoding.js
+probe_json.txt
+probe_output.txt
+original_photo.heic
+wrong_photo1.jpg
+wrong_photo2.jpg
