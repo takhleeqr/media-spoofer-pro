@@ -44,6 +44,10 @@
       "!ffmpeg*",
       "!ffprobe*"
     ],
+    "asarUnpack": [
+      "mediapipe/**",
+      "fonts/**"
+    ],
     "win": {
       "target": "nsis",
       "icon": "logo.png",
@@ -107,6 +111,7 @@
     }
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.14",
     "sharp": "^0.35.3"
   }
 }

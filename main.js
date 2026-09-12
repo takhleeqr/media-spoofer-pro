@@ -5,6 +5,10 @@ const fs = require('fs');
 // ── Crash logger: captures crashes to Desktop where it's always writable ──
 const os = require('os');
 const CRASH_LOG = path.join(os.homedir(), 'Desktop', 'spoofer-crash.log');
+// GPU acceleration is OFF: the export encoder (Intel QuickSync) needs the Intel
+// graphics chip free — with acceleration ON, window compositing + the looping
+// preview fight the encoder for that same chip and exports get DRAMATICALLY slower
+// (~15s → minutes). UI smoothness is handled by keeping the interface light instead.
 app.disableHardwareAcceleration();
 function writeCrash(type, err) {
     const msg = `[${new Date().toISOString()}] ${type}\n${err?.stack || err}\n\n`;
@@ -301,6 +305,19 @@ ipcMain.handle('write-file', async (event, filePath, data) => {
         return true;
     } catch (error) {
         console.error('write-file error:', error);
+        throw new Error(`Failed to write file: ${error.message}`);
+    }
+});
+
+// Write a base64 payload as real binary (used by the AI beauty pass to save
+// processed video frames the renderer produces as JPEGs).
+ipcMain.handle('write-file-base64', async (event, filePath, b64) => {
+    try {
+        const normalizedPath = filePath.replace(/\\/g, '/');
+        await fs.promises.writeFile(normalizedPath, Buffer.from(b64, 'base64'));
+        return true;
+    } catch (error) {
+        console.error('write-file-base64 error:', error);
         throw new Error(`Failed to write file: ${error.message}`);
     }
 });

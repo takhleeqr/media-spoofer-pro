@@ -7,6 +7,10 @@ let modeSelection, imageInterface, videoInterface, processSection;
 // Global variables for preview navigation
 let currentPreviewIndex = 0;
 
+// Tracks the Text card's on/off state so the per-video caption inputs in the file
+// list are shown/hidden (rebuilt) only when it actually toggles.
+let _lastTextCardOn = false;
+
 // Global variables for enhanced progress tracking
 let progressStartTime = 0;
 let progressUpdateInterval = null;
@@ -202,6 +206,10 @@ function showPreview(filePath, mode) {
         const previewUrl = toPreviewUrl(filePath);
 
         if (isImage) {
+            previewIsVideo = false;
+            previewSourceDims = null;
+            const noteEl = document.getElementById('previewNote');
+            if (noteEl) noteEl.style.display = 'none';
             if (videoPreview) { videoPreview.style.display = 'none'; clearMediaElementSource(videoPreview); }
 
             if (isHeic && imagePreview) {
@@ -236,46 +244,66 @@ function showPreview(filePath, mode) {
                     imagePreview.src = previewUrl;
                 }
             }
+        } else if (previewEditMode) {
+            // Live WYSIWYG mode: renderEditPreview shows the raw source INSTANTLY
+            // (no black wait), skips the ffmpeg render when nothing needs it, and
+            // otherwise renders the edits in the background and swaps them in.
+            previewIsVideo = true;
+            renderEditPreview();
+            updateNavigationButtons('media');
+            return;
         } else {
-            // Convert to file:// URL — raw Windows paths can crash the GPU decoder on some codecs
+            // POSTER-FIRST, then a PLAYABLE PROXY if needed. Show the still thumbnail
+            // immediately (no phantom controls). Try to play the original directly;
+            // if the built-in player can't decode it (HEVC/H.265), transcode a small
+            // H.264 preview copy and play that — so controls + scrubbing work.
+            previewIsVideo = true;
+            previewSourceDims = null;
+            if (imagePreview) { imagePreview.style.display = 'block'; clearMediaElementSource(imagePreview); }
             if (videoPreview) {
-                videoPreview.style.display = 'block';
+                videoPreview.style.display = 'none';
+                videoPreview.removeAttribute('controls');
                 clearMediaElementSource(videoPreview);
-                videoPreview.preload = 'metadata';
-                videoPreview.removeAttribute('poster');
-                videoPreview.src = previewUrl;
-                videoPreview.load();
             }
-            if (imagePreview) { imagePreview.style.display = 'none'; clearMediaElementSource(imagePreview); }
+            const noteEl = document.getElementById('previewNote');
+            if (noteEl) noteEl.style.display = 'none';
 
-            // Some videos (HEVC/H.265 — e.g. Pixel .TS.mp4) can't be decoded by the
-            // built-in player and render as a black box. Generate an ffmpeg poster
-            // frame: use it as the <video> poster for playable clips, and swap to a
-            // still image if the video can't paint a frame at all.
-            const usePosterImage = async () => {
+            // Thumbnail now (also gives us the true source display size).
+            generateVideoPoster(filePath).then(poster => {
                 if (currentPreviewRequest !== filePath) return;
-                const poster = await generateVideoPoster(filePath);
-                if (currentPreviewRequest !== filePath || !poster) return;
-                const purl = toPreviewUrl(poster);
-                if (imagePreview) { imagePreview.style.display = 'block'; imagePreview.src = purl; }
-                if (videoPreview) videoPreview.style.display = 'none';
-                if (typeof refreshPreviewGeometry === 'function') setTimeout(refreshPreviewGeometry, 60);
-            };
+                if (poster && imagePreview) imagePreview.src = toPreviewUrl(poster);
+                if (typeof refreshPreviewGeometry === 'function') setTimeout(refreshPreviewGeometry, 40);
+            });
+
             if (videoPreview) {
-                videoPreview.addEventListener('error', usePosterImage, { once: true });
-                generateVideoPoster(filePath).then(poster => {
-                    if (currentPreviewRequest === filePath && poster && videoPreview) {
-                        videoPreview.setAttribute('poster', toPreviewUrl(poster));
-                    }
-                });
-                // Backup: an undecodable clip can load metadata yet never paint —
-                // if there's still no frame size shortly after, fall back to the image.
-                setTimeout(() => {
-                    if (currentPreviewRequest === filePath && videoPreview &&
-                        videoPreview.style.display !== 'none' && !videoPreview.videoWidth) {
-                        usePosterImage();
-                    }
-                }, 1500);
+                let upgraded = false;
+                const showPlayer = () => {
+                    if (currentPreviewRequest !== filePath || !videoPreview || !videoPreview.videoWidth) return;
+                    upgraded = true;
+                    if (noteEl) noteEl.style.display = 'none';
+                    videoPreview.setAttribute('controls', '');
+                    videoPreview.style.display = 'block';
+                    if (imagePreview) imagePreview.style.display = 'none';
+                    if (typeof refreshPreviewGeometry === 'function') refreshPreviewGeometry();
+                };
+                // 1) Try the original directly (fast path for H.264/decodable clips).
+                videoPreview.preload = 'auto';
+                videoPreview.src = previewUrl;
+                videoPreview.addEventListener('loadeddata', showPlayer, { once: true });
+                videoPreview.load();
+
+                // 2) If it didn't start playing shortly, build an H.264 proxy and play that.
+                setTimeout(async () => {
+                    if (currentPreviewRequest !== filePath || upgraded || (videoPreview && videoPreview.videoWidth)) return;
+                    if (noteEl) noteEl.style.display = 'block'; // "Preparing preview…"
+                    const proxy = await generatePlayableProxy(filePath);
+                    if (currentPreviewRequest !== filePath || upgraded || !proxy || !videoPreview) { if (noteEl && currentPreviewRequest === filePath) noteEl.style.display = 'none'; return; }
+                    clearMediaElementSource(videoPreview);
+                    videoPreview.preload = 'auto';
+                    videoPreview.src = toPreviewUrl(proxy);
+                    videoPreview.addEventListener('loadeddata', showPlayer, { once: true });
+                    videoPreview.load();
+                }, 900);
             }
         }
 
@@ -502,6 +530,48 @@ async function generateVideoPoster(videoPath) {
     return res;
 }
 
+// Transcode a small, universally-playable H.264 proxy for videos the built-in
+// player can't decode (HEVC/H.265). Uses the GPU chip when available and caps the
+// long edge at 1280 so it's fast and small; the real (full-res) processing is
+// unaffected. Cached; concurrent calls share one ffmpeg run.
+async function generatePlayableProxy(videoPath) {
+    if (videoProxyCache.has(videoPath)) {
+        const prev = await videoProxyCache.get(videoPath);
+        if (prev && await electronAPI.exists(prev)) return prev;
+        videoProxyCache.delete(videoPath);
+    }
+    const job = (async () => {
+        try {
+            if (!ffmpegPath) return null;
+            const tempDir = await electronAPI.getTempDir();
+            const base = (videoPath.split(/[\\/]/).pop() || 'video').replace(/\.[^.]+$/, '');
+            const uniq = Date.now() + '_' + Math.floor(Math.random() * 10000);
+            const out = path.join(tempDir, `preview_${uniq}_${base}.mp4`);
+            // Display-normalize (correct shape/square pixels) then cap the long edge
+            // at 1280 (never upscales).
+            const cap = "scale=w='if(gt(iw\\,ih)\\,min(1280\\,iw)\\,-2)':h='if(gt(iw\\,ih)\\,-2\\,min(1280\\,ih))'";
+            const vArgs = (hwEncoder === 'h264_qsv')
+                ? ['-c:v', 'h264_qsv', '-global_quality', '28', '-preset', 'veryfast', '-pix_fmt', 'nv12']
+                : (hwEncoder === 'h264_nvenc')
+                    ? ['-c:v', 'h264_nvenc', '-rc', 'vbr', '-cq', '30', '-preset', 'p5', '-pix_fmt', 'yuv420p']
+                    : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-pix_fmt', 'yuv420p'];
+            const cmd = ['-y', '-i', videoPath,
+                '-vf', SAR_NORMALIZE + ',' + cap,
+                ...vArgs,
+                '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
+                '-movflags', '+faststart',
+                out];
+            await spawnFFmpeg(cmd);
+            if (await electronAPI.exists(out)) { videoPreviewTempFiles.push(out); return out; }
+        } catch (e) { console.warn('Preview proxy generation failed:', e); }
+        return null;
+    })();
+    videoProxyCache.set(videoPath, job);
+    const res = await job;
+    if (!res) videoProxyCache.delete(videoPath);
+    return res;
+}
+
 // Helper function to spawn FFmpeg process securely
 async function spawnFFmpeg(command) {
     try {
@@ -546,12 +616,26 @@ let appReady = false;
 let usedOutputPaths = new Set();   // every path handed out this run (lowercased)
 let attemptOutputs = [];           // paths created during the current file attempt
 let systemFontPath = null;         // resolved TTF path for watermark text (per-platform)
+let bundledFontsDir = null;        // real-disk path to the bundled caption fonts (fonts/)
+// Caption fonts bundled with the app (family label -> ttf filename in fonts/).
+const CAPTION_FONTS = {
+    'Montserrat': 'Montserrat.ttf', 'Poppins': 'Poppins.ttf', 'Inter': 'Inter.ttf',
+    'Archivo Black': 'ArchivoBlack.ttf', 'League Spartan': 'LeagueSpartan.ttf', 'Rubik': 'Rubik.ttf',
+    'Bebas Neue': 'BebasNeue.ttf', 'Anton': 'Anton.ttf', 'Oswald': 'Oswald.ttf',
+    'Barlow Condensed': 'BarlowCondensed.ttf', 'Kanit': 'Kanit.ttf', 'Caveat': 'Caveat.ttf',
+    'Dancing Script': 'DancingScript.ttf', 'Pacifico': 'Pacifico.ttf', 'Bangers': 'Bangers.ttf'
+};
 let hwEncoder = null;              // detected hardware H.264 encoder (e.g. 'h264_qsv') or null
 let elapsedBeforePause = 0;        // accumulated seconds across pause/resume
 let lastShownPreviewPath = null;   // guard so we don't reload/re-convert the same preview
 const heicPreviewCache = new Map(); // source HEIC path -> converted temp JPEG (preview)
 const videoPosterCache = new Map(); // source video path -> Promise<temp JPG poster | null>
-let videoPreviewTempFiles = [];     // poster JPGs made for previews, for cleanup
+const videoProxyCache = new Map();  // source video path -> Promise<temp playable H.264 mp4 | null>
+let videoPreviewTempFiles = [];     // poster JPGs / proxies made for previews, for cleanup
+let previewIsVideo = false;         // is the current preview a video (vs an image)?
+let previewSourceDims = null;       // the video's true display size, so crop math stays correct
+let previewCropDims = null;         // SAR-normalized source display size (crop-value space) for the live-crop preview
+                                    // even when a downscaled playable proxy is shown
 const heicProcessCache = new Map(); // source HEIC path -> temp JPEG (processing, per run)
 let heicTempFiles = [];             // all HEIC temp JPEGs created this run, for cleanup
 let appInitializationPromise = Promise.resolve();
@@ -622,6 +706,15 @@ async function initializeFFmpegPaths() {
     } catch (e) {
         console.warn('Watermark font resolution failed:', e.message);
     }
+
+    // Resolve the bundled caption-fonts folder on real disk (ffmpeg is an external
+    // process, so it can't read fonts from inside app.asar → they're asarUnpack'd).
+    try {
+        const appPath = await electronAPI.getAppPath();
+        const base = appPath.includes('app.asar') ? appPath.replace('app.asar', 'app.asar.unpacked') : appPath;
+        bundledFontsDir = base.replace(/\\/g, '/').replace(/\/$/, '') + '/fonts';
+        console.log('Bundled fonts dir:', bundledFontsDir);
+    } catch (e) { console.warn('Bundled fonts dir resolution failed:', e.message); }
 
     // Enhanced debugging for all platforms
     let ffmpegExists = false;
@@ -962,6 +1055,9 @@ function syncComposeToLegacy() {
     const nameInput = document.getElementById('cxNaming');
     if (nameInput) { nameInput.disabled = keepName; nameInput.style.opacity = keepName ? '0.45' : '1'; }
 
+    // Clip length for splitting -> the legacy control the engine reads.
+    setV('clipLength', val('cxClipLen', '6-8'));
+
     // Derive the processing mode from output + make-unique.
     let vMode;
     if (output === 'frames') vMode = 'extract-frames';
@@ -984,8 +1080,79 @@ function syncComposeToLegacy() {
         }
     }
     updateComposeSummary(output, makeUnique);
-    // Toggling the Crop card (or any change) refreshes its live preview overlay.
+    // Bulk per-video text: typing in the Text card edits the CURRENT video's own
+    // caption; mirror it onto the file + its per-row input (kept in sync).
+    const _cxTextEl = document.getElementById('cxText');
+    const _curFile = selectedFiles[currentPreviewIndex];
+    if (_cxTextEl && _curFile && _curFile.type === 'video') {
+        _curFile.captionText = _cxTextEl.value;
+        const _row = document.getElementById('caprow-' + currentPreviewIndex);
+        if (_row && _row.value !== _cxTextEl.value) _row.value = _cxTextEl.value;
+    }
+    // Toggling the Text card shows/hides the per-row caption inputs → rebuild list.
+    const _textOnNow = !!document.querySelector('.cx-c[data-card="text"].on');
+    if (_textOnNow !== _lastTextCardOn) { _lastTextCardOn = _textOnNow; updateFileList(); }
+    // Toggling the Crop card (or any change) refreshes its live preview overlay,
+    // reshapes the preview box (live crop is instant, no ffmpeg), then repositions
+    // the caption inside it.
     if (typeof updateCropOverlay === 'function') updateCropOverlay();
+    if (typeof updatePreviewSize === 'function') updatePreviewSize();
+    // On-screen text is a live overlay — update it instantly (no render wait).
+    if (typeof updateCaptionOverlay === 'function') updateCaptionOverlay();
+    // Any edit change re-renders the live WYSIWYG base preview (debounced; skips
+    // the render when only the text changed).
+    if (typeof scheduleEditPreview === 'function') scheduleEditPreview();
+}
+
+// ===== Manual cut ranges (Split → "Manual cuts") =====
+// Each row is a start/end (seconds); every range becomes its own exported video
+// with the SAME edits applied. Ranges may overlap and be in any order.
+function addCutRow(start, end) {
+    const rows = document.getElementById('cxCutRows');
+    if (!rows) return;
+    const row = document.createElement('div');
+    row.className = 'cx-cut-row';
+    row.style.cssText = 'display:flex; gap:8px; align-items:center; margin-bottom:6px;';
+    const sVal = (start != null && start !== '') ? start : '';
+    const eVal = (end != null && end !== '') ? end : '';
+    row.innerHTML =
+        '<span class="l" style="min-width:38px">Start</span>' +
+        '<input class="cx-in cx-cut-start" type="number" min="0" step="1" placeholder="0" style="width:78px" value="' + sVal + '">' +
+        '<span class="l" style="min-width:24px">End</span>' +
+        '<input class="cx-in cx-cut-end" type="number" min="0" step="1" placeholder="end" style="width:78px" value="' + eVal + '">' +
+        '<button type="button" class="cx-cut-del btn btn-secondary" title="Remove this cut" style="padding:5px 9px; font-size:.75rem;">✕</button>';
+    row.querySelector('.cx-cut-del').addEventListener('click', () => { row.remove(); if (typeof syncComposeToLegacy === 'function') syncComposeToLegacy(); });
+    row.querySelectorAll('input').forEach(inp => { inp.addEventListener('input', syncComposeToLegacy); inp.addEventListener('change', syncComposeToLegacy); });
+    rows.appendChild(row);
+}
+
+// Read the manual cut rows into [{start, end|null}], skipping blank rows.
+function readManualCuts() {
+    const out = [];
+    document.querySelectorAll('#cxCutRows .cx-cut-row').forEach(r => {
+        const sV = (r.querySelector('.cx-cut-start') || {}).value;
+        const eV = (r.querySelector('.cx-cut-end') || {}).value;
+        if ((sV == null || sV === '') && (eV == null || eV === '')) return; // blank row
+        const start = Math.max(0, parseFloat(sV) || 0);
+        const end = (eV == null || eV === '') ? null : parseFloat(eV);
+        out.push({ start, end });
+    });
+    return out;
+}
+
+// Show the manual-cuts editor only when the output is Split AND clip length is
+// "manual"; show the auto-length note otherwise.
+function updateManualCutsVisibility() {
+    const sel = document.getElementById('cxClipLen');
+    const ed = document.getElementById('cxManualCuts');
+    const note = document.getElementById('cxClipLenNote');
+    const onTile = document.querySelector('#cxOutput .o.on');
+    const splitOn = onTile && onTile.getAttribute('data-out') === 'split';
+    const manual = !!(splitOn && sel && sel.value === 'manual');
+    if (ed) ed.style.display = manual ? 'block' : 'none';
+    if (note) note.style.display = (splitOn && !manual) ? '' : 'none';
+    // Seed a couple of empty rows the first time the editor is shown.
+    if (manual) { const rows = document.getElementById('cxCutRows'); if (rows && !rows.children.length) { addCutRow(); addCutRow(); } }
 }
 
 function updateComposeSummary(output, makeUnique) {
@@ -1000,6 +1167,11 @@ function updateComposeSummary(output, makeUnique) {
     let lead = makeUnique ? `<b>${copies > 1 ? copies + ' unique copies' : '1 unique copy'}</b> of each ${output === 'split' ? 'video (split into clips)' : 'file'}` :
         (output === 'split' ? 'each video <b>split into clips</b>' : 'a processed <b>copy</b> of each file');
     parts.push(lead);
+    if (isOn('setcover')) parts.push('<b>custom cover</b>');
+    if (isOn('skinai')) parts.push('<b>AI-beautified</b>');
+    if (isOn('skin')) parts.push('<b>skin-smoothed</b>');
+    if (isOn('enhance')) parts.push('<b>enhanced</b>');
+    if (isOn('denoise')) parts.push('<b>noise-cleaned</b>');
     if (isOn('crop')) parts.push('<b>cropped</b>');
     if (isOn('shrink')) parts.push('<b>shrunk</b>');
     if (isOn('mirror')) parts.push('<b>mirrored</b>');
@@ -1009,6 +1181,7 @@ function updateComposeSummary(output, makeUnique) {
     if (isOn('loop')) parts.push('<b>looped</b>');
     if (isOn('mute')) parts.push('<b>muted</b>');
     if (isOn('reframe')) parts.push('<b>reframed</b>');
+    if (isOn('text')) parts.push('<b>captioned</b>');
     if (isOn('watermark')) parts.push('<b>watermarked</b>');
     if (isOn('logo')) parts.push('<b>logo-stamped</b>');
     if (isOn('music')) parts.push('<b>new music</b>');
@@ -1018,8 +1191,11 @@ function updateComposeSummary(output, makeUnique) {
     if (s) s.innerHTML = 'You’ll get ' + parts.join(', ') + '.';
 }
 
-// Intrinsic (displayed) pixel size of whichever preview media is visible.
+// Intrinsic (displayed) pixel size of the current preview media. For videos we
+// return the TRUE source display size (captured from the poster) so crop math and
+// the preview box stay correct even when a downscaled playable proxy is showing.
 function getPreviewMediaDims() {
+    if (previewIsVideo && previewSourceDims && previewSourceDims.w) return previewSourceDims;
     const img = document.getElementById('image-preview');
     const vid = document.getElementById('video-preview');
     if (vid && vid.style.display !== 'none' && vid.videoWidth) return { w: vid.videoWidth, h: vid.videoHeight };
@@ -1027,28 +1203,355 @@ function getPreviewMediaDims() {
     return null;
 }
 
-// Size the preview box to the media's true shape so landscape videos get a wide
-// box and portrait a tall one — instead of everything squeezed into a fixed
-// portrait frame. Fills the column width, capped by a max height.
+// Live crop as FRACTIONS of the true source display size (previewCropDims) — so it
+// matches the export regardless of the downscaled preview proxy's pixel size. Only
+// while editing a video with the Crop card on and non-zero values; null otherwise.
+function getCropFrac() {
+    const card = document.querySelector('.cx-c[data-card="crop"]');
+    const src = previewCropDims;
+    if (!(previewEditMode && previewIsVideo && card && card.classList.contains('on') && src && src.w && src.h)) return null;
+    const gv = id => Math.max(0, parseInt((document.getElementById(id) || {}).value) || 0);
+    const MIN = 16;
+    let t = gv('cxCropTop'), b = gv('cxCropBottom'), l = gv('cxCropLeft'), r = gv('cxCropRight');
+    t = Math.min(t, src.h - MIN); b = Math.min(b, Math.max(0, src.h - MIN - t));
+    l = Math.min(l, src.w - MIN); r = Math.min(r, Math.max(0, src.w - MIN - l));
+    t = Math.max(0, t); b = Math.max(0, b); l = Math.max(0, l); r = Math.max(0, r);
+    if (!(t || b || l || r)) return null;
+    return { ft: t / src.h, fb: b / src.h, fl: l / src.w, fr: r / src.w, keptW: src.w - l - r, keptH: src.h - t - b };
+}
+
+// Dimensions of what the preview BOX shows filled edge-to-edge = the cropped
+// (output) shape while live-cropping, else the full media shape.
+function getPreviewOutputDims() {
+    const full = getPreviewMediaDims();
+    if (!full) return null;
+    const cf = getCropFrac();
+    return cf ? { w: cf.keptW, h: cf.keptH } : full;
+}
+
+// Show the crop live by scaling/offsetting the media inside the (overflow-hidden)
+// wrapper so ONLY the kept region fills it — instant, no ffmpeg. Uses FRACTIONS so
+// the proxy's real pixel size is irrelevant. Resets to a contained fit when off.
+function applyLiveCrop(wrap) {
+    const vid = document.getElementById('video-preview');
+    const img = document.getElementById('image-preview');
+    const reset = (el) => { if (!el) return; el.style.position = ''; el.style.width = '100%'; el.style.height = '100%'; el.style.left = ''; el.style.top = ''; el.style.objectFit = 'contain'; };
+    const cf = getCropFrac();
+    if (!cf) { reset(vid); reset(img); return; }
+    const media = previewIsVideo ? vid : img;
+    reset(previewIsVideo ? img : vid);
+    if (!media) return;
+    const cw = wrap.clientWidth, ch = wrap.clientHeight;
+    const fw = 1 - cf.fl - cf.fr, fh = 1 - cf.ft - cf.fb; // kept width/height as fractions
+    media.style.position = 'absolute';
+    media.style.objectFit = 'fill';
+    media.style.width = (cw / fw) + 'px';
+    media.style.height = (ch / fh) + 'px';
+    media.style.left = (-cf.fl * (cw / fw)) + 'px';
+    media.style.top = (-cf.ft * (ch / fh)) + 'px';
+}
+
+// Size the preview box to the OUTPUT shape (cropped while editing, else the media's
+// true shape) so landscape videos get a wide box and portrait a tall one — capped
+// by a max height — then apply the live crop inside it.
 function updatePreviewSize() {
     const wrap = document.querySelector('.preview-wrapper');
     if (!wrap) return;
-    const dims = getPreviewMediaDims();
+    const dims = getPreviewOutputDims();
     if (!dims || !dims.w || !dims.h) return;
     const container = wrap.parentElement; // .preview-container
+    // Width always follows whatever column the preview currently sits in (the
+    // layout classes / DOM move do the reshaping — see applyPreviewLayout). The
+    // height cap keeps the whole sticky section on screen so nothing hides:
+    //  - normal: 440px
+    //  - enlarged portrait: nearly the full viewport (tall reels)
+    //  - enlarged landscape: about half (it's wide & short anyway)
     const availW = Math.max(160, (container && container.clientWidth) || 300);
-    const maxH = 440;
+    const landscape = dims.w > dims.h;
+    let maxH;
+    if (previewExpanded) maxH = landscape ? window.innerHeight * 0.55 : Math.max(440, window.innerHeight - 220);
+    else maxH = 440;
     let w = availW, h = w * dims.h / dims.w;
     if (h > maxH) { h = maxH; w = h * dims.w / dims.h; }
     wrap.style.width = Math.round(w) + 'px';
     wrap.style.height = Math.round(h) + 'px';
+    applyLiveCrop(wrap);
 }
 
-// Preview media became ready or the window resized — refit the box AND the crop
-// overlay (which measures the box).
+// Reshape the layout for the current preview size + video orientation:
+//  - enlarged + portrait  → widen the preview column, squeeze the option cards
+//    (CSS class `portrait-big` on #unifiedInterface).
+//  - enlarged + landscape → move the whole preview section full-width into the
+//    slot above "What should we do to it?" (as wide as step 1).
+//  - otherwise            → preview back in its home spot in the files column.
+let _previewHome = null; // { parent, next } to restore the section on shrink
+function applyPreviewLayout() {
+    const ui = document.getElementById('unifiedInterface');
+    const sec = document.getElementById('previewSection');
+    const step2 = document.getElementById('cxOptionsStep');
+    const optionsParent = step2 && step2.parentNode; // #composeUI (tall → sticky works)
+    if (!ui || !sec) return;
+    const dims = getPreviewMediaDims();
+    const landscape = !!(dims && dims.w > dims.h);
+    const big = !!previewExpanded;
+    ui.classList.toggle('portrait-big', big && !landscape);
+    if (big && landscape && step2 && optionsParent) {
+        if (sec.parentNode !== optionsParent || sec.nextSibling !== step2) {
+            if (!_previewHome) _previewHome = { parent: sec.parentNode, next: sec.nextSibling };
+            optionsParent.insertBefore(sec, step2);
+        }
+    } else {
+        if (_previewHome && sec.parentNode !== _previewHome.parent) {
+            _previewHome.parent.insertBefore(sec, _previewHome.next);
+        }
+        _previewHome = null;
+    }
+}
+
+// Preview media became ready or the window resized — reshape the layout, refit
+// the box, then the crop + caption overlays (which measure the box).
 function refreshPreviewGeometry() {
+    applyPreviewLayout();
     updatePreviewSize();
     if (typeof updateCropOverlay === 'function') updateCropOverlay();
+    if (typeof updateCaptionOverlay === 'function') updateCaptionOverlay();
+}
+
+// Inject @font-face rules so the bundled caption fonts render in the live text
+// overlay exactly like the export uses them. Runs once.
+let _captionFontsInjected = false;
+function injectCaptionFonts() {
+    if (_captionFontsInjected) return;
+    _captionFontsInjected = true;
+    const css = Object.entries(CAPTION_FONTS).map(([fam, file]) =>
+        `@font-face{font-family:'${fam}';src:url('fonts/${file}');font-weight:normal;font-style:normal;font-display:swap;}`).join('\n');
+    const el = document.createElement('style'); el.textContent = css; document.head.appendChild(el);
+}
+
+// Live on-screen text overlay — instant (no ffmpeg), multi-line, positioned/styled
+// to match the exported caption as closely as the browser can. Reads the Text card.
+let _capRetry = 0;
+function updateCaptionOverlay() {
+    const ov = document.getElementById('captionOverlay');
+    if (!ov) return;
+    const card = document.querySelector('.cx-c[data-card="text"]');
+    const textEl = document.getElementById('cxText');
+    const txt = textEl ? textEl.value : '';
+    // Whether the caption SHOULD be visible is independent of whether we can
+    // measure the box yet — only hide when it genuinely shouldn't show.
+    const shouldShow = !!(card && card.classList.contains('on') && previewIsVideo && txt.trim());
+    if (!shouldShow) { ov.style.display = 'none'; _capRetry = 0; return; }
+
+    // Use the OUTPUT shape (cropped while editing) so the caption sits inside the
+    // cropped frame exactly like the export (text is applied after crop).
+    const dims = getPreviewOutputDims();
+    const wrap = ov.parentElement;
+    const ww = wrap ? wrap.clientWidth : 0, wh = wrap ? wrap.clientHeight : 0;
+    // Should be visible but the video/box isn't measurable this instant (mid
+    // reload, a just-applied resize, or a DOM move). Don't hide it permanently —
+    // retry over the next frames so it reappears on its own, no card toggle.
+    if (!dims || !dims.w || !dims.h || !ww || !wh) {
+        if (_capRetry++ < 120) requestAnimationFrame(updateCaptionOverlay);
+        return;
+    }
+    _capRetry = 0;
+    const scale = Math.min(ww / dims.w, wh / dims.h);
+    const rw = dims.w * scale, rh = dims.h * scale;
+    const ox = (ww - rw) / 2, oy = (wh - rh) / 2;
+    const V = (id, d) => { const e = document.getElementById(id); return e ? e.value : d; };
+    const C = (id) => { const e = document.getElementById(id); return !!(e && e.checked); };
+    const sizeFrac = ({ small: 0.045, medium: 0.065, large: 0.09 })[V('cxTextSize', 'medium')] || 0.065;
+    const align = V('cxTextAlign', 'center'), pos = V('cxTextPos', 'bottom');
+    const box = C('cxTextBox');
+    const M = 0.04, fontPx = sizeFrac * rh;
+
+    ov.style.display = 'block';
+    ov.style.fontFamily = `'${V('cxTextFont', 'Montserrat')}', sans-serif`;
+    ov.style.fontSize = fontPx + 'px';
+    ov.style.color = V('cxTextColor', '#ffffff');
+    ov.style.textAlign = align;
+    ov.style.textTransform = C('cxTextUpper') ? 'uppercase' : 'none';
+    ov.style.textShadow = C('cxTextOutline') ? '-1.5px -1.5px 0 #000,1.5px -1.5px 0 #000,-1.5px 1.5px 0 #000,1.5px 1.5px 0 #000' : '0 2px 4px rgba(0,0,0,.55)';
+    ov.style.background = box ? (V('cxTextBoxColor', '#000000') + '80') : 'transparent';
+    ov.style.padding = box ? `${fontPx * 0.18}px ${fontPx * 0.35}px` : '0';
+    ov.style.borderRadius = box ? '5px' : '0';
+    ov.textContent = txt;
+
+    // Width: constrain to the frame (minus margins) so long text wraps like a caption.
+    const maxW = rw - 2 * M * rw;
+    ov.style.maxWidth = maxW + 'px';
+    ov.style.width = box ? 'auto' : maxW + 'px';
+    const ow = ov.offsetWidth, oh = ov.offsetHeight;
+    // Horizontal placement (box hugs the text; non-box fills width and text-aligns).
+    let left = ox + M * rw;
+    if (box) left = align === 'center' ? ox + (rw - ow) / 2 : align === 'right' ? ox + rw - M * rw - ow : ox + M * rw;
+    ov.style.left = left + 'px';
+    // Vertical placement.
+    ov.style.top = (pos === 'top' ? oy + M * rh : pos === 'bottom' ? oy + rh - M * rh - oh : oy + (rh - oh) / 2) + 'px';
+}
+
+// ===== LIVE WYSIWYG PREVIEW =====
+// Renders the current file's first few seconds through the REAL export pipeline
+// (buildMasterFilter) at a small size, so the preview shows edits (text, crop,
+// colour, reframe…) exactly as they'll export — and plays smoothly. Debounced.
+let previewEditMode = true;
+let previewExpanded = false;
+let _prevRenderToken = 0;
+let _prevRenderTimer = null;
+let _prevRenderedPath = null;
+let _lastBaseKey = null;
+let _prevRawShownPath = null; // source currently shown raw (so we don't reload it every edit)
+let _prevShowingRendered = false; // is the <video> currently showing a rendered proxy?
+
+function scheduleEditPreview() {
+    if (!previewEditMode) return;
+    // Text is drawn live by the overlay, so refresh it instantly here.
+    if (typeof updateCaptionOverlay === 'function') updateCaptionOverlay();
+    clearTimeout(_prevRenderTimer);
+    _prevRenderTimer = setTimeout(renderEditPreview, 450);
+}
+
+// Does the current edit set actually need an ffmpeg render, or is the raw source
+// already what the preview should show? Crop + text are drawn live in the browser,
+// so they don't count. HEVC/HDR/anamorphic always need a render (the browser can't
+// play HEVC and the others change the frame). Spoof DNA isn't previewed.
+function _editNeedsRender(s, probe) {
+    if (probe && (/(hevc|h265)/i.test(probe.codec || '') || probe.hdr || probe.anamorphic)) return true;
+    return !!(
+        rotateFilter(s) || mirrorFilter(s) || resolutionFilter(s) ||
+        skinSmoothFilter(s) || enhanceFilter(s) || grainFilter(s) || speedVideoFilter(s) ||
+        (s.orientation && s.orientation !== 'auto') ||
+        (s.watermark && s.watermark.enabled)
+    );
+}
+
+// Fast encoder args for the tiny preview clip. Measured on this project: for a
+// ~3s preview, libx264 ultrafast beats the GPU encoders (h264_qsv/nvenc) because
+// their fixed hardware-init cost outweighs the encode savings on so few frames.
+function _previewEncodeArgs() {
+    return ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-pix_fmt', 'yuv420p'];
+}
+
+// Show the raw source in the <video> immediately (browser decodes H.264 instantly),
+// so the preview NEVER starts on a black screen. For a source the browser can't
+// decode (HEVC), drop a still poster in as the instant paint instead.
+function showRawInstant(f, token) {
+    const vid = document.getElementById('video-preview');
+    const img = document.getElementById('image-preview');
+    if (img) { img.style.display = 'none'; }
+    if (vid) {
+        vid.loop = false; vid.removeAttribute('poster'); vid.setAttribute('controls', '');
+        vid.style.display = 'block';
+        // Show the first frame, PAUSED. The user presses play when they want it —
+        // no autoplay, no looping (that kept the CPU/GPU busy for no reason).
+        vid.src = toPreviewUrl(f.path); vid.load();
+    }
+    previewIsVideo = true; previewSourceDims = null; _prevShowingRendered = false;
+    setTimeout(refreshPreviewGeometry, 60);
+    // Fallback: if the browser can't decode it (HEVC), it stays black — swap in a
+    // poster so there's always something visible until the render lands.
+    setTimeout(async () => {
+        if (token !== _prevRenderToken) return;
+        if (_prevShowingRendered) return;               // a rendered proxy already took over
+        if (vid && vid.videoWidth > 0) return;          // raw decoded fine
+        const poster = await generateVideoPoster(f.path);
+        if (token !== _prevRenderToken || _prevShowingRendered) return;
+        if (poster && vid && !(vid.videoWidth > 0)) {
+            if (img) { img.style.display = 'block'; img.src = toPreviewUrl(poster); }
+            vid.style.display = 'none';
+            setTimeout(refreshPreviewGeometry, 60);
+        }
+    }, 500);
+}
+
+async function renderEditPreview() {
+    if (!previewEditMode || isProcessing) return;
+    const f = selectedFiles[currentPreviewIndex];
+    if (!f || f.type !== 'video') return;
+    let s; try { s = getProcessingSettings('video'); } catch (e) { return; }
+    const token = ++_prevRenderToken;
+    const noteEl = document.getElementById('previewNote');
+    const vid = document.getElementById('video-preview');
+
+    // STEP 1 — instant first paint: on a NEW file, show the raw source right away
+    // (no black screen, no waiting for a render). Reset render state for the file.
+    if (_prevRawShownPath !== f.path) {
+        _prevRawShownPath = f.path;
+        if (_prevRenderedPath) { try { await electronAPI.unlink(_prevRenderedPath); } catch (e) {} }
+        _prevRenderedPath = null; _lastBaseKey = null;
+        showRawInstant(f, token);
+    }
+
+    try {
+        const probe = await probeVideo(f.path);
+        if (token !== _prevRenderToken) return; // superseded while probing
+        // True source display size so the live crop divides by the real height.
+        if (probe.dispW && probe.dispH) previewCropDims = { w: probe.dispW, h: probe.dispH };
+
+        // STEP 2 — skip the render entirely when the raw source already IS the
+        // preview (nothing but live crop/text active, and the browser can play it).
+        const sBase = Object.assign({}, s, {
+            textOverlay: Object.assign({}, s.textOverlay || {}, { enabled: false }),
+            crop: Object.assign({}, s.crop || {}, { enabled: false })
+        });
+        if (!_editNeedsRender(sBase, probe)) {
+            if (noteEl) noteEl.style.display = 'none';
+            // If a rendered proxy was showing, drop back to the raw source.
+            if (_prevShowingRendered) { showRawInstant(f, token); }
+            _lastBaseKey = null;
+            if (_prevRenderedPath) { try { await electronAPI.unlink(_prevRenderedPath); } catch (e) {} _prevRenderedPath = null; }
+            updateCaptionOverlay();
+            return;
+        }
+
+        // STEP 3 — a render is needed. Skip if the base filter is unchanged.
+        const filter = buildMasterFilter(sBase, null, probe.dar, false, probe.hdr);
+        const baseKey = f.path + '|' + filter;
+        if (baseKey === _lastBaseKey && _prevRenderedPath && _prevShowingRendered) {
+            if (noteEl) noteEl.style.display = 'none';
+            updateCaptionOverlay();
+            return;
+        }
+        _lastBaseKey = baseKey;
+        // The note sits over the ALREADY-VISIBLE raw video (not a black screen).
+        if (noteEl) { noteEl.textContent = 'Updating preview…'; noteEl.style.display = 'block'; }
+        // STEP 3 continued — small (480), short (3s) and low-fps (15) so it renders
+        // in ~1-2s, in the background over the already-visible video. fps=15 first
+        // halves the frames the filters have to process.
+        const cap = "scale='if(gt(iw\\,ih)\\,min(480\\,iw)\\,-2)':'if(gt(iw\\,ih)\\,-2\\,min(480\\,ih))'";
+        const tempDir = await electronAPI.getTempDir();
+        const out = path.join(tempDir, `editprev_${Date.now()}_${Math.floor(Math.random() * 1e5)}.mp4`);
+        await spawnFFmpeg(['-y', '-t', '3', '-i', f.path, '-vf', 'fps=15,' + filter + ',' + cap,
+            ..._previewEncodeArgs(), '-an', '-movflags', '+faststart', out]);
+        if (token !== _prevRenderToken) { try { await electronAPI.unlink(out); } catch (e) {} return; } // superseded
+        if (_prevRenderedPath) { try { await electronAPI.unlink(_prevRenderedPath); } catch (e) {} }
+        _prevRenderedPath = out;
+        const img = document.getElementById('image-preview');
+        if (img) img.style.display = 'none';
+        if (vid) {
+            vid.loop = false; vid.removeAttribute('poster'); vid.setAttribute('controls', '');
+            vid.style.display = 'block';
+            // First frame, PAUSED — the user plays it on demand (no autoplay/loop).
+            vid.src = toPreviewUrl(out); vid.load();
+        }
+        previewIsVideo = true; previewSourceDims = null; _prevShowingRendered = true;
+        if (noteEl) noteEl.style.display = 'none';
+        setTimeout(refreshPreviewGeometry, 60);
+    } catch (e) {
+        if (noteEl) noteEl.style.display = 'none';
+        console.warn('Edit preview render failed:', e && e.message);
+    }
+}
+
+// Enlarge/center the preview so text and fine edits are easy to judge. The
+// preview grows/shrinks IN PLACE within the preview column (not a modal) — just
+// a bigger height cap. The whole section is sticky, so it stays put while the
+// options scroll.
+function setPreviewExpanded(on) {
+    previewExpanded = on;
+    const btn = document.getElementById('prevExpandBtn');
+    if (btn) { btn.classList.toggle('on', on); btn.textContent = on ? '⤡ Smaller' : '⤢ Bigger'; }
+    refreshPreviewGeometry();
 }
 
 // Redraw the live crop overlay: dim the trimmed edges, outline what stays, and
@@ -1057,6 +1560,9 @@ function refreshPreviewGeometry() {
 function updateCropOverlay() {
     const overlay = document.getElementById('cropOverlay');
     if (!overlay) return;
+    // In live edit-preview, the crop is already baked into the rendered frame, so
+    // the drag-overlay would double up — hide it.
+    if (previewEditMode) { overlay.style.display = 'none'; return; }
     const wrapper = overlay.parentElement;
     const cropCard = document.querySelector('.cx-c[data-card="crop"]');
     const on = cropCard && cropCard.classList.contains('on');
@@ -1095,7 +1601,9 @@ function updateCropOverlay() {
 
 // On blur, snap any over-crop back to a value that keeps ≥16px on that axis.
 function clampCropInputs() {
-    const dims = getPreviewMediaDims();
+    // Use the TRUE source display size (crop-value space); in edit mode
+    // getPreviewMediaDims is the downscaled proxy, which would clamp too small.
+    const dims = previewCropDims || getPreviewMediaDims();
     if (!dims) return;
     const MINKEEP = 16;
     const clamp = (id, max) => { const el = document.getElementById(id); if (!el) return; let v = Math.max(0, parseInt(el.value) || 0); if (v > max) el.value = max; };
@@ -1103,23 +1611,257 @@ function clampCropInputs() {
     clamp('cxCropLeft', dims.w - MINKEEP); clamp('cxCropRight', dims.w - MINKEEP);
 }
 
+// Full visual filter for the cover picker so the candidate frames + the embedded
+// cover look EXACTLY like the export: geometry (crop/rotate/mirror) PLUS the
+// whole-frame skin smoothing, the enhance grade (colour/sharpen/glow/vignette),
+// grain, and the caption. Text timing is forced to "whole" so the caption always
+// shows on a still frame regardless of its playback window. (AI skin smoothing is
+// a separate per-frame pre-pass, so it can't be reflected on a single grabbed
+// frame — noted in the UI.)
+function coverVisualFilter(settings) {
+    const s = settings || {};
+    const sCover = Object.assign({}, s, {
+        textOverlay: s.textOverlay ? Object.assign({}, s.textOverlay, { timing: { mode: 'whole' } }) : undefined
+    });
+    return [
+        SAR_NORMALIZE,
+        cropFilter(sCover) || null,
+        rotateFilter(sCover) || null,
+        mirrorFilter(sCover) || null,
+        skinSmoothFilter(sCover) || null,
+        enhanceFilter(sCover) || null,
+        textOverlayFilter(sCover) || null,
+        grainFilter(sCover) || null,
+        'setsar=1'
+    ].filter(Boolean).join(',');
+}
+
+// Extract evenly-spaced candidate frames from a video for the cover picker.
+// Applies the same crop/rotate/mirror as the output so the picker shows what the
+// cover will actually look like (e.g. after edge-cropping).
+async function extractCoverCandidates(videoPath, settings) {
+    const tempDir = await electronAPI.getTempDir();
+    const dur = (await getVideoDuration(videoPath)) || 0;
+    const n = Math.max(10, Math.min(Math.round(dur / 3) || 10, 24)); // ~1 per 3s, 10–24
+    const geo = coverVisualFilter(settings || {});
+    const out = [];
+    for (let k = 0; k < n; k++) {
+        const t = dur > 0 ? +(dur * (k + 0.5) / n).toFixed(2) : 0;
+        const p = path.join(tempDir, `cand_${Date.now()}_${k}.jpg`);
+        try {
+            await spawnFFmpeg(['-y', '-ss', String(t), '-i', videoPath, '-frames:v', '1', '-vf', geo + ',scale=480:-2', '-q:v', '4', p]);
+            if (await electronAPI.exists(p)) { out.push({ time: t, path: p }); videoPreviewTempFiles.push(p); }
+        } catch (e) { /* skip a frame that fails */ }
+    }
+    return out;
+}
+
+// Open the cover-thumbnail picker for the currently previewed video.
+async function openCoverPicker() {
+    const f = selectedFiles[currentPreviewIndex];
+    if (!f || f.type !== 'video') { alert('Add a video and make sure it is the one showing in the Preview, then pick a frame.'); return; }
+    const modal = document.getElementById('coverPicker');
+    const grid = document.getElementById('cpGrid');
+    const statusEl = document.getElementById('cpStatus');
+    const lb = document.getElementById('cpLightbox');
+    grid.innerHTML = ''; lb.style.display = 'none';
+    statusEl.style.display = 'block'; statusEl.textContent = 'Extracting frames…';
+    modal.style.display = 'flex';
+
+    // Read the current crop/rotate/mirror so the candidates match the output framing.
+    let geoSettings = {};
+    try { geoSettings = getProcessingSettings('video') || {}; } catch (e) { }
+    const cands = await extractCoverCandidates(f.path, geoSettings);
+    if (!cands.length) { statusEl.textContent = 'Could not read frames from this video.'; return; }
+    statusEl.style.display = 'none';
+    cands.forEach(c => {
+        const img = document.createElement('img');
+        img.src = toPreviewUrl(c.path);
+        img.title = c.time.toFixed(1) + 's';
+        img.style.cssText = 'width:100%;height:auto;border-radius:8px;cursor:pointer;border:2px solid transparent;display:block';
+        img.addEventListener('click', () => openCoverLightbox(c, f));
+        grid.appendChild(img);
+    });
+}
+
+// Enlarge one candidate so the user can inspect it before choosing.
+function openCoverLightbox(c, f) {
+    const lb = document.getElementById('cpLightbox');
+    document.getElementById('cpBig').src = toPreviewUrl(c.path);
+    lb.style.display = 'flex';
+    document.getElementById('cpUse').onclick = () => {
+        f._thumbTime = c.time; // stored per-file; used at export
+        const card = document.querySelector('.cx-c[data-card="setcover"]');
+        if (card && !card.classList.contains('on')) card.classList.add('on');
+        const prev = document.getElementById('cxCoverPreview');
+        if (prev) { prev.src = toPreviewUrl(c.path); prev.style.display = 'inline-block'; }
+        const nm = document.getElementById('cxCoverName');
+        if (nm) nm.textContent = 'frame at ' + c.time.toFixed(1) + 's';
+        document.getElementById('coverPicker').style.display = 'none';
+        lb.style.display = 'none';
+        if (typeof syncComposeToLegacy === 'function') syncComposeToLegacy();
+    };
+}
+
+// ===== AI SKIN SMOOTHING (Phase 2) =====
+// Uses the bundled MediaPipe Selfie-Multiclass model to mask skin (face=class 3,
+// body=class 2) per frame, then applies the validated beauty look (face/body
+// split + frequency-separation + glow). Slow (AI per frame) but skin-targeted.
+let _skinSeg = null;
+async function getSkinSegmenter() {
+    if (_skinSeg) return _skinSeg;
+    const vision = await import('./mediapipe/vision_bundle.mjs');
+    const fileset = await vision.FilesetResolver.forVisionTasks('./mediapipe/wasm');
+    _skinSeg = await vision.ImageSegmenter.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: './mediapipe/selfie_multiclass_256x256.tflite', delegate: 'CPU' },
+        runningMode: 'IMAGE', outputCategoryMask: true, outputConfidenceMasks: false
+    });
+    return _skinSeg;
+}
+
+function loadImageEl(url) {
+    return new Promise((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error('frame load failed')); im.src = url; });
+}
+
+// Beautify one frame already drawn on ctx (W×H), using the AI skin mask. Same math
+// the test page validated: frequency separation (even tone, keep texture), face vs
+// body strength, glow, brighten, warmth — applied only on skin pixels.
+function beautifyFrame(ctx, W, H, mask, mw, mh, p) {
+    const bigR = Math.max(6, Math.round(W / 110)), smallR = Math.max(1, Math.round(W / 650));
+    const layer = (radius, extra = '') => { const c = document.createElement('canvas'); c.width = W; c.height = H; const cx = c.getContext('2d'); cx.filter = `blur(${radius}px)${extra}`; cx.drawImage(ctx.canvas, 0, 0); cx.filter = 'none'; return cx.getImageData(0, 0, W, H); };
+    const tone = layer(bigR), fine = layer(smallR), glow = layer(bigR * 2.2, ' brightness(1.22)');
+    const orig = ctx.getImageData(0, 0, W, H), out = ctx.createImageData(W, H);
+    const keep = p.keep, kGlow = p.glow * 0.55, kBright = p.bright * 0.45, kWarm = p.warm * 16;
+    const screen = (a, b) => 255 - (255 - a) * (255 - b) / 255;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        const cls = mask[Math.min(mh - 1, (y / H * mh) | 0) * mw + Math.min(mw - 1, (x / W * mw) | 0)];
+        if (cls !== 2 && cls !== 3) { out.data[i] = orig.data[i]; out.data[i + 1] = orig.data[i + 1]; out.data[i + 2] = orig.data[i + 2]; out.data[i + 3] = 255; continue; }
+        const amount = cls === 3 ? p.face : p.body;
+        for (let c = 0; c < 3; c++) {
+            const o = orig.data[i + c];
+            const hi = o - fine.data[i + c];
+            const ret = tone.data[i + c] + hi * keep;
+            let v = o * (1 - amount) + ret * amount;
+            if (kGlow) v = v * (1 - kGlow) + screen(v, glow.data[i + c]) * kGlow;
+            if (kBright) v = v + (255 - v) * kBright;
+            out.data[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
+        }
+        if (kWarm) { out.data[i] = Math.min(255, out.data[i] + kWarm); out.data[i + 2] = Math.max(0, out.data[i + 2] - kWarm); }
+        out.data[i + 3] = 255;
+    }
+    ctx.putImageData(out, 0, 0);
+}
+
+async function getSourceFps(videoPath) {
+    try {
+        const r = await electronAPI.spawnProcess(ffprobePath, ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=avg_frame_rate', '-of', 'default=nk=1:nw=1', videoPath]);
+        const [n, d] = (r.stdout || '').trim().split('/').map(Number);
+        const fps = d ? n / d : (n || 30);
+        return (fps && isFinite(fps) && fps > 0) ? Math.min(60, Math.round(fps * 1000) / 1000) : 30;
+    } catch (e) { return 30; }
+}
+
+// Extract CFR frames -> AI-smooth skin per frame -> reassemble with original audio.
+// Returns { outVideo, work } (work is the temp dir to delete afterwards).
+async function beautyPass(inputPath, s, onProgress) {
+    const seg = await getSkinSegmenter();
+    const fps = await getSourceFps(inputPath);
+    const fast = (s.skinAI.mode === 'fast');
+    const cap = fast ? 960 : 1600; // long-edge processing size
+    const tempDir = await electronAPI.getTempDir();
+    const work = path.join(tempDir, `beauty_${Date.now()}_${Math.floor(Math.random() * 1e6)}`);
+    const inDir = path.join(work, 'in'), outDir = path.join(work, 'out');
+    await electronAPI.mkdir(work); await electronAPI.mkdir(inDir); await electronAPI.mkdir(outDir);
+
+    const capF = `scale='if(gt(iw\\,ih)\\,min(${cap}\\,iw)\\,-2)':'if(gt(iw\\,ih)\\,-2\\,min(${cap}\\,ih))'`;
+    await spawnFFmpeg(['-y', '-i', inputPath, '-vf', SAR_NORMALIZE + ',' + capF, '-vsync', 'cfr', '-r', String(fps), '-q:v', '2', path.join(inDir, 'f_%06d.jpg')]);
+    const frames = (await electronAPI.readdir(inDir)).filter(f => /\.jpg$/i.test(f)).sort();
+    if (!frames.length) { try { await electronAPI.rmdir(work); } catch (e) {} throw new Error('AI skin smoothing: could not read frames from this video.'); }
+
+    const cv = document.createElement('canvas'); const ctx = cv.getContext('2d', { willReadFrequently: true });
+    const p = { face: s.skinAI.face, body: s.skinAI.body, keep: s.skinAI.keep, glow: s.skinAI.glow, bright: s.skinAI.bright, warm: s.skinAI.warm };
+    for (let idx = 0; idx < frames.length; idx++) {
+        if (!isProcessing) { try { await electronAPI.rmdir(work); } catch (e) {} throw new Error('cancelled'); }
+        const im = await loadImageEl(toPreviewUrl(path.join(inDir, frames[idx])));
+        cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+        ctx.drawImage(im, 0, 0);
+        const res = seg.segment(cv);
+        const mask = res.categoryMask.getAsUint8Array(); const mw = res.categoryMask.width, mh = res.categoryMask.height;
+        res.categoryMask.close();
+        beautifyFrame(ctx, cv.width, cv.height, mask, mw, mh, p);
+        await electronAPI.writeFileBase64(path.join(outDir, frames[idx]), cv.toDataURL('image/jpeg', 0.95).split(',')[1]);
+        if (onProgress && (idx % 2 === 0 || idx === frames.length - 1)) onProgress((idx + 1) / frames.length);
+    }
+
+    const outVideo = path.join(work, 'beautified.mp4');
+    await spawnFFmpeg(['-y', '-framerate', String(fps), '-i', path.join(outDir, 'f_%06d.jpg'), '-i', inputPath,
+        '-map', '0:v:0', '-map', '1:a:0?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-b:a', '160k', '-af', 'aresample=async=1:first_pts=0', '-shortest', '-movflags', '+faststart', outVideo]);
+    return { outVideo, work };
+}
+
 function setupComposeUI() {
     const compose = document.getElementById('composeUI');
     if (!compose) return;
+    injectCaptionFonts(); // make bundled fonts available to the live text overlay
+
+    // Cover-thumbnail picker wiring. Move the overlay to <body> so a transformed
+    // ancestor can't break its fixed centering (it was opening scrolled to the top).
+    const coverPickerEl = document.getElementById('coverPicker');
+    if (coverPickerEl && coverPickerEl.parentNode !== document.body) document.body.appendChild(coverPickerEl);
+    const coverPickBtn = document.getElementById('cxCoverPick');
+    if (coverPickBtn) coverPickBtn.addEventListener('click', openCoverPicker);
+    const cpClose = document.getElementById('cpClose');
+    if (cpClose) cpClose.addEventListener('click', () => { document.getElementById('coverPicker').style.display = 'none'; });
+    const cpBack = document.getElementById('cpBack');
+    if (cpBack) cpBack.addEventListener('click', () => { document.getElementById('cpLightbox').style.display = 'none'; });
+
+    // Live WYSIWYG preview: toggle + enlarge/center controls.
+    const editToggle = document.getElementById('prevEditToggle');
+    if (editToggle) editToggle.addEventListener('change', () => {
+        previewEditMode = editToggle.checked;
+        const f = selectedFiles[currentPreviewIndex];
+        // Force a fresh instant paint when turning edits back on.
+        _prevRawShownPath = null; _prevShowingRendered = false;
+        if (previewEditMode) { renderEditPreview(); }
+        else if (f) { lastShownPreviewPath = null; showPreview(f.path, f.type); } // back to raw source
+    });
+    const expandBtn = document.getElementById('prevExpandBtn');
+    if (expandBtn) expandBtn.addEventListener('click', () => setPreviewExpanded(!previewExpanded));
 
     // Crop card: wire the 4 inputs + preview-media load events to the live overlay.
     ['cxCropTop', 'cxCropBottom', 'cxCropLeft', 'cxCropRight'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            el.addEventListener('input', updateCropOverlay);
-            el.addEventListener('change', () => { clampCropInputs(); updateCropOverlay(); });
+            // Live: updatePreviewSize re-crops the box instantly (edit mode) and
+            // updateCaptionOverlay keeps any caption inside it; updateCropOverlay
+            // handles the drag-band overlay in raw (non-edit) mode.
+            const liveCrop = () => { updateCropOverlay(); updatePreviewSize(); updateCaptionOverlay(); };
+            el.addEventListener('input', liveCrop);
+            el.addEventListener('change', () => { clampCropInputs(); liveCrop(); });
         }
     });
     const vp = document.getElementById('video-preview');
     const ip = document.getElementById('image-preview');
     if (vp) vp.addEventListener('loadedmetadata', refreshPreviewGeometry);
-    if (ip) ip.addEventListener('load', refreshPreviewGeometry);
+    // A reloaded preview video reports real dimensions at loadeddata/playing —
+    // reposition the live caption then so it never stays hidden after a re-render.
+    if (vp) { vp.addEventListener('loadeddata', updateCaptionOverlay); vp.addEventListener('playing', updateCaptionOverlay); }
+    if (ip) ip.addEventListener('load', () => {
+        // When previewing a video, the shown image is its poster — capture the true
+        // display size here so crop math uses the source dims, not a scaled proxy's.
+        if (previewIsVideo && ip.naturalWidth) previewSourceDims = { w: ip.naturalWidth, h: ip.naturalHeight };
+        refreshPreviewGeometry();
+    });
     window.addEventListener('resize', refreshPreviewGeometry);
+    // Keep the live caption glued to the preview box through every size change
+    // (Bigger/Smaller, the landscape DOM move, window resize) without hunting call
+    // sites — repositioning whenever the box's measured size changes.
+    const pwrap = document.querySelector('.preview-wrapper');
+    if (pwrap && typeof ResizeObserver === 'function') {
+        new ResizeObserver(() => updateCaptionOverlay()).observe(pwrap);
+    }
 
     // Buttery scrolling: flag the body while the page is actively scrolling so the
     // CSS can suspend hover-lifts/transitions that would otherwise repaint under
@@ -1132,6 +1874,15 @@ function setupComposeUI() {
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+
+    // The live preview loops forever; when the window is minimised / hidden there's
+    // no reason to keep decoding+painting it, so pause it and resume when visible.
+    // This frees the CPU/GPU whenever you're not actually looking at the app.
+    document.addEventListener('visibilitychange', () => {
+        const vp = document.getElementById('video-preview');
+        if (!vp) return;
+        if (document.hidden) { try { vp.pause(); } catch (e) {} }
+    });
 
     // Move the frame-extractor panel INTO the compose options column so it flows
     // below the output selector when "Extract frames" is chosen (no overlap).
@@ -1215,17 +1966,28 @@ function setupComposeUI() {
             const noOpts = (out === 'frames' || out === 'audio' || out === 'thumb' || out === 'gif');
             if (optStep) optStep.style.display = noOpts ? 'none' : 'block';
             if (fxNote) fxNote.style.display = out === 'frames' ? 'block' : 'none';
+            // Clip-length chooser only makes sense when splitting into clips.
+            const clipRow = document.getElementById('cxClipLenRow');
+            if (clipRow) clipRow.style.display = (out === 'split') ? 'flex' : 'none';
+            updateManualCutsVisibility();
             syncComposeToLegacy();
         });
     });
+
+    // Manual-cuts editor: show/hide on clip-length change, and add rows.
+    const clipLenSel = document.getElementById('cxClipLen');
+    if (clipLenSel) clipLenSel.addEventListener('change', () => { updateManualCutsVisibility(); syncComposeToLegacy(); });
+    const addCutBtn = document.getElementById('cxAddCut');
+    if (addCutBtn) addCutBtn.addEventListener('click', () => { addCutRow(); syncComposeToLegacy(); });
 
     // Card toggles (skip static cards that are always on)
     document.querySelectorAll('.cx-c:not(.static) .cx-ch').forEach(h => {
         h.addEventListener('click', () => { h.closest('.cx-c').classList.toggle('on'); syncComposeToLegacy(); });
     });
 
-    // Any control change re-syncs
-    compose.querySelectorAll('select, input').forEach(el => {
+    // Any control change re-syncs (textarea included so the caption field fires
+    // live — the per-video caption edits flow through syncComposeToLegacy).
+    compose.querySelectorAll('select, input, textarea').forEach(el => {
         el.addEventListener('change', syncComposeToLegacy);
         el.addEventListener('input', syncComposeToLegacy);
     });
@@ -1714,9 +2476,40 @@ function setupProcessingControls() {
         selectOutputBtn.addEventListener('click', selectOutputFolder);
     }
 
-    // Prevent default drag behavior on document
-    document.addEventListener('dragover', (e) => e.preventDefault());
-    document.addEventListener('drop', (e) => e.preventDefault());
+    // Prevent default drag behavior on document + auto-scroll near the edges so
+    // you can drag a file to the drop zone even when scrolled down. A big top/bottom
+    // hot-zone (≈28% of the window, min 160px) with speed proportional to how close
+    // you are to the edge. Uses a timer (not requestAnimationFrame, which the OS
+    // throttles during a native drag) and capture-phase listeners (so it fires even
+    // over children that stop propagation).
+    let _dragScrollTimer = null, _dragScrollSpeed = 0;
+    const _startDragScroll = () => {
+        if (_dragScrollTimer) return;
+        _dragScrollTimer = setInterval(() => {
+            if (!_dragScrollSpeed) return;
+            const el = document.scrollingElement || document.documentElement;
+            el.scrollTop += _dragScrollSpeed; // scrolls the page regardless of scroller
+        }, 16);
+    };
+    const _stopDragScroll = () => { _dragScrollSpeed = 0; if (_dragScrollTimer) { clearInterval(_dragScrollTimer); _dragScrollTimer = null; } };
+    const _onDragOver = (e) => {
+        e.preventDefault();
+        const h = window.innerHeight;
+        const zone = Math.max(160, h * 0.28);
+        const maxStep = 42; // px per ~16ms tick at the very edge → fast
+        const y = e.clientY;
+        if (y <= 0 || y >= h) { _dragScrollSpeed = 0; return; }
+        if (y < zone) _dragScrollSpeed = -Math.ceil(maxStep * (1 - y / zone) + 4);
+        else if (y > h - zone) _dragScrollSpeed = Math.ceil(maxStep * (1 - (h - y) / zone) + 4);
+        else { _dragScrollSpeed = 0; return; }
+        _startDragScroll();
+    };
+    document.addEventListener('dragover', _onDragOver, true); // capture phase
+    document.addEventListener('drop', (e) => { e.preventDefault(); _stopDragScroll(); }, true);
+    document.addEventListener('dragleave', (e) => { if (e.relatedTarget === null) _stopDragScroll(); }, true);
+    document.addEventListener('dragend', _stopDragScroll, true);
+    window.addEventListener('mouseup', _stopDragScroll);
+    window.addEventListener('blur', _stopDragScroll);
 }
 
 // Output folder selection
@@ -2081,6 +2874,10 @@ function updateFileList() {
         return;
     }
 
+    // Per-video caption inputs appear only while the "Text on screen" card is on,
+    // so each video in the queue can carry its OWN caption (shared style).
+    const textOn = !!document.querySelector('.cx-c[data-card="text"].on');
+
     fileList.innerHTML = selectedFiles.map((file, index) => `
         <div class="file-item ${index === currentPreviewIndex ? 'active' : ''}" onclick="previewFileByClick(${index})" style="cursor: pointer;">
             <div class="file-info">
@@ -2105,6 +2902,10 @@ function updateFileList() {
                 </div>
                 <div class="progress-text" id="progress-text-${index}">${file.status || 'Ready'}</div>
             </div>
+            ${file.type === 'video' && textOn ? `
+            <div class="file-caption" onclick="event.stopPropagation()">
+                <textarea id="caprow-${index}" class="file-caption-input" rows="1" placeholder="Caption for this video (optional)…" oninput="setFileCaption(${index}, this.value)">${escapeHtml(file.captionText || '')}</textarea>
+            </div>` : ''}
         </div>
     `).join('');
 
@@ -2279,6 +3080,10 @@ async function startProcessing() {
 
     isProcessing = true;
     isPaused = false;
+    // Pause the looping preview during a job so it never competes with the export
+    // encoder for the CPU/GPU, and clear any lingering "Updating preview…" note.
+    try { const _vp = document.getElementById('video-preview'); if (_vp) _vp.pause(); } catch (e) {}
+    { const _n = document.getElementById('previewNote'); if (_n) _n.style.display = 'none'; }
     processedCount = 0;
     outputCount = 0;
     currentBatch = 0;
@@ -2506,8 +3311,32 @@ async function startProcessing() {
                         // processFile / generateOutputPathForBatch read file.type
                         // directly, so no shared currentMode toggling is needed —
                         // that makes concurrent files safe.
-                        const fileSettings = file.type === 'image' ? imageSettings : videoSettings;
-                        await processFile(file, batchDir, batch, i, fileSettings);
+                        let fileSettings = file.type === 'image' ? imageSettings : videoSettings;
+                        // Bulk per-video text: give THIS video its own caption
+                        // (shared style from the card). A blank/untouched row = no
+                        // caption on that video.
+                        if (file.type === 'video' && fileSettings.textOverlay && fileSettings.textOverlay.enabled) {
+                            fileSettings = Object.assign({}, fileSettings, {
+                                textOverlay: Object.assign({}, fileSettings.textOverlay, { text: (file.captionText != null ? file.captionText : '') })
+                            });
+                        }
+
+                        // AI skin smoothing (slow): beautify to a temp video first,
+                        // then run the rest of the pipeline on that. Kept as a
+                        // pre-pass so it stacks with every other option/output.
+                        let workFile = file;
+                        let beautyWork = null;
+                        if (fileSettings.skinAI && fileSettings.skinAI.enabled && file.type === 'video') {
+                            addStatusMessage(`✨ AI skin smoothing "${file.name}" — this runs on every frame, so it takes a few minutes…`, 'info');
+                            const bp = await beautyPass(file.path, fileSettings, (frac) => updateStepProgress(`Smoothing skin: ${file.name} (${Math.round(frac * 100)}%)`, Math.round(frac * 100)));
+                            beautyWork = bp.work;
+                            workFile = Object.assign(Object.create(Object.getPrototypeOf(file)), file, { path: bp.outVideo });
+                        }
+                        try {
+                            await processFile(workFile, batchDir, batch, i, fileSettings);
+                        } finally {
+                            if (beautyWork) { try { await electronAPI.rmdir(beautyWork); } catch (e) { /* temp cleanup */ } }
+                        }
 
                         // Verify the outputs actually exist and aren't empty — a
                         // 0-byte/broken file must not be reported as success.
@@ -2846,6 +3675,36 @@ async function applyExtrasPass(outputPath, settings) {
     }
 }
 
+// Embed a chosen frame as the video's cover image (the thumbnail players/Explorer
+// show). Extracts the frame fresh from the source at `time` (full quality), then
+// attaches it as MP4/MOV cover art with a stream-copy remux (no video re-encode,
+// so it composes with any other processing). mp4/mov only — other containers don't
+// carry attached-picture cover art, so it's skipped there.
+async function applyThumbnailPass(outputPath, sourcePath, time, settings) {
+    const ext = (path.parse(outputPath).ext || '.mp4').toLowerCase();
+    if (!['.mp4', '.mov', '.m4v'].includes(ext)) {
+        addStatusMessage('Cover thumbnail is only supported for MP4/MOV output — skipped for this format.', 'warning');
+        return;
+    }
+    const tempDir = await electronAPI.getTempDir();
+    const cover = path.join(tempDir, `cover_${Date.now()}_${Math.floor(Math.random() * 10000)}.jpg`);
+    // Full-resolution grab of the chosen frame, with the SAME visual edits as the
+    // output (crop/rotate/mirror + skin/enhance/grain + caption) so the cover
+    // matches the video exactly.
+    const geo = coverVisualFilter(settings || {});
+    await spawnFFmpeg(['-y', '-ss', String(Math.max(0, time)), '-i', sourcePath, '-frames:v', '1', '-vf', geo, '-q:v', '2', cover]);
+    if (!(await electronAPI.exists(cover))) { addStatusMessage('Could not create the cover frame — thumbnail not set.', 'warning'); return; }
+
+    const tmp = outputPath.slice(0, -ext.length) + '__cover' + ext;
+    await spawnFFmpeg(['-y', '-i', outputPath, '-i', cover,
+        '-map', '0', '-map', '1', '-c', 'copy', '-map_metadata', '0', '-disposition:v:1', 'attached_pic',
+        '-movflags', '+faststart', tmp]);
+    try { await electronAPI.unlink(outputPath); } catch (e) {}
+    await electronAPI.copyFile(tmp, outputPath);
+    try { await electronAPI.unlink(tmp); } catch (e) {}
+    try { await electronAPI.unlink(cover); } catch (e) {}
+}
+
 // Grab a single cover frame (from the middle of the clip) as a JPEG.
 async function processThumbnail(file, outputDir, settings, updateProgress, fileIndex = 0) {
     const probe = await probeVideo(file.path);
@@ -2880,9 +3739,12 @@ async function processGif(file, outputDir, settings, updateProgress, fileIndex =
 async function processExtractAudio(file, outputDir, settings, updateProgress, fileIndex = 0) {
     const outputPath = generateOutputPathForBatch(file, outputDir, { ...settings, videoFormat: 'mp3' }, null, fileIndex);
     updateProgress(30);
+    const denoise = audioDenoiseFilter(settings); // optional background-noise removal
     const command = [
         '-y', '-i', file.path,
-        '-vn', '-c:a', 'libmp3lame', '-b:a', '192k', '-ac', '2', '-ar', '48000',
+        '-vn',
+        ...(denoise ? ['-af', denoise] : []),
+        '-c:a', 'libmp3lame', '-b:a', '192k', '-ac', '2', '-ar', '48000',
         '-map_metadata', '-1',
         outputPath
     ];
@@ -2931,6 +3793,9 @@ async function processSpoof(file, outputDir, settings, updateProgress, fileIndex
         console.log('Processing as VIDEO');
         await processVideoSpoof(file.path, outputPath, effects, settings, updateProgress);
         if (settings.logoPath || settings.musicPath) await applyExtrasPass(outputPath, settings);
+        if (settings.setCover && settings.setCover.enabled && file._thumbTime != null) {
+            await applyThumbnailPass(outputPath, file.path, file._thumbTime, settings);
+        }
     }
 
     outputCount++;
@@ -2989,6 +3854,9 @@ async function processConvert(file, outputDir, settings, updateProgress, fileInd
     } else {
         await convertVideo(file.path, outputPath, settings);
         if (settings.logoPath || settings.musicPath) await applyExtrasPass(outputPath, settings);
+        if (settings.setCover && settings.setCover.enabled && file._thumbTime != null) {
+            await applyThumbnailPass(outputPath, file.path, file._thumbTime, settings);
+        }
     }
 
     outputCount++;
@@ -3021,7 +3889,7 @@ async function probeVideo(videoPath) {
             '-v', 'error',
             '-select_streams', 'v:0',
             '-show_entries', 'format=duration',
-            '-show_entries', 'stream=width,height,display_aspect_ratio,sample_aspect_ratio,color_transfer,color_primaries',
+            '-show_entries', 'stream=width,height,display_aspect_ratio,sample_aspect_ratio,color_transfer,color_primaries,codec_name',
             '-show_entries', 'stream_tags=rotate',
             '-show_entries', 'stream_side_data=rotation',
             '-of', 'json',
@@ -3035,6 +3903,8 @@ async function probeVideo(videoPath) {
         let anamorphic = false; // true when pixels are non-square (SAR != 1:1)
         let hdr = false;        // true for HLG / PQ (Dolby Vision) / BT.2020 sources
         let ok = false;         // did ffprobe actually read this file?
+        let dispW = null, dispH = null; // SAR-normalized display size (crop-value space)
+        let codec = null;       // video codec (e.g. 'h264', 'hevc') — for preview decodability
 
         if (result.code === 0) {
             const data = JSON.parse(result.stdout);
@@ -3048,6 +3918,7 @@ async function probeVideo(videoPath) {
             // --- Extract DAR (same logic as old getVideoDAR) ---
             if (data.streams && data.streams[0]) {
                 const stream = data.streams[0];
+                codec = (stream.codec_name || '').toLowerCase();
                 let width = parseInt(stream.width);
                 let height = parseInt(stream.height);
                 let darStr = stream.display_aspect_ratio;
@@ -3118,16 +3989,27 @@ async function probeVideo(videoPath) {
                 }
 
                 dar = { ratio: `${num}:${den}`, decimal: num / den };
+
+                // SAR-normalized display size — the coordinate space the Crop card's
+                // pixel values live in (SAR_NORMALIZE expands the deficient axis). Used
+                // by the live-crop preview so it divides by the true source size, not
+                // the downscaled preview proxy.
+                let effSar = 1;
+                if (sar && sar.includes(':')) { const [sN, sD] = sar.split(':').map(Number); if (sN > 0 && sD > 0) effSar = sN / sD; }
+                if (width && height) {
+                    dispW = effSar >= 1 ? Math.round(width * effSar) : width;
+                    dispH = effSar >= 1 ? height : Math.round(height / effSar);
+                }
             }
         }
 
-        const probeResult = { duration, dar, anamorphic, hdr, ok };
+        const probeResult = { duration, dar, anamorphic, hdr, ok, dispW, dispH, codec };
         videoProbeCache.set(normalizedPath, probeResult);
         return probeResult;
 
     } catch (error) {
         console.warn('probeVideo failed:', error.message);
-        const fallback = { duration: 90, dar: null, anamorphic: false, hdr: false, ok: false };
+        const fallback = { duration: 90, dar: null, anamorphic: false, hdr: false, ok: false, dispW: null, dispH: null, codec: null };
         videoProbeCache.set(normalizedPath, fallback);
         return fallback;
     }
@@ -3291,7 +4173,7 @@ function generateWatermarkFilter(watermarkSettings) {
     let fontArg = '';
     if (systemFontPath) {
         const escFont = systemFontPath.replace(/\\/g, '/').replace(/:/g, '\\:');
-        fontArg = `:fontfile=${escFont}`;
+        fontArg = `:fontfile='${escFont}'`; // must be single-quoted or the filtergraph parser rejects it
     }
 
     // Build the drawtext filter. Opacity is applied to the text color too (was
@@ -3306,6 +4188,65 @@ function generateWatermarkFilter(watermarkSettings) {
     }
 
     return filter;
+}
+
+// On-screen caption text (drawtext). Richer than the corner watermark: choice of
+// bundled fonts, size relative to height, position + align, colour, background box,
+// outline, shadow, and balanced timing (whole video / first N seconds / range).
+function textOverlayFilter(settings) {
+    const o = settings && settings.textOverlay;
+    if (!o || !o.enabled || !o.text || !String(o.text).trim()) return '';
+
+    // Font (bundled) → path must be single-quoted AND have its drive-colon escaped,
+    // or ffmpeg's filtergraph parser rejects it. Fall back to the system font.
+    const q = (p) => `'${p.replace(/\\/g, '/').replace(/:/g, '\\:')}'`;
+    let fontArg = '';
+    const file = CAPTION_FONTS[o.font];
+    if (bundledFontsDir && file) fontArg = `:fontfile=${q(bundledFontsDir + '/' + file)}`;
+    else if (systemFontPath) fontArg = `:fontfile=${q(systemFontPath)}`;
+
+    let text = String(o.text);
+    if (o.uppercase) text = text.toUpperCase();
+    const escapedText = text.replace(/\\/g, '\\\\').replace(/'/g, "'\\''");
+
+    const hexToFF = (hex, def) => { const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || ''); return m ? `0x${m[1]}${m[2]}${m[3]}` : def; };
+    const color = hexToFF(o.color, '0xffffff');
+    const sizeFrac = ({ small: 0.045, medium: 0.065, large: 0.09 })[o.size] || 0.065;
+    // borderw/boxborderw must be plain integers (no expressions) — size by preset.
+    const outlineW = ({ small: 3, medium: 4, large: 6 })[o.size] || 4;
+    const boxPad = ({ small: 10, medium: 14, large: 20 })[o.size] || 14;
+    const M = 0.04; // side/edge margin as fraction of width/height
+
+    // Horizontal position by align.
+    const x = o.align === 'left' ? `${M}*w` : o.align === 'right' ? `w-text_w-${M}*w` : '(w-text_w)/2';
+    // Vertical position by pos.
+    const y = o.pos === 'top' ? `${M}*h` : o.pos === 'bottom' ? `h-text_h-${M}*h` : '(h-text_h)/2';
+
+    // Per-line alignment for multi-line captions + a little line spacing.
+    const talign = ({ left: 'L', center: 'C', right: 'R' })[o.align] || 'C';
+    const lineSpace = ({ small: 4, medium: 6, large: 9 })[o.size] || 6;
+
+    const parts = [
+        `text='${escapedText}'`, fontArg.slice(1), 'expansion=none',
+        `fontsize=h*${sizeFrac}`, `fontcolor=${color}`, `x=${x}`, `y=${y}`,
+        `text_align=${talign}`, `line_spacing=${lineSpace}`
+    ].filter(Boolean);
+
+    if (o.box) parts.push('box=1', `boxcolor=${hexToFF(o.boxColor, '0x000000')}@0.5`, `boxborderw=${boxPad}`);
+    if (o.outline) parts.push(`borderw=${outlineW}`, 'bordercolor=black');
+    if (o.shadow) parts.push('shadowx=2', 'shadowy=2', 'shadowcolor=black@0.6');
+
+    // Timing.
+    const t = o.timing || {};
+    if (t.mode === 'first') {
+        const n = Math.max(0.5, parseFloat(t.seconds) || 4);
+        parts.push(`enable='lte(t\\,${n})'`);
+    } else if (t.mode === 'range') {
+        const s = Math.max(0, parseFloat(t.start) || 0);
+        const e = parseFloat(t.end);
+        if (!isNaN(e) && e > s) parts.push(`enable='between(t\\,${s}\\,${e})'`);
+    }
+    return `drawtext=${parts.join(':')}`;
 }
 
 /**
@@ -3461,6 +4402,78 @@ function rotateFilter(settings) {
     return '';
 }
 
+// Skin smoothing / beauty (Phase 1: whole-frame). Edge-preserving bilateral blur
+// blended over the original at an adjustable strength, then a light contrast-
+// adaptive sharpen so eyes/hair/edges stay crisp. Spatial window kept moderate so
+// it's usable on weak laptops; the blend opacity carries the perceived strength.
+// (Skin/face-only targeting comes later via the AI phase.)
+function skinSmoothFilter(settings) {
+    const s = settings && settings.skinSmooth;
+    if (!s || !s.enabled) return '';
+    const map = {
+        light: { S: 4, R: 0.10, op: 0.50 },
+        medium: { S: 8, R: 0.12, op: 0.70 },
+        strong: { S: 12, R: 0.15, op: 0.90 }
+    };
+    const p = map[s.strength] || map.medium;
+    return `split[sk0][sk1];[sk1]bilateral=sigmaS=${p.S}:sigmaR=${p.R}[skb];[sk0][skb]blend=all_mode=normal:all_opacity=${p.op},cas=0.20`;
+}
+
+// Enhance / beauty extras (ported from the Video Enhancement Tool): colour grade
+// (brightness/contrast/saturation/warmth), sharpen, soft glow, and vignette. All
+// sliders are -100..100 (colour) or 0..100 (the rest); 0 / centred = no change, so
+// this returns '' when nothing is set. Grain + loudness are handled separately.
+function enhanceFilter(settings) {
+    const e = settings && settings.enhance;
+    if (!e || !e.enabled) return '';
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const n = (v) => (parseInt(v) || 0) / 100; // slider → -1..1 (or 0..1)
+    const parts = [];
+
+    // Colour: eq for brightness/contrast/saturation, colortemperature for warmth.
+    const b = clamp(n(e.brightness) * 0.4, -0.4, 0.4);
+    const c = clamp(1 + n(e.contrast) * 0.5, 0.6, 1.8);
+    const sat = clamp(1 + n(e.saturation) * 0.8, 0.2, 2.0);
+    if (b !== 0 || c !== 1 || sat !== 1) {
+        parts.push(`eq=brightness=${b.toFixed(3)}:contrast=${c.toFixed(3)}:saturation=${sat.toFixed(3)}`);
+    }
+    const w = n(e.warmth);
+    if (w !== 0) {
+        const kelvin = Math.round(clamp(6500 - w * 3000, 3000, 12000)); // warmer = lower K
+        parts.push(`colortemperature=temperature=${kelvin}:mix=1:pl=1`);
+    }
+    // Sharpen (contrast-adaptive, halo-free).
+    const sh = clamp(n(e.sharpen), 0, 1);
+    if (sh > 0) parts.push(`cas=${(sh * 0.8).toFixed(2)}`);
+    // Soft diffusion glow — screen-blend a blurred copy over the image.
+    const g = clamp(n(e.glow), 0, 1);
+    if (g > 0) {
+        const sigma = (8 + g * 10).toFixed(1);
+        const opacity = clamp(g * 0.6, 0, 0.6).toFixed(2);
+        parts.push(`split[gl0][gl1];[gl1]gblur=sigma=${sigma}[glb];[gl0][glb]blend=all_mode=screen:all_opacity=${opacity}`);
+    }
+    // Vignette (gently darkened edges).
+    const v = clamp(n(e.vignette), 0, 1);
+    if (v > 0) parts.push(`vignette=a=${(0.6 + v * 0.7).toFixed(2)}`);
+
+    return parts.join(',');
+}
+
+// Film grain — kept separate so it can be added LAST (after text) so it grains the
+// whole frame. Slider 0..100.
+function grainFilter(settings) {
+    const e = settings && settings.enhance;
+    if (!e || !e.enabled) return '';
+    const amt = Math.round(((parseInt(e.grain) || 0) / 100) * 20);
+    return amt > 0 ? `noise=alls=${amt}:allf=t+u` : '';
+}
+
+// Loudness normalisation for talking clips (EBU R128). Audio-only.
+function loudnormFilter(settings) {
+    const e = settings && settings.enhance;
+    return (e && e.enabled && e.loudnorm) ? 'loudnorm=I=-14:TP=-1.5:LRA=11' : '';
+}
+
 // Optional crop — trim pixels off each edge (like HandBrake). Changes the real
 // output dimensions (no padding/black bars). Coordinates are in the SOURCE's
 // displayed pixels, which is exactly what the live preview shows. trunc(...)*2
@@ -3600,15 +4613,31 @@ function videoEncodeArgs(outputExt, settings, hdr = false) {
     return args;
 }
 
+// Background-noise removal for the audio track (FFT denoiser), ported from the
+// standalone noise tool: an optional low-rumble highpass + afftdn(nr,nf). Strength
+// presets map to noise-reduction (dB) + noise-floor (dB).
+function audioDenoiseFilter(settings) {
+    const d = settings && settings.audioDenoise;
+    if (!d || !d.enabled) return '';
+    const map = { light: { nr: 10, nf: -20 }, balanced: { nr: 14, nf: -25 }, strong: { nr: 20, nf: -30 } };
+    const p = map[d.strength] || map.balanced;
+    const parts = [];
+    if (d.rumble !== false) parts.push('highpass=f=80'); // cut low outdoor rumble (safe for voice)
+    parts.push(`afftdn=nr=${p.nr}:nf=${p.nf}`);
+    return parts.join(',');
+}
+
 // Audio arguments, chosen once so we never emit conflicting -c:a flags (F26).
 // Standardize to stereo 48kHz (what social platforms expect; also downmixes 5.1
 // so centre-channel dialogue isn't lost).
 function audioEncodeArgs(outputExt, settings) {
     if (settings.removeAudio) return ['-an'];
-    // aresample=async keeps audio locked to the (now CFR) video; atempo matches a
-    // speed change so audio pitch/length track the video.
+    // Chain: noise removal -> speed (atempo) -> resample lock. aresample=async keeps
+    // audio locked to the (now CFR) video; atempo matches a speed change.
+    const denoise = audioDenoiseFilter(settings);
+    const loud = loudnormFilter(settings);
     const atempo = speedAudioFilter(settings);
-    const af = (atempo ? atempo + ',' : '') + 'aresample=async=1:first_pts=0';
+    const af = [denoise, loud, atempo, 'aresample=async=1:first_pts=0'].filter(Boolean).join(',');
     const common = ['-ac', '2', '-ar', '48000', '-af', af];
     if (outputExt === '.webm') return ['-c:a', 'libopus', '-b:a', '128k', ...common];
     return ['-c:a', 'aac', '-b:a', '160k', ...common];
@@ -3779,6 +4808,16 @@ function buildMasterFilter(settings, effects, originalDAR, isImage = false, hdr 
     const res = resolutionFilter(settings);
     if (res) parts.push(res);
 
+    // 5a. Skin smoothing / beauty (after any downscale so it works at the final
+    //     size; before the watermark so text stays crisp).
+    const skin = skinSmoothFilter(settings);
+    if (skin) parts.push(skin);
+
+    // 5a2. Enhance extras — colour grade / sharpen / glow / vignette (grain is
+    //      added last, below, so it covers the whole frame incl. text).
+    const enh = enhanceFilter(settings);
+    if (enh) parts.push(enh);
+
     // 5b. Speed change (video side) — audio is retimed in audioEncodeArgs.
     const spd = speedVideoFilter(settings);
     if (spd) parts.push(spd);
@@ -3786,6 +4825,14 @@ function buildMasterFilter(settings, effects, originalDAR, isImage = false, hdr 
     // 6. Watermark
     const watermarkFilter = generateWatermarkFilter(settings.watermark);
     if (watermarkFilter) parts.push(watermarkFilter);
+
+    // 6b. On-screen caption text.
+    const textFilter = textOverlayFilter(settings);
+    if (textFilter) parts.push(textFilter);
+
+    // 6c. Film grain — last visual step so it grains everything (incl. text).
+    const grain = grainFilter(settings);
+    if (grain) parts.push(grain);
 
     // 7. Square pixels + 8-bit 4:2:0 output for universal compatibility.
     parts.push('setsar=1', 'format=yuv420p');
@@ -3963,21 +5010,22 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
     // Determine clip length target based on settings.
     // minLen/maxLen define the acceptable window a keyframe cut may land in;
     // idealFor() is the preferred length we aim the cut at.
+    // Manual cut ranges override the auto plan entirely (see below).
+    const manualCuts = (Array.isArray(settings.manualCuts) && settings.manualCuts.length) ? settings.manualCuts : null;
+
     const clipLengthSetting = settings.clipLength || '6-8';
     let minLen, maxLen, idealFor;
 
-    switch (clipLengthSetting) {
-        case '8':
-            minLen = 6.5; maxLen = 9.5; idealFor = () => 8;
-            break;
-        case '10':
-            minLen = 8; maxLen = 12; idealFor = () => 10;
-            break;
-        case '15':
-            minLen = 12; maxLen = 18; idealFor = () => 15;
-            break;
-        default: // '6-8' (each clip independently randomised 6-8s)
-            minLen = 6; maxLen = 8; idealFor = () => 6 + Math.random() * 2;
+    if (clipLengthSetting === '6-8') {
+        // Each clip independently randomised 6–8s (most natural for reposts).
+        minLen = 6; maxLen = 8; idealFor = () => 6 + Math.random() * 2;
+    } else {
+        // Any fixed target N seconds (5/10/15/20/30/60…): aim for N, allow a
+        // keyframe cut within ±20–25% so fast-copy can still land on one.
+        const n = Math.max(2, parseFloat(clipLengthSetting) || 8);
+        minLen = Math.max(1, n * 0.8);
+        maxLen = n * 1.25;
+        idealFor = () => n;
     }
 
     // Determine fast copy eligibility (Proposal 1: Split Only Speedup).
@@ -3986,8 +5034,9 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
     // (non-1:1 SAR) must be re-encoded to square pixels or its clips get stretched
     // thumbnails (F3).
     // Mirror, rotate, speed, downscale, or shrink/compress all require a re-encode too.
-    const _needsFilter = mirrorFilter(settings) || rotateFilter(settings) || speedVideoFilter(settings) || resolutionFilter(settings) || cropFilter(settings) || settings.compress;
+    const _needsFilter = mirrorFilter(settings) || rotateFilter(settings) || speedVideoFilter(settings) || resolutionFilter(settings) || cropFilter(settings) || skinSmoothFilter(settings) || enhanceFilter(settings) || grainFilter(settings) || textOverlayFilter(settings) || audioDenoiseFilter(settings) || loudnormFilter(settings) || settings.compress;
     const useFastCopy = !applySpoof &&
+        !manualCuts &&
         (!settings.watermark || !settings.watermark.enabled) &&
         (settings.orientation === 'auto') &&
         !probe.anamorphic &&
@@ -4008,7 +5057,11 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
         rotateFilter(settings) || null,
         mirrorFilter(settings) || null,
         resolutionFilter(settings) || null,
+        skinSmoothFilter(settings) || null,
+        enhanceFilter(settings) || null,
         speedVideoFilter(settings) || null,
+        textOverlayFilter(settings) || null,
+        grainFilter(settings) || null,
         'format=yuv420p'
     ].filter(Boolean).join(',');
 
@@ -4047,7 +5100,25 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
     let startTime = 0;
     let clipNumber = 1;
 
-    while (duration - startTime > 0.5) {
+    // MANUAL CUTS: one clip per user range (any order, may overlap). Always a
+    // precise re-encode so the cut is exact and every edit is applied.
+    if (manualCuts) {
+        for (const r of manualCuts) {
+            const start = Math.max(0, Math.min(r.start, duration));
+            const end = (r.end == null || isNaN(r.end)) ? duration : Math.min(r.end, duration);
+            if (end - start >= 0.1) {
+                clips.push({ start, duration: +(end - start).toFixed(3), needsReencode: true, number: clipNumber++ });
+            } else {
+                addStatusMessage(`Skipped an invalid cut (${r.start}–${r.end == null ? 'end' : r.end}s): end must be after start and within the video.`, 'warning');
+            }
+        }
+        if (clips.length === 0) {
+            throw new Error(`No valid cut ranges for "${file.name}". Check the start/end times (end must be after start).`);
+        }
+        addStatusMessage(`Manual cuts: ${clips.length} clip(s) — ${clips.map(c => `${c.start.toFixed(0)}–${(c.start + c.duration).toFixed(0)}s`).join(', ')}`, 'info');
+    }
+
+    while (!manualCuts && duration - startTime > 0.5) {
         const ideal = idealFor();
         let endTime;
         let needsReencode;
@@ -4075,7 +5146,17 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
         }
 
         endTime = Math.min(endTime, duration);
-        if (endTime - startTime < 3) break; // Skip a too-short tail
+        // A leftover shorter than 3s isn't its own clip — instead of DROPPING it,
+        // merge it into the previous clip so no footage is ever lost. (Only when
+        // there's a previous clip; a whole video under the minimum errors below.)
+        if (endTime - startTime < 3) {
+            if (clips.length > 0) {
+                const last = clips[clips.length - 1];
+                last.duration = duration - last.start; // extend to the very end
+                last.needsReencode = true;             // new end may not be on a keyframe
+            }
+            break;
+        }
 
         clips.push({
             start: startTime,
@@ -4320,7 +5401,7 @@ async function convertVideo(inputPath, outputPath, settings) {
         if (probe.anamorphic) needsReencoding = true;
 
         // Shrink / mirror / rotate / speed / downscale also require a real re-encode.
-        if (settings.compress || mirrorFilter(settings) || rotateFilter(settings) || speedVideoFilter(settings) || resolutionFilter(settings) || cropFilter(settings)) needsReencoding = true;
+        if (settings.compress || mirrorFilter(settings) || rotateFilter(settings) || speedVideoFilter(settings) || resolutionFilter(settings) || cropFilter(settings) || skinSmoothFilter(settings) || enhanceFilter(settings) || grainFilter(settings) || textOverlayFilter(settings) || loudnormFilter(settings)) needsReencoding = true;
 
         const _tl = inputTrimLoopArgs(settings);
         let command = ['-y', ..._tl.pre, '-i', normalizedInputPath,
@@ -4335,7 +5416,7 @@ async function convertVideo(inputPath, outputPath, settings) {
             const reframe = isForcedOrientation || (settings.watermark && settings.watermark.enabled);
             const filterComplex = reframe
                 ? buildMasterFilter(settings, null, probe.dar, false, probe.hdr)
-                : [probe.hdr ? HDR_TONEMAP : null, SAR_NORMALIZE, cropFilter(settings) || null, rotateFilter(settings) || null, mirrorFilter(settings) || null, resolutionFilter(settings) || null, speedVideoFilter(settings) || null, 'format=yuv420p'].filter(Boolean).join(',');
+                : [probe.hdr ? HDR_TONEMAP : null, SAR_NORMALIZE, cropFilter(settings) || null, rotateFilter(settings) || null, mirrorFilter(settings) || null, resolutionFilter(settings) || null, skinSmoothFilter(settings) || null, enhanceFilter(settings) || null, speedVideoFilter(settings) || null, textOverlayFilter(settings) || null, grainFilter(settings) || null, 'format=yuv420p'].filter(Boolean).join(',');
             command.push('-vf', filterComplex);
 
             // Quality-aware codec (F10) + non-conflicting audio (F26)
@@ -4344,8 +5425,13 @@ async function convertVideo(inputPath, outputPath, settings) {
         } else {
             console.log('ConvertOnly: Using Fast Stream Copy (Remuxing).');
             command.push('-c:v', 'copy');
-            // Keep audio as-is (copy) or drop it — no re-encode on the fast path.
-            command.push(...(settings.removeAudio ? ['-an'] : ['-c:a', 'copy']));
+            // Keep the video copy, but if background-noise removal is on we must
+            // re-encode just the AUDIO (can't denoise a copied stream).
+            if (!settings.removeAudio && audioDenoiseFilter(settings)) {
+                command.push(...audioEncodeArgs(outputExt, settings));
+            } else {
+                command.push(...(settings.removeAudio ? ['-an'] : ['-c:a', 'copy']));
+            }
         }
 
         command.push(normalizedOutputPath);
@@ -4497,6 +5583,11 @@ function getProcessingSettings(fileType) {
         settings.clipLength = document.getElementById('clipLength').value;
         settings.namingPattern = document.getElementById('videoNamingPattern').value;
 
+        // Manual cut ranges (Split → "Manual cuts"): each range becomes its own
+        // output video, all with the same edits. Null unless that mode is chosen.
+        const clipLenEl = document.getElementById('cxClipLen');
+        settings.manualCuts = (clipLenEl && clipLenEl.value === 'manual') ? readManualCuts() : null;
+
         // Rotation setting for videos (only relevant for spoof modes)
         const videoRotationCheckbox = document.getElementById('videoRotationEnabled');
         settings.enableRotation = videoRotationCheckbox ? videoRotationCheckbox.checked : true;
@@ -4526,6 +5617,74 @@ function getProcessingSettings(fileType) {
         const spdCard = document.querySelector('.cx-c[data-card="speed"]');
         settings.speed = (spdCard && spdCard.classList.contains('on'))
             ? parseFloat((document.getElementById('cxSpeedVal') || {}).value || '1') : 1;
+
+        // Set cover / custom thumbnail (per-file frame stored on file._thumbTime)
+        const coverCard = document.querySelector('.cx-c[data-card="setcover"]');
+        settings.setCover = { enabled: !!(coverCard && coverCard.classList.contains('on')) };
+
+        // On-screen caption text
+        const textCard = document.querySelector('.cx-c[data-card="text"]');
+        const tv = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
+        const tc = (id, def) => { const el = document.getElementById(id); return el ? el.checked : def; };
+        settings.textOverlay = {
+            enabled: !!(textCard && textCard.classList.contains('on')),
+            text: tv('cxText', ''),
+            font: tv('cxTextFont', 'Montserrat'),
+            size: tv('cxTextSize', 'medium'),
+            color: tv('cxTextColor', '#ffffff'),
+            pos: tv('cxTextPos', 'bottom'),
+            align: tv('cxTextAlign', 'center'),
+            uppercase: tc('cxTextUpper', false),
+            outline: tc('cxTextOutline', true),
+            box: tc('cxTextBox', false),
+            boxColor: tv('cxTextBoxColor', '#000000'),
+            timing: { mode: tv('cxTextTiming', 'whole'), seconds: tv('cxTextSeconds', '4'), start: tv('cxTextStart', ''), end: tv('cxTextEnd', '') }
+        };
+
+        // Skin smoothing / beauty
+        const skinCard = document.querySelector('.cx-c[data-card="skin"]');
+        settings.skinSmooth = {
+            enabled: !!(skinCard && skinCard.classList.contains('on')),
+            strength: (document.getElementById('cxSkin') || {}).value || 'medium'
+        };
+
+        // AI skin smoothing (face/body-targeted beauty). Sliders 0-100 → 0-1.
+        const aiCard = document.querySelector('.cx-c[data-card="skinai"]');
+        const num = (id, def) => { const el = document.getElementById(id); return el ? (parseInt(el.value) || 0) / 100 : def; };
+        settings.skinAI = {
+            enabled: !!(aiCard && aiCard.classList.contains('on')),
+            mode: (document.getElementById('cxAiMode') || {}).value || 'quality',
+            face: num('cxAiFace', 0.2),
+            body: num('cxAiBody', 0.45),
+            keep: num('cxAiKeep', 0.85),
+            glow: num('cxAiGlow', 0.3),
+            bright: num('cxAiBright', 0.18),
+            warm: num('cxAiWarm', 0.12)
+        };
+
+        // Enhance extras — colour / sharpen / glow / vignette / grain / loudness
+        const enhCard = document.querySelector('.cx-c[data-card="enhance"]');
+        const ev = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
+        settings.enhance = {
+            enabled: !!(enhCard && enhCard.classList.contains('on')),
+            brightness: ev('cxEnhBright', '0'),
+            contrast: ev('cxEnhContrast', '0'),
+            saturation: ev('cxEnhSat', '0'),
+            warmth: ev('cxEnhWarm', '0'),
+            sharpen: ev('cxEnhSharpen', '0'),
+            glow: ev('cxEnhGlow', '0'),
+            vignette: ev('cxEnhVignette', '0'),
+            grain: ev('cxEnhGrain', '0'),
+            loudnorm: !!(document.getElementById('cxEnhLoud') && document.getElementById('cxEnhLoud').checked)
+        };
+
+        // Audio noise removal (FFT denoiser)
+        const dnCard = document.querySelector('.cx-c[data-card="denoise"]');
+        settings.audioDenoise = {
+            enabled: !!(dnCard && dnCard.classList.contains('on')),
+            strength: (document.getElementById('cxDenoise') || {}).value || 'balanced',
+            rumble: !(document.getElementById('cxDenoiseRumble') && document.getElementById('cxDenoiseRumble').checked === false)
+        };
 
         // Crop — trim pixels off each edge (HandBrake-style; changes output dims)
         const cropCard = document.querySelector('.cx-c[data-card="crop"]');
@@ -4914,6 +6073,29 @@ function previewFileByClick(index) {
         showPreview(file.path, file.type);
         updateFileList();
         updateNavigationButtons('media');
+        syncCaptionFieldToCurrentFile();
+    }
+}
+
+// Bulk per-video text: the "Text on screen" card edits the caption of whichever
+// video is showing in the preview; each video keeps its own text (shared style).
+// These two helpers keep the card field, the per-row inputs, and file.captionText
+// in sync.
+function syncCaptionFieldToCurrentFile() {
+    const cx = document.getElementById('cxText');
+    const f = selectedFiles[currentPreviewIndex];
+    if (!cx || !f || f.type !== 'video') return;
+    cx.value = (f.captionText != null ? f.captionText : '');
+    if (typeof updateCaptionOverlay === 'function') updateCaptionOverlay();
+}
+function setFileCaption(index, value) {
+    const f = selectedFiles[index];
+    if (!f) return;
+    f.captionText = value;
+    if (index === currentPreviewIndex) {
+        const cx = document.getElementById('cxText');
+        if (cx && cx.value !== value) cx.value = value;
+        if (typeof updateCaptionOverlay === 'function') updateCaptionOverlay();
     }
 }
 
@@ -4946,6 +6128,7 @@ function navigatePreview(mode, direction) {
     showPreview(file.path, file.type);
     updateFileList();
     updateNavigationButtons('media');
+    syncCaptionFieldToCurrentFile();
 }
 
 function removeFile(index) {
@@ -5089,3 +6272,8 @@ function updateNavigationButtons(mode) {
 }
 
 // (sleep is defined earlier in the file)
+
+
+
+
+

@@ -1102,10 +1102,10 @@
       .header{ display:none !important; }
 
       /* Top app bar */
-      .appbar{ display:flex; align-items:center; gap:14px; padding:12px 22px; background:var(--sh-surface);
+      .appbar{ display:flex; align-items:center; gap:12px; padding:9px 18px; background:var(--sh-surface);
                border-bottom:1px solid var(--sh-line); position:sticky; top:0; z-index:40; }
       .appbar .brand{ display:flex; align-items:center; gap:11px; }
-      .appbar .brand .nm{ font-weight:750; font-size:1.05rem; letter-spacing:-.01em; }
+      .appbar .brand .nm{ font-weight:750; font-size:.98rem; letter-spacing:-.01em; }
       .appbar .brand .nm span{ color:var(--sh-mut); font-weight:600; }
       .appbar .by{ margin-left:auto; display:flex; align-items:center; gap:7px; color:var(--sh-mut); font-size:.82rem; font-weight:500; }
       .appbar .by b{ color:var(--sh-ink); font-weight:700; }
@@ -1113,13 +1113,15 @@
       /* Two-pane workspace */
       #unifiedInterface{ flex:1; display:grid; grid-template-columns:360px minmax(0,1fr);
             grid-template-areas:"stats stats" "files options" "run run" "log log";
-            gap:16px; align-items:start; padding:18px 22px 40px; max-width:1280px; margin:0 auto; width:100%; }
+            gap:12px; align-items:start; padding:14px 18px 30px; max-width:1280px; margin:0 auto; width:100%; }
       @media(max-width:900px){ #unifiedInterface{ grid-template-columns:1fr; grid-template-areas:"stats" "files" "options" "run" "log"; } }
       #statsGrid{ grid-area:stats; }
       /* NOT sticky: a sticky left column floats over the full-width log row below
          it and covers the logs while you scroll. Let it scroll with the page so
          the activity log underneath is always fully visible. */
-      .upload-section{ grid-area:files; align-self:start; }
+      /* Stretch to the full "files options" row height so the sticky preview
+         inside it stays pinned while the taller options column scrolls past. */
+      .upload-section{ grid-area:files; align-self:stretch; }
       #composeUI{ grid-area:options; }
       #legacySettings{ grid-area:options; }
       #fxPanel{ grid-area:options; }
@@ -1128,27 +1130,27 @@
 
       /* Flat panels (replace the old heavy cards) */
       #unifiedInterface .section{ background:var(--sh-surface) !important; border:1px solid var(--sh-line) !important;
-            border-radius:14px !important; box-shadow:0 1px 2px rgba(20,28,44,.04) !important; padding:16px !important; margin:0 !important; }
+            border-radius:12px !important; box-shadow:0 1px 2px rgba(20,28,44,.04) !important; padding:12px !important; margin:0 !important; }
       #unifiedInterface .section h3{ font-size:.72rem !important; letter-spacing:.1em; text-transform:uppercase;
-            color:var(--sh-mut) !important; font-weight:700 !important; margin:0 0 12px !important; background:none !important; -webkit-text-fill-color:currentColor !important; }
+            color:var(--sh-mut) !important; font-weight:700 !important; margin:0 0 9px !important; background:none !important; -webkit-text-fill-color:currentColor !important; }
       #unifiedInterface .section h4{ color:var(--sh-ink2) !important; }
 
       /* Drop zone */
       #unifiedInterface .drop-zone{ border:1.5px dashed var(--sh-line2) !important; border-radius:12px !important;
-            background:var(--sh-bg) !important; padding:20px 12px !important; }
+            background:var(--sh-bg) !important; padding:14px 12px !important; }
       #unifiedInterface .drop-zone:hover{ border-color:var(--tv) !important; background:var(--tvs) !important; }
       #unifiedInterface .upload-icon{ color:var(--tv); }
-      #unifiedInterface .drop-zone h4{ font-size:.95rem; }
+      #unifiedInterface .drop-zone h4{ font-size:.87rem; }
 
       /* Buttons — neutral, with the primary in brand violet; SVG icons inline */
       #unifiedInterface .btn{ border-radius:10px !important; font-weight:600 !important; display:inline-flex !important;
-            align-items:center; justify-content:center; gap:8px; padding:10px 16px !important; font-size:.88rem !important; }
-      #unifiedInterface .btn svg{ width:17px; height:17px; flex:none; }
+            align-items:center; justify-content:center; gap:8px; padding:8px 13px !important; font-size:.82rem !important; }
+      #unifiedInterface .btn svg{ width:15px; height:15px; flex:none; }
       #unifiedInterface .btn-secondary{ background:var(--sh-surface) !important; border:1px solid var(--sh-line2) !important; color:var(--sh-ink) !important; }
       #unifiedInterface .btn-secondary:hover:not(:disabled){ border-color:var(--tv) !important; color:var(--tv) !important; }
       #unifiedInterface .btn-secondary svg{ color:var(--sh-mut); }
       #unifiedInterface .btn-secondary:hover:not(:disabled) svg{ color:var(--tv); }
-      #unifiedInterface .btn-primary{ background:var(--tv) !important; border:none !important; color:#fff !important; box-shadow:0 4px 14px rgba(106,90,249,.32) !important; padding:10px 22px !important; }
+      #unifiedInterface .btn-primary{ background:var(--tv) !important; border:none !important; color:#fff !important; box-shadow:0 4px 14px rgba(106,90,249,.32) !important; padding:8px 18px !important; }
       #unifiedInterface .btn-primary:hover:not(:disabled){ background:var(--tv2) !important; }
       #unifiedInterface .btn-success{ background:var(--sh-surface) !important; border:1px solid var(--sh-line2) !important; color:var(--tv) !important; }
       #unifiedInterface .btn-success svg{ color:var(--tv); }
@@ -1212,8 +1214,8 @@
       /* Stats row (relocated to the top of the workspace) */
       #unifiedInterface .stats-grid{ display:grid !important; grid-template-columns:repeat(4,1fr) !important; gap:12px !important; margin:0 !important; background:none !important; border:0 !important; padding:0 !important; }
       @media(max-width:640px){ #unifiedInterface .stats-grid{ grid-template-columns:repeat(2,1fr) !important; } }
-      #unifiedInterface .stat-card{ background:var(--sh-surface) !important; border:1px solid var(--sh-line) !important; border-radius:12px !important; padding:14px 16px !important; box-shadow:0 1px 2px rgba(20,28,44,.04) !important; text-align:center !important; }
-      #unifiedInterface .stat-value{ color:var(--tv) !important; font-weight:750 !important; font-size:1.55rem !important; font-variant-numeric:tabular-nums; }
+      #unifiedInterface .stat-card{ background:var(--sh-surface) !important; border:1px solid var(--sh-line) !important; border-radius:11px !important; padding:10px 12px !important; box-shadow:0 1px 2px rgba(20,28,44,.04) !important; text-align:center !important; }
+      #unifiedInterface .stat-value{ color:var(--tv) !important; font-weight:750 !important; font-size:1.25rem !important; font-variant-numeric:tabular-nums; }
       #unifiedInterface .stat-label{ color:var(--sh-mut) !important; font-size:.7rem !important; letter-spacing:.07em; text-transform:uppercase; font-weight:600 !important; margin-top:3px; }
 
       /* Preview navigation */
@@ -1233,6 +1235,11 @@
       #unifiedInterface .progress-bar{ background:var(--sh-line) !important; }
       #unifiedInterface .progress-fill{ background:var(--tv) !important; }
       #unifiedInterface .empty-state{ color:var(--sh-mut) !important; }
+      /* Per-video caption input (bulk text) — wraps onto its own full-width line. */
+      #unifiedInterface .file-item{ flex-wrap:wrap; }
+      #unifiedInterface .file-caption{ flex-basis:100%; width:100%; margin-top:8px; }
+      #unifiedInterface .file-caption-input{ width:100%; box-sizing:border-box; border:1px solid var(--sh-line2); background:var(--sh-bg); border-radius:8px; padding:6px 8px; font:inherit; font-size:.78rem; line-height:1.3; color:var(--sh-ink); resize:vertical; min-height:30px; }
+      #unifiedInterface .file-caption-input:focus{ outline:none; border-color:var(--tv); box-shadow:0 0 0 2px var(--tvs); }
     </style>
 
     <div class="app-container">
@@ -1295,6 +1302,10 @@
                 <!-- Preview Section (unified: shows image OR video depending on file type) -->
                 <div class="section" id="previewSection" style="display: none; margin-top: 10px;">
                     <h3><svg class="h-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>Preview</h3>
+                    <div class="preview-controls" style="display:flex; align-items:center; gap:12px; margin:0 0 8px; flex-wrap:wrap;">
+                        <label style="display:flex; align-items:center; gap:7px; font-size:.8rem; font-weight:600; cursor:pointer;"><input type="checkbox" id="prevEditToggle" checked style="width:15px;height:15px;accent-color:var(--tv)"> Show my edits (matches export)</label>
+                        <button type="button" id="prevExpandBtn" class="btn btn-secondary" style="padding:5px 12px; font-size:.78rem; margin-left:auto;">⤢ Bigger</button>
+                    </div>
                     <div class="preview-container"
                         style="display: flex; justify-content: center; align-items: center; margin: 8px 0;">
                         <div class="preview-wrapper"
@@ -1309,6 +1320,10 @@
                             <div id="video-text-watermark"
                                 style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); color: white; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); opacity: 0.8; pointer-events: none; display: none;">
                             </div>
+                            <!-- Live on-screen text overlay (instant, matches the exported caption) -->
+                            <div id="captionOverlay" style="position:absolute; display:none; pointer-events:none; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.15;"></div>
+                            <!-- Shown while transcoding a playable preview copy for HEVC clips -->
+                            <div id="previewNote" style="position:absolute; left:0; right:0; bottom:0; display:none; pointer-events:none; text-align:center; font-size:.72rem; font-weight:600; color:#fff; background:linear-gradient(0deg, rgba(0,0,0,.68), rgba(0,0,0,0)); padding:18px 8px 7px;">Preparing preview…</div>
                             <!-- Live crop overlay: dims the trimmed edges, outlines what stays -->
                             <div id="cropOverlay" style="position:absolute; inset:0; display:none; pointer-events:none;">
                                 <div class="crop-band" id="cropBandTop"></div>
@@ -1416,44 +1431,44 @@
                   --ac:#5b5be6;--acs:#eeeefe;--acl:#cfd0f8;--good:#12925a;--goods:#e4f6ec;--warn:#b7791f;--r:14px;
                   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
               .cx *{box-sizing:border-box}
-              .cx-step{margin-bottom:18px}
-              .cx-sh{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
-              .cx-sn{width:24px;height:24px;border-radius:8px;background:var(--ac);color:#fff;font-weight:700;font-size:.82rem;display:grid;place-items:center;flex:none}
-              .cx-sh h3{font-size:1.06rem;font-weight:650;margin:0;letter-spacing:-.01em}
-              .cx-sh .h{margin-left:auto;font-size:.8rem;color:var(--mut)}
-              .cx-seg{display:flex;gap:10px;flex-wrap:wrap}
-              .cx-seg .o{flex:1;min-width:150px;border:1.5px solid var(--ln);border-radius:12px;padding:13px 14px;background:var(--s);cursor:pointer;transition:.15s;display:flex;gap:11px;align-items:flex-start}
+              .cx-step{margin-bottom:13px}
+              .cx-sh{display:flex;align-items:baseline;gap:9px;margin-bottom:9px}
+              .cx-sn{width:21px;height:21px;border-radius:7px;background:var(--ac);color:#fff;font-weight:700;font-size:.76rem;display:grid;place-items:center;flex:none}
+              .cx-sh h3{font-size:.95rem;font-weight:650;margin:0;letter-spacing:-.01em}
+              .cx-sh .h{margin-left:auto;font-size:.74rem;color:var(--mut)}
+              .cx-seg{display:flex;gap:8px;flex-wrap:wrap}
+              .cx-seg .o{flex:1;min-width:135px;border:1.5px solid var(--ln);border-radius:11px;padding:10px 11px;background:var(--s);cursor:pointer;transition:.15s;display:flex;gap:9px;align-items:flex-start}
               .cx-seg .o:hover{border-color:var(--ln2)}
               .cx-seg .o.on{border-color:var(--ac);background:var(--acs);box-shadow:0 0 0 1px var(--acl) inset}
-              .cx-seg .o svg{width:22px;height:22px;color:var(--ac);flex:none;margin-top:1px}
-              .cx-seg .o .t{font-weight:640;font-size:.92rem}
-              .cx-seg .o .d{font-size:.76rem;color:var(--mut);margin-top:2px;line-height:1.35}
-              .cx-opts{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+              .cx-seg .o svg{width:19px;height:19px;color:var(--ac);flex:none;margin-top:1px}
+              .cx-seg .o .t{font-weight:640;font-size:.84rem}
+              .cx-seg .o .d{font-size:.71rem;color:var(--mut);margin-top:2px;line-height:1.3}
+              .cx-opts{display:grid;grid-template-columns:1fr 1fr;gap:9px}
               @media(max-width:760px){.cx-opts{grid-template-columns:1fr}}
-              .cx-c{border:1px solid var(--ln);border-radius:12px;background:var(--s);overflow:hidden;transition:border-color .15s,box-shadow .15s}
+              .cx-c{border:1px solid var(--ln);border-radius:11px;background:var(--s);overflow:hidden;transition:border-color .15s,box-shadow .15s}
               .cx-c.on{border-color:var(--acl);box-shadow:0 1px 2px rgba(20,28,50,.05)}
               .cx-c.full{grid-column:1/-1}
-              .cx-ch{display:flex;align-items:center;gap:11px;padding:12px 13px;cursor:pointer;user-select:none}
-              .cx-ci{width:32px;height:32px;border-radius:9px;background:var(--s2);display:grid;place-items:center;flex:none;color:var(--ink2)}
+              .cx-ch{display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;user-select:none}
+              .cx-ci{width:27px;height:27px;border-radius:8px;background:var(--s2);display:grid;place-items:center;flex:none;color:var(--ink2)}
               .cx-c.on .cx-ci{background:var(--acs);color:var(--ac)}
-              .cx-ci svg{width:18px;height:18px}
+              .cx-ci svg{width:15px;height:15px}
               .cx-ct{flex:1;min-width:0}
-              .cx-ct .n{font-weight:640;font-size:.9rem}
-              .cx-ct .s{font-size:.75rem;color:var(--mut);margin-top:1px}
-              .cx-tag{font-size:.6rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:var(--s2);color:var(--mut);margin-left:6px}
+              .cx-ct .n{font-weight:640;font-size:.83rem}
+              .cx-ct .s{font-size:.7rem;color:var(--mut);margin-top:1px}
+              .cx-tag{font-size:.58rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 5px;border-radius:5px;background:var(--s2);color:var(--mut);margin-left:6px}
               .cx-tag.v{background:var(--goods);color:var(--good)}
-              .cx-sw{width:40px;height:23px;border-radius:100px;background:var(--ln2);position:relative;flex:none;transition:.18s}
-              .cx-sw::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.18s}
-              .cx-c.on .cx-sw{background:var(--ac)}.cx-c.on .cx-sw::after{left:19px}
-              .cx-b{display:none;padding:0 13px 13px;border-top:1px solid var(--ln)}
-              .cx-c.on .cx-b{display:block;padding-top:11px}
+              .cx-sw{width:36px;height:21px;border-radius:100px;background:var(--ln2);position:relative;flex:none;transition:.18s}
+              .cx-sw::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.18s}
+              .cx-c.on .cx-sw{background:var(--ac)}.cx-c.on .cx-sw::after{left:17px}
+              .cx-b{display:none;padding:0 11px 11px;border-top:1px solid var(--ln)}
+              .cx-c.on .cx-b{display:block;padding-top:9px}
               .cx-c.static .cx-sw{display:none}.cx-c.static .cx-b{display:block}
-              .cx-r{display:flex;align-items:center;gap:9px;margin-top:9px;flex-wrap:wrap}
-              .cx-r .l{font-size:.78rem;color:var(--ink2);min-width:82px}
-              .cx-in{border:1px solid var(--ln2);background:var(--s2);border-radius:8px;padding:7px 9px;font:inherit;font-size:.82rem;color:var(--ink);flex:1;min-width:90px}
+              .cx-r{display:flex;align-items:center;gap:9px;margin-top:8px;flex-wrap:wrap}
+              .cx-r .l{font-size:.75rem;color:var(--ink2);min-width:78px}
+              .cx-in{border:1px solid var(--ln2);background:var(--s2);border-radius:8px;padding:6px 8px;font:inherit;font-size:.8rem;color:var(--ink);flex:1;min-width:90px}
               select.cx-in{cursor:pointer}
-              .cx-in.sm{flex:none;width:72px}
-              .cx-note{font-size:.76rem;color:var(--mut);margin-top:8px;line-height:1.4}
+              .cx-in.sm{flex:none;width:68px}
+              .cx-note{font-size:.73rem;color:var(--mut);margin-top:7px;line-height:1.4}
               .cx-sum{margin-top:16px;border:1px solid var(--ln);background:linear-gradient(180deg,var(--acs),var(--s));border-radius:12px;padding:13px 15px}
               .cx-sum .k{font-size:.66rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:5px}
               .cx-sum p{margin:0;font-size:.92rem;color:var(--ink)}
@@ -1591,9 +1606,27 @@
               /* ---- Preview that adapts to the video's real shape (portrait OR
                      landscape). JS sets the exact width/height on .preview-wrapper
                      from the media dimensions; these are the sizing bounds. ---- */
-              .preview-wrapper{ max-width:100%; max-height:440px;
+              .preview-wrapper{ max-width:100%;
                     transition:width .18s var(--mo), height .18s var(--mo); transform:translateZ(0); }
               .preview-container{ min-height:120px; }
+              /* The whole preview section (preview + its Prev/Next controls) stays
+                 pinned in place while the options column scrolls. */
+              #previewSection{ position:sticky; top:64px; z-index:5; }
+              #prevExpandBtn.on{ background:var(--tv) !important; color:#fff !important; border-color:var(--tv) !important; }
+              /* When moved into the options column (enlarged landscape), give it the
+                 same gap the step blocks use. */
+              #composeUI > #previewSection{ margin-bottom:13px !important; }
+
+              /* ENLARGED PORTRAIT: widen the preview column and let the option cards
+                 squeeze into the rest, with slightly smaller card text so nothing
+                 clips. Only on wide enough screens — narrow stays single-column. */
+              @media(min-width:901px){
+                #unifiedInterface.portrait-big{ grid-template-columns:minmax(360px,46%) minmax(0,1fr); }
+              }
+              #unifiedInterface.portrait-big #composeUI .cx-ct .n{ font-size:.78rem; }
+              #unifiedInterface.portrait-big #composeUI .cx-ct .s{ font-size:.66rem; }
+              #unifiedInterface.portrait-big #composeUI .cx-seg .o .t{ font-size:.8rem; }
+              #unifiedInterface.portrait-big #composeUI .cx-seg .o .d{ font-size:.67rem; }
 
               @media (prefers-reduced-motion: reduce){
                 *,*::before,*::after{ animation:none !important; transition:none !important; }
@@ -1642,8 +1675,32 @@
                   </select>
                   <span class="cx-note" style="margin:0">Sets the shape &amp; format for that platform.</span>
                 </div>
+                <div class="cx-platform" id="cxClipLenRow" style="display:none">
+                  <span class="l">Clip length</span>
+                  <select class="cx-in" id="cxClipLen">
+                    <option value="6-8" selected>6–8 sec (varied — most natural)</option>
+                    <option value="5">~5 seconds</option>
+                    <option value="10">~10 seconds</option>
+                    <option value="15">~15 seconds</option>
+                    <option value="20">~20 seconds</option>
+                    <option value="30">~30 seconds</option>
+                    <option value="60">~60 seconds</option>
+                    <option value="manual">Manual cuts — I set the ranges</option>
+                  </select>
+                  <span class="cx-note" id="cxClipLenNote" style="margin:0">Each clip is about this long. Nothing is discarded — a short leftover joins the last clip.</span>
+                </div>
+                <!-- Manual cut ranges: each becomes its own video, same edits on all. -->
+                <div id="cxManualCuts" style="display:none; margin-top:10px; border:1px solid var(--ln); border-radius:11px; padding:11px; background:var(--s2);">
+                  <div style="font-size:.8rem; font-weight:650; margin-bottom:8px;">Manual cuts — each range exports as its own video (same edits applied to all)</div>
+                  <div id="cxCutRows"></div>
+                  <button type="button" id="cxAddCut" class="btn btn-secondary" style="margin-top:6px; padding:6px 12px; font-size:.8rem;">+ Add cut</button>
+                  <div class="cx-note" style="margin-top:8px;">Times are in seconds. Leave <b>End</b> blank for “to the end”. Ranges can overlap and be in any order.</div>
+                </div>
               </div>
 
+              <!-- When a LANDSCAPE video is enlarged, #previewSection is moved to
+                   here (directly before this step) so it sits full-width above the
+                   options and can stay sticky while the cards scroll beneath it. -->
               <div class="cx-step" id="cxOptionsStep">
                 <div class="cx-sh"><span class="cx-sn">2</span><h3>What should we do to it?</h3><span class="h">stack any</span></div>
                 <div class="cx-opts">
@@ -1715,6 +1772,55 @@
                     <div class="cx-b"><div class="cx-r"><span class="l">Extra loops</span><input class="cx-in sm" id="cxLoopCount" type="number" min="1" value="1"></div><div class="cx-note">Repeats the video this many extra times.</div></div>
                   </div>
 
+                  <div class="cx-c" data-card="skin">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M9 10h.01M15 10h.01M9.5 15a3.5 3.5 0 0 0 5 0"/><path d="M17 4l1.2 2.4L20.5 7.6 18.2 8.8 17 11l-1.2-2.2L13.5 7.6l2.3-1.2z"/></svg></span>
+                      <div class="cx-ct"><div class="n">Smooth skin <span class="cx-tag v">video</span></div><div class="s">Softer, cleaner skin (whole frame)</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Strength</span><select class="cx-in" id="cxSkin"><option value="light">Light — natural</option><option value="medium" selected>Medium</option><option value="strong">Strong</option></select></div>
+                      <div class="cx-note">Fast, whole-frame softening — good for quick close-ups. For skin-only "beauty" (face + body) use <b>Smooth skin — AI beauty</b> below.</div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="skinai">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.2"/></svg></span>
+                      <div class="cx-ct"><div class="n">Smooth skin — AI beauty <span class="cx-tag v">video</span></div><div class="s">CapCut-style: targets skin only (face + body)</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Face</span><input type="range" id="cxAiFace" min="0" max="100" value="20" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:26px;text-align:right">20</span></div>
+                      <div class="cx-r"><span class="l">Body</span><input type="range" id="cxAiBody" min="0" max="100" value="45" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:26px;text-align:right">45</span></div>
+                      <div class="cx-r"><span class="l">Keep it real</span><input type="range" id="cxAiKeep" min="0" max="100" value="85" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:26px;text-align:right">85</span></div>
+                      <div class="cx-r"><span class="l">Glow</span><input type="range" id="cxAiGlow" min="0" max="100" value="30" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:26px;text-align:right">30</span></div>
+                      <div class="cx-r"><span class="l">Speed</span><select class="cx-in" id="cxAiMode"><option value="quality" selected>Quality — best (slower)</option><option value="fast">Fast — smaller (quicker)</option></select></div>
+                      <div class="cx-note">⚠️ Runs AI on every frame — a 1-minute video takes several minutes. Smooths only skin (face gently, body stronger); clothes, hair &amp; background are untouched. MP4/MOV.</div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c full" data-card="enhance">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.8-.5z"/></svg></span>
+                      <div class="cx-ct"><div class="n">Enhance / beautify <span class="cx-tag v">video</span></div><div class="s">Colour, sharpen, glow, vignette, grain, loudness</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Brightness</span><input type="range" id="cxEnhBright" min="-100" max="100" value="0" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:30px;text-align:right">0</span></div>
+                      <div class="cx-r"><span class="l">Contrast</span><input type="range" id="cxEnhContrast" min="-100" max="100" value="0" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:30px;text-align:right">0</span></div>
+                      <div class="cx-r"><span class="l">Saturation</span><input type="range" id="cxEnhSat" min="-100" max="100" value="0" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:30px;text-align:right">0</span></div>
+                      <div class="cx-r"><span class="l">Warmth</span><input type="range" id="cxEnhWarm" min="-100" max="100" value="0" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:30px;text-align:right">0</span></div>
+                      <div class="cx-r"><span class="l">Sharpen</span><input type="range" id="cxEnhSharpen" min="0" max="100" value="0" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:30px;text-align:right">0</span></div>
+                      <div class="cx-r"><span class="l">Glow</span><input type="range" id="cxEnhGlow" min="0" max="100" value="0" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:30px;text-align:right">0</span></div>
+                      <div class="cx-r"><span class="l">Vignette</span><input type="range" id="cxEnhVignette" min="0" max="100" value="0" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:30px;text-align:right">0</span></div>
+                      <div class="cx-r"><span class="l">Grain</span><input type="range" id="cxEnhGrain" min="0" max="100" value="0" style="flex:1" oninput="this.nextElementSibling.textContent=this.value"><span class="l" style="min-width:30px;text-align:right">0</span></div>
+                      <label class="cx-keepname"><input type="checkbox" id="cxEnhLoud"> <span>Normalise loudness (steady volume — good for talking videos)</span></label>
+                      <div class="cx-note">Brightness / Contrast / Saturation / Warmth are centred at 0 — slide left or right. Sharpen, Glow, Vignette and Grain start at 0 (off). Shows live in the preview.</div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="denoise">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4M7 6v12M11 3v18M15 8v8M19 5v14M23 10v4"/></svg></span>
+                      <div class="cx-ct"><div class="n">Remove background noise <span class="cx-tag v">audio</span></div><div class="s">Clean hiss, hum &amp; rumble from the sound</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r"><span class="l">Strength</span><select class="cx-in" id="cxDenoise"><option value="light">Light — gentle</option><option value="balanced" selected>Balanced</option><option value="strong">Strong — aggressive</option></select></div>
+                      <label class="cx-keepname"><input type="checkbox" id="cxDenoiseRumble" checked> <span>Also cut low rumble (wind / handling)</span></label>
+                      <div class="cx-note">Best for steady background noise (fan, AC, hiss, street). Very strong settings can make voices sound slightly “underwater”.</div>
+                    </div>
+                  </div>
+
                   <div class="cx-c" data-card="mute">
                     <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H2v6h4l5 4V5zM22 9l-6 6M16 9l6 6"/></svg></span>
                       <div class="cx-ct"><div class="n">Remove audio <span class="cx-tag v">video</span></div><div class="s">Mute the video</div></div><span class="cx-sw"></span></div>
@@ -1741,6 +1847,31 @@
                     </div>
                   </div>
 
+                  <div class="cx-c full" data-card="text">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg></span>
+                      <div class="cx-ct"><div class="n">Text on screen <span class="cx-tag v">video</span></div><div class="s">Reel-style caption in your fonts</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r" style="align-items:flex-start"><span class="l">Text</span><textarea class="cx-in" id="cxText" rows="2" placeholder="Your caption — press Enter for a new line" style="resize:vertical;min-height:38px;font:inherit"></textarea></div>
+                      <div class="cx-r"><span class="l">Font</span><select class="cx-in" id="cxTextFont">
+                        <option>Montserrat</option><option>Poppins</option><option>Inter</option><option>Archivo Black</option><option>League Spartan</option><option>Rubik</option><option>Bebas Neue</option><option>Anton</option><option>Oswald</option><option>Barlow Condensed</option><option>Kanit</option><option>Caveat</option><option>Dancing Script</option><option>Pacifico</option><option>Bangers</option>
+                      </select>
+                        <span class="l" style="min-width:40px">Size</span><select class="cx-in" id="cxTextSize"><option value="small">Small</option><option value="medium" selected>Medium</option><option value="large">Large</option></select></div>
+                      <div class="cx-r"><span class="l">Position</span><select class="cx-in" id="cxTextPos"><option value="top">Top</option><option value="middle">Middle</option><option value="bottom" selected>Bottom</option></select>
+                        <span class="l" style="min-width:40px">Align</span><select class="cx-in" id="cxTextAlign"><option value="left">Left</option><option value="center" selected>Center</option><option value="right">Right</option></select>
+                        <span class="l" style="min-width:40px">Colour</span><input type="color" id="cxTextColor" value="#ffffff"></div>
+                      <div class="cx-r" style="gap:16px">
+                        <label class="cx-keepname"><input type="checkbox" id="cxTextUpper"> UPPERCASE</label>
+                        <label class="cx-keepname"><input type="checkbox" id="cxTextOutline" checked> Outline</label>
+                        <label class="cx-keepname"><input type="checkbox" id="cxTextBox"> Background</label>
+                        <input type="color" id="cxTextBoxColor" value="#000000" title="Background colour">
+                      </div>
+                      <div class="cx-r"><span class="l">Show for</span><select class="cx-in" id="cxTextTiming" onchange="document.getElementById('cxTextFirst').style.display=this.value==='first'?'flex':'none';document.getElementById('cxTextRange').style.display=this.value==='range'?'flex':'none'"><option value="whole" selected>Whole video</option><option value="first">First few seconds</option><option value="range">Custom range</option></select></div>
+                      <div class="cx-r" id="cxTextFirst" style="display:none"><span class="l">Seconds</span><input class="cx-in sm" id="cxTextSeconds" type="number" min="1" step="0.5" value="4"></div>
+                      <div class="cx-r" id="cxTextRange" style="display:none"><span class="l">Start (s)</span><input class="cx-in sm" id="cxTextStart" type="number" min="0" step="0.1" value="0"><span class="l" style="min-width:40px">End (s)</span><input class="cx-in sm" id="cxTextEnd" type="number" min="0" step="0.1" placeholder="end"></div>
+                      <div class="cx-note">Your bundled fonts, size scales to the video. Different text per video (bulk) is coming next.</div>
+                    </div>
+                  </div>
+
                   <div class="cx-c" data-card="logo">
                     <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg></span>
                       <div class="cx-ct"><div class="n">Logo overlay <span class="cx-tag v">video</span></div><div class="s">Stamp a PNG logo on the video</div></div><span class="cx-sw"></span></div>
@@ -1758,6 +1889,19 @@
                       <div class="cx-r"><button type="button" class="cx-in" id="cxMusicPick" style="cursor:pointer">Choose music file…</button></div>
                       <div class="cx-r"><span class="l">File</span><span id="cxMusicName" style="font-size:.78rem;color:var(--mut)">none chosen</span></div>
                       <div class="cx-note">The original sound is removed and replaced with this track.</div>
+                    </div>
+                  </div>
+
+                  <div class="cx-c" data-card="setcover">
+                    <div class="cx-ch"><span class="cx-ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="M21 15l-5-4-4 3-2-1.5L3 17"/></svg></span>
+                      <div class="cx-ct"><div class="n">Set cover thumbnail <span class="cx-tag v">video</span></div><div class="s">Pick the frame shown as the cover</div></div><span class="cx-sw"></span></div>
+                    <div class="cx-b">
+                      <div class="cx-r">
+                        <button type="button" class="cx-in" id="cxCoverPick" style="cursor:pointer">Pick a frame…</button>
+                        <img id="cxCoverPreview" alt="" style="display:none;height:54px;border-radius:6px;border:1px solid var(--ln2)">
+                        <span id="cxCoverName" style="font-size:.78rem;color:var(--mut)">no frame chosen</span>
+                      </div>
+                      <div class="cx-note">Choose which frame becomes the video's cover image (what shows as the thumbnail). Works for one-file MP4/MOV output. Pick a frame per video.</div>
                     </div>
                   </div>
 
@@ -2085,9 +2229,13 @@
                             <label>Clip Length (seconds)</label>
                             <select id="clipLength">
                                 <option value="6-8" selected>6-8 seconds (Random)</option>
+                                <option value="5">~5 seconds</option>
                                 <option value="8">Exactly 8 seconds</option>
                                 <option value="10">Exactly 10 seconds</option>
                                 <option value="15">Exactly 15 seconds</option>
+                                <option value="20">~20 seconds</option>
+                                <option value="30">~30 seconds</option>
+                                <option value="60">~60 seconds</option>
                             </select>
                         </div>
 
@@ -2312,6 +2460,29 @@
             </div>
         </div>
 
+
+        <!-- Cover-thumbnail frame picker -->
+        <div id="coverPicker" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(12,11,20,.78); overflow-y:auto; padding:24px; justify-content:center; align-items:flex-start;">
+          <div style="background:var(--sh-surface); color:var(--sh-ink); width:min(1000px,94vw); max-height:calc(100vh - 48px); margin:auto; border-radius:16px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 24px 60px rgba(0,0,0,.5);">
+            <div style="display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--sh-line);">
+              <b style="font-size:1rem;">Pick the cover frame</b>
+              <span id="cpHint" style="color:var(--sh-mut); font-size:.85rem;">Click a frame to enlarge, then choose it.</span>
+              <button type="button" id="cpClose" class="btn btn-secondary" style="margin-left:auto;">Close</button>
+            </div>
+            <div id="cpBody" style="overflow:auto; min-height:0; padding:16px;">
+              <div id="cpStatus" style="color:var(--sh-mut); font-size:.9rem; padding:20px; text-align:center;">Extracting frames…</div>
+              <div id="cpGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px;"></div>
+            </div>
+          </div>
+          <!-- enlarge view -->
+          <div id="cpLightbox" style="display:none; position:absolute; inset:0; background:rgba(0,0,0,.88); flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:20px;">
+            <img id="cpBig" alt="frame" style="max-width:92vw; max-height:72vh; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,.6);">
+            <div style="display:flex; gap:10px;">
+              <button type="button" id="cpBack" class="btn btn-secondary">← Back to all frames</button>
+              <button type="button" id="cpUse" class="btn btn-primary">Use this frame as cover</button>
+            </div>
+          </div>
+        </div>
 
         <!-- Lightbox overlay (global) -->
         <div id="fxLightbox">

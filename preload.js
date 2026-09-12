@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // File system operations
     readFile: (path) => ipcRenderer.invoke('read-file', path),
     writeFile: (path, data) => ipcRenderer.invoke('write-file', path, data),
+    writeFileBase64: (path, b64) => ipcRenderer.invoke('write-file-base64', path, b64),
     exists: (path) => ipcRenderer.invoke('file-exists', path),
     getFileStats: (path) => ipcRenderer.invoke('get-file-stats', path),
     mkdir: (path) => ipcRenderer.invoke('mkdir', path),
