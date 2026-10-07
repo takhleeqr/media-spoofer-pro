@@ -197,7 +197,7 @@ function showPreview(filePath, mode) {
 
         // Determine if this is an image or video based on file extension
         const ext = filePath.split('.').pop().toLowerCase();
-        const imageExts = ['jpg', 'jpeg', 'png', 'heic', 'webp', 'bmp', 'gif', 'tiff', 'tif', 'svg', 'ico', 'jfif', 'avif', 'jxl'];
+        const imageExts = ['jpg', 'jpeg', 'png', 'heic', 'webp', 'bmp', 'tiff', 'tif', 'svg', 'ico', 'jfif', 'avif', 'jxl']; // gif = video (→ mp4)
         const isImage = imageExts.includes(ext);
         const isHeic = (ext === 'heic' || ext === 'heif');
 
@@ -211,6 +211,12 @@ function showPreview(filePath, mode) {
             const noteEl = document.getElementById('previewNote');
             if (noteEl) noteEl.style.display = 'none';
             if (videoPreview) { videoPreview.style.display = 'none'; clearMediaElementSource(videoPreview); }
+
+            // Live edit preview for non-HEIC photos (shows crop/enhance/text/skin…).
+            if (previewEditMode && !isHeic) {
+                const f = selectedFiles[currentPreviewIndex];
+                if (f && f.path === filePath && f.type === 'image') { renderImageEditPreview(f); updateNavigationButtons('media'); return; }
+            }
 
             if (isHeic && imagePreview) {
                 // Clear previous preview immediately to avoid confusion
@@ -635,6 +641,8 @@ let videoPreviewTempFiles = [];     // poster JPGs / proxies made for previews, 
 let previewIsVideo = false;         // is the current preview a video (vs an image)?
 let previewSourceDims = null;       // the video's true display size, so crop math stays correct
 let previewCropDims = null;         // SAR-normalized source display size (crop-value space) for the live-crop preview
+let _cropRect = null;               // last drawn crop box geometry {ox,oy,rw,rh,mw,mh} for the drag handlers
+let _defaultCropFrac = null;        // last crop the user set (proportions) — the suggestion for not-yet-touched files
                                     // even when a downscaled playable proxy is shown
 const heicProcessCache = new Map(); // source HEIC path -> temp JPEG (processing, per run)
 let heicTempFiles = [];             // all HEIC temp JPEGs created this run, for cleanup
@@ -1084,7 +1092,7 @@ function syncComposeToLegacy() {
     // caption; mirror it onto the file + its per-row input (kept in sync).
     const _cxTextEl = document.getElementById('cxText');
     const _curFile = selectedFiles[currentPreviewIndex];
-    if (_cxTextEl && _curFile && _curFile.type === 'video') {
+    if (_cxTextEl && _curFile && (_curFile.type === 'video' || _curFile.type === 'image')) {
         _curFile.captionText = _cxTextEl.value;
         const _row = document.getElementById('caprow-' + currentPreviewIndex);
         if (_row && _row.value !== _cxTextEl.value) _row.value = _cxTextEl.value;
@@ -1203,69 +1211,24 @@ function getPreviewMediaDims() {
     return null;
 }
 
-// Live crop as FRACTIONS of the true source display size (previewCropDims) — so it
-// matches the export regardless of the downscaled preview proxy's pixel size. Only
-// while editing a video with the Crop card on and non-zero values; null otherwise.
-function getCropFrac() {
-    const card = document.querySelector('.cx-c[data-card="crop"]');
-    const src = previewCropDims;
-    if (!(previewEditMode && previewIsVideo && card && card.classList.contains('on') && src && src.w && src.h)) return null;
-    const gv = id => Math.max(0, parseInt((document.getElementById(id) || {}).value) || 0);
-    const MIN = 16;
-    let t = gv('cxCropTop'), b = gv('cxCropBottom'), l = gv('cxCropLeft'), r = gv('cxCropRight');
-    t = Math.min(t, src.h - MIN); b = Math.min(b, Math.max(0, src.h - MIN - t));
-    l = Math.min(l, src.w - MIN); r = Math.min(r, Math.max(0, src.w - MIN - l));
-    t = Math.max(0, t); b = Math.max(0, b); l = Math.max(0, l); r = Math.max(0, r);
-    if (!(t || b || l || r)) return null;
-    return { ft: t / src.h, fb: b / src.h, fl: l / src.w, fr: r / src.w, keptW: src.w - l - r, keptH: src.h - t - b };
-}
-
-// Dimensions of what the preview BOX shows filled edge-to-edge = the cropped
-// (output) shape while live-cropping, else the full media shape.
+// The crop is shown as a draggable BOX drawn over the full media (see
+// updateCropOverlay + setupCropDrag) — not by zooming the preview — so the preview
+// always shows the whole image/frame and output dims = the media's true shape.
 function getPreviewOutputDims() {
-    const full = getPreviewMediaDims();
-    if (!full) return null;
-    const cf = getCropFrac();
-    return cf ? { w: cf.keptW, h: cf.keptH } : full;
+    return getPreviewMediaDims();
 }
 
-// Show the crop live by scaling/offsetting the media inside the (overflow-hidden)
-// wrapper so ONLY the kept region fills it — instant, no ffmpeg. Uses FRACTIONS so
-// the proxy's real pixel size is irrelevant. Resets to a contained fit when off.
-function applyLiveCrop(wrap) {
-    const vid = document.getElementById('video-preview');
-    const img = document.getElementById('image-preview');
-    const reset = (el) => { if (!el) return; el.style.position = ''; el.style.width = '100%'; el.style.height = '100%'; el.style.left = ''; el.style.top = ''; el.style.objectFit = 'contain'; };
-    const cf = getCropFrac();
-    if (!cf) { reset(vid); reset(img); return; }
-    const media = previewIsVideo ? vid : img;
-    reset(previewIsVideo ? img : vid);
-    if (!media) return;
-    const cw = wrap.clientWidth, ch = wrap.clientHeight;
-    const fw = 1 - cf.fl - cf.fr, fh = 1 - cf.ft - cf.fb; // kept width/height as fractions
-    media.style.position = 'absolute';
-    media.style.objectFit = 'fill';
-    media.style.width = (cw / fw) + 'px';
-    media.style.height = (ch / fh) + 'px';
-    media.style.left = (-cf.fl * (cw / fw)) + 'px';
-    media.style.top = (-cf.ft * (ch / fh)) + 'px';
-}
-
-// Size the preview box to the OUTPUT shape (cropped while editing, else the media's
-// true shape) so landscape videos get a wide box and portrait a tall one — capped
-// by a max height — then apply the live crop inside it.
+// Size the preview box to the media's true shape (landscape wide, portrait tall),
+// capped by a max height. Media fills the wrapper normally (no crop reframe).
 function updatePreviewSize() {
     const wrap = document.querySelector('.preview-wrapper');
     if (!wrap) return;
     const dims = getPreviewOutputDims();
     if (!dims || !dims.w || !dims.h) return;
+    // Undo any leftover absolute sizing (from the old reframe) so the media fills
+    // the wrapper via object-fit:contain.
+    ['video-preview', 'image-preview'].forEach(id => { const el = document.getElementById(id); if (el) { el.style.position = ''; el.style.width = '100%'; el.style.height = '100%'; el.style.left = ''; el.style.top = ''; el.style.objectFit = 'contain'; } });
     const container = wrap.parentElement; // .preview-container
-    // Width always follows whatever column the preview currently sits in (the
-    // layout classes / DOM move do the reshaping — see applyPreviewLayout). The
-    // height cap keeps the whole sticky section on screen so nothing hides:
-    //  - normal: 440px
-    //  - enlarged portrait: nearly the full viewport (tall reels)
-    //  - enlarged landscape: about half (it's wide & short anyway)
     const availW = Math.max(160, (container && container.clientWidth) || 300);
     const landscape = dims.w > dims.h;
     let maxH;
@@ -1275,7 +1238,6 @@ function updatePreviewSize() {
     if (h > maxH) { h = maxH; w = h * dims.w / dims.h; }
     wrap.style.width = Math.round(w) + 'px';
     wrap.style.height = Math.round(h) + 'px';
-    applyLiveCrop(wrap);
 }
 
 // Reshape the layout for the current preview size + video orientation:
@@ -1464,10 +1426,84 @@ function showRawInstant(f, token) {
     }, 500);
 }
 
+// Live edit preview for PHOTOS: show the raw photo instantly, then (if any edit
+// needs it) render the edited photo through the same pipeline to a small JPG and
+// swap it in. Photos render in well under a second, so this stays snappy.
+async function renderImageEditPreview(f) {
+    if (!previewEditMode || isProcessing || !f || f.type !== 'image') return;
+    const token = ++_prevRenderToken;
+    const img = document.getElementById('image-preview');
+    const vid = document.getElementById('video-preview');
+    const noteEl = document.getElementById('previewNote');
+    const resetImg = () => { if (img) { img.style.position = ''; img.style.width = '100%'; img.style.height = '100%'; img.style.left = ''; img.style.top = ''; img.style.objectFit = 'contain'; } };
+
+    // Instant first paint on a NEW photo: show the raw image immediately, and
+    // capture its TRUE pixel size so the drag-crop box maps to export pixels.
+    if (_prevRawShownPath !== f.path) {
+        _prevRawShownPath = f.path;
+        if (_prevRenderedPath) { try { await electronAPI.unlink(_prevRenderedPath); } catch (e) {} }
+        _prevRenderedPath = null; _lastBaseKey = null; _prevShowingRendered = false;
+        previewCropDims = null;
+        if (vid) { try { vid.pause(); } catch (e) {} vid.style.display = 'none'; }
+        resetImg();
+        if (img) { img.style.display = 'block'; img.src = toPreviewUrl(f.path); }
+        previewIsVideo = false; previewSourceDims = null;
+        const probeImg = new Image();
+        probeImg.onload = () => { previewCropDims = { w: probeImg.naturalWidth, h: probeImg.naturalHeight }; updateCropOverlay(); };
+        probeImg.src = toPreviewUrl(f.path);
+        setTimeout(refreshPreviewGeometry, 60);
+    }
+
+    let s; try { s = getProcessingSettings('image'); } catch (e) { return; }
+    // Crop is shown as a draggable box over the full photo (see updateCropOverlay),
+    // so it's EXCLUDED from the render — everything else bakes into the preview.
+    const sRender = Object.assign({}, s, { crop: Object.assign({}, s.crop || {}, { enabled: false }) });
+    const txtImg = () => textOverlayFilter(Object.assign({}, sRender, { textOverlay: sRender.textOverlay ? Object.assign({}, sRender.textOverlay, { timing: { mode: 'whole' } }) : undefined }));
+    const needs = rotateFilter(sRender) || mirrorFilter(sRender) || skinSmoothFilter(sRender) || enhanceFilter(sRender) || grainFilter(sRender) || txtImg() || (sRender.watermark && sRender.watermark.enabled);
+    if (!needs) {
+        if (noteEl) noteEl.style.display = 'none';
+        if (_prevShowingRendered && img) { img.src = toPreviewUrl(f.path); _prevShowingRendered = false; }
+        if (_prevRenderedPath) { try { await electronAPI.unlink(_prevRenderedPath); } catch (e) {} _prevRenderedPath = null; }
+        _lastBaseKey = null;
+        return;
+    }
+    const filter = buildMasterFilter(sRender, null, null, true); // photo edits (crop excluded → shown as box)
+    const baseKey = f.path + '|' + filter;
+    if (baseKey === _lastBaseKey && _prevRenderedPath && _prevShowingRendered) { if (noteEl) noteEl.style.display = 'none'; return; }
+    _lastBaseKey = baseKey;
+    if (noteEl) { noteEl.textContent = 'Updating preview…'; noteEl.style.display = 'block'; }
+    const cap = "scale='if(gt(iw\\,ih)\\,min(1000\\,iw)\\,-2)':'if(gt(iw\\,ih)\\,-2\\,min(1000\\,ih))'";
+    try {
+        const tempDir = await electronAPI.getTempDir();
+        const out = path.join(tempDir, `imgprev_${Date.now()}_${Math.floor(Math.random() * 1e5)}.jpg`);
+        await spawnFFmpeg(['-y', '-i', f.path, '-vf', filter + ',' + cap, '-frames:v', '1', '-q:v', '3', out]);
+        if (token !== _prevRenderToken) { try { await electronAPI.unlink(out); } catch (e) {} return; }
+        if (_prevRenderedPath) { try { await electronAPI.unlink(_prevRenderedPath); } catch (e) {} }
+        _prevRenderedPath = out;
+        resetImg();
+        if (img) { img.style.display = 'block'; img.src = toPreviewUrl(out); }
+        if (vid) vid.style.display = 'none';
+        previewIsVideo = false; previewSourceDims = null; _prevShowingRendered = true;
+        if (noteEl) noteEl.style.display = 'none';
+        setTimeout(refreshPreviewGeometry, 60);
+    } catch (e) {
+        if (noteEl) noteEl.style.display = 'none';
+        console.warn('Image edit preview failed:', e && e.message);
+    }
+}
+
 async function renderEditPreview() {
     if (!previewEditMode || isProcessing) return;
     const f = selectedFiles[currentPreviewIndex];
-    if (!f || f.type !== 'video') return;
+    if (!f) return;
+    if (f.type === 'image') {
+        const ext = (f.path.split('.').pop() || '').toLowerCase();
+        // HEIC display needs conversion, so its preview stays raw (edits still apply
+        // on export); other photos get a live edit preview.
+        if (ext !== 'heic' && ext !== 'heif') return renderImageEditPreview(f);
+        return;
+    }
+    if (f.type !== 'video') return;
     let s; try { s = getProcessingSettings('video'); } catch (e) { return; }
     const token = ++_prevRenderToken;
     const noteEl = document.getElementById('previewNote');
@@ -1475,7 +1511,8 @@ async function renderEditPreview() {
 
     // STEP 1 — instant first paint: on a NEW file, show the raw source right away
     // (no black screen, no waiting for a render). Reset render state for the file.
-    if (_prevRawShownPath !== f.path) {
+    const _isNewFile = (_prevRawShownPath !== f.path);
+    if (_isNewFile) {
         _prevRawShownPath = f.path;
         if (_prevRenderedPath) { try { await electronAPI.unlink(_prevRenderedPath); } catch (e) {} }
         _prevRenderedPath = null; _lastBaseKey = null;
@@ -1485,7 +1522,7 @@ async function renderEditPreview() {
     try {
         const probe = await probeVideo(f.path);
         if (token !== _prevRenderToken) return; // superseded while probing
-        // True source display size so the live crop divides by the real height.
+        // True source display size so the crop box maps to export pixels.
         if (probe.dispW && probe.dispH) previewCropDims = { w: probe.dispW, h: probe.dispH };
 
         // STEP 2 — skip the render entirely when the raw source already IS the
@@ -1560,55 +1597,169 @@ function setPreviewExpanded(on) {
 function updateCropOverlay() {
     const overlay = document.getElementById('cropOverlay');
     if (!overlay) return;
-    // In live edit-preview, the crop is already baked into the rendered frame, so
-    // the drag-overlay would double up — hide it.
-    if (previewEditMode) { overlay.style.display = 'none'; return; }
     const wrapper = overlay.parentElement;
     const cropCard = document.querySelector('.cx-c[data-card="crop"]');
     const on = cropCard && cropCard.classList.contains('on');
     const info = document.getElementById('cxCropInfo');
+    // Use the DISPLAYED image's shape (aspect) to lay out the box — always correct
+    // for whatever photo is on screen, independent of the async true-size probe.
     const dims = getPreviewMediaDims();
 
     if (!on || !dims) {
         overlay.style.display = 'none';
-        if (on && info) info.textContent = 'Add a video, then type pixels to trim — the preview shows what stays.';
+        _cropRect = null;
+        if (on && info) info.textContent = 'Add a photo or video, then drag the box (or pick a shape) to crop.';
         return;
     }
 
-    const mw = dims.w, mh = dims.h, MINKEEP = 16;
-    const gv = id => Math.max(0, parseInt((document.getElementById(id) || {}).value) || 0);
-    let t = gv('cxCropTop'), b = gv('cxCropBottom'), l = gv('cxCropLeft'), r = gv('cxCropRight');
-    // Clamp for display so the kept box can't invert.
-    t = Math.min(t, mh - MINKEEP); b = Math.min(b, Math.max(0, mh - MINKEEP - t));
-    l = Math.min(l, mw - MINKEEP); r = Math.min(r, Math.max(0, mw - MINKEEP - l));
-    t = Math.max(0, t); b = Math.max(0, b); l = Math.max(0, l); r = Math.max(0, r);
+    const mw = dims.w, mh = dims.h;
+    // Crop as PROPORTIONS of the frame (the stored source of truth) → box position.
+    const frac = currentCropFrac();
+    const ft = frac.ft, fb = frac.fb, fl = frac.fl, fr = frac.fr;
 
     const ww = wrapper.clientWidth, wh = wrapper.clientHeight;
     const scale = Math.min(ww / mw, wh / mh);
     const rw = mw * scale, rh = mh * scale;
     const ox = (ww - rw) / 2, oy = (wh - rh) / 2;
-    const tp = t * scale, bp = b * scale, lp = l * scale, rp = r * scale;
-    const shade = 'rgba(8,10,18,.60)';
+    _cropRect = { ox, oy, rw, rh }; // media rect on screen — fractions map onto it
+    const tp = ft * rh, bp = fb * rh, lp = fl * rw, rp = fr * rw;
+    const shade = 'rgba(8,10,18,.55)';
     const set = (id, css) => { const el = document.getElementById(id); if (el) el.style.cssText = css; };
-    set('cropBandTop', `position:absolute;left:${ox}px;top:${oy}px;width:${rw}px;height:${tp}px;background:${shade};`);
-    set('cropBandBottom', `position:absolute;left:${ox}px;top:${oy + rh - bp}px;width:${rw}px;height:${bp}px;background:${shade};`);
-    set('cropBandLeft', `position:absolute;left:${ox}px;top:${oy + tp}px;width:${lp}px;height:${rh - tp - bp}px;background:${shade};`);
-    set('cropBandRight', `position:absolute;left:${ox + rw - rp}px;top:${oy + tp}px;width:${rp}px;height:${rh - tp - bp}px;background:${shade};`);
-    set('cropKeep', `position:absolute;left:${ox + lp}px;top:${oy + tp}px;width:${rw - lp - rp}px;height:${rh - tp - bp}px;border:1.5px solid #6a5af9;box-shadow:0 0 0 1px rgba(255,255,255,.55);`);
+    set('cropBandTop', `position:absolute;left:${ox}px;top:${oy}px;width:${rw}px;height:${tp}px;background:${shade};pointer-events:none;`);
+    set('cropBandBottom', `position:absolute;left:${ox}px;top:${oy + rh - bp}px;width:${rw}px;height:${bp}px;background:${shade};pointer-events:none;`);
+    set('cropBandLeft', `position:absolute;left:${ox}px;top:${oy + tp}px;width:${lp}px;height:${rh - tp - bp}px;background:${shade};pointer-events:none;`);
+    set('cropBandRight', `position:absolute;left:${ox + rw - rp}px;top:${oy + tp}px;width:${rp}px;height:${rh - tp - bp}px;background:${shade};pointer-events:none;`);
+    const keep = document.getElementById('cropKeep');
+    if (keep) {
+        keep.style.cssText = `position:absolute;left:${ox + lp}px;top:${oy + tp}px;width:${rw - lp - rp}px;height:${rh - tp - bp}px;border:1.5px solid #6a5af9;box-shadow:0 0 0 1px rgba(255,255,255,.55);pointer-events:auto;cursor:move;`;
+        ensureCropHandles(keep);
+    }
     overlay.style.display = 'block';
-    if (info) info.textContent = `Source ${mw}×${mh} → Result ${mw - l - r}×${mh - t - b}`;
+    // Sync the pixel fine-tune fields for display (from true source size if known).
+    const src = previewCropDims || dims;
+    const setV = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = Math.max(0, Math.round(v)); };
+    setV('cxCropTop', ft * src.h); setV('cxCropBottom', fb * src.h); setV('cxCropLeft', fl * src.w); setV('cxCropRight', fr * src.w);
+    if (info) info.textContent = `Drag to crop · keeps ${Math.round((1 - fl - fr) * 100)}% × ${Math.round((1 - ft - fb) * 100)}% (${Math.round((1 - fl - fr) * src.w)}×${Math.round((1 - ft - fb) * src.h)}px)`;
 }
 
-// On blur, snap any over-crop back to a value that keeps ≥16px on that axis.
-function clampCropInputs() {
-    // Use the TRUE source display size (crop-value space); in edit mode
-    // getPreviewMediaDims is the downscaled proxy, which would clamp too small.
-    const dims = previewCropDims || getPreviewMediaDims();
-    if (!dims) return;
-    const MINKEEP = 16;
-    const clamp = (id, max) => { const el = document.getElementById(id); if (!el) return; let v = Math.max(0, parseInt(el.value) || 0); if (v > max) el.value = max; };
-    clamp('cxCropTop', dims.h - MINKEEP); clamp('cxCropBottom', dims.h - MINKEEP);
-    clamp('cxCropLeft', dims.w - MINKEEP); clamp('cxCropRight', dims.w - MINKEEP);
+// Create the 8 resize handles inside the crop box once (corners + edge midpoints).
+function ensureCropHandles(keep) {
+    if (keep.querySelector('.cx-crop-h')) return; // already added
+    const defs = [
+        ['nw', '0', '0'], ['n', '50%', '0'], ['ne', '100%', '0'],
+        ['e', '100%', '50%'], ['se', '100%', '100%'], ['s', '50%', '100%'],
+        ['sw', '0', '100%'], ['w', '0', '50%']
+    ];
+    const cur = { nw: 'nwse', se: 'nwse', ne: 'nesw', sw: 'nesw', n: 'ns', s: 'ns', e: 'ew', w: 'ew' };
+    defs.forEach(([h, x, y]) => {
+        const el = document.createElement('div');
+        el.className = 'cx-crop-h'; el.dataset.h = h;
+        el.style.cssText = `position:absolute;left:${x};top:${y};width:14px;height:14px;margin:-7px 0 0 -7px;background:#fff;border:2px solid #6a5af9;border-radius:3px;pointer-events:auto;cursor:${cur[h]}-resize;`;
+        keep.appendChild(el);
+    });
+}
+
+// Chosen shape/aspect ratio (width/height) from the dropdown; null = free.
+function cropAspectRatio() {
+    const v = (document.getElementById('cxCropAspect') || {}).value || 'free';
+    if (v === 'free') return null;
+    const [a, c] = v.split(':').map(Number);
+    return (a > 0 && c > 0) ? a / c : null;
+}
+
+// Picking a shape sets the largest centred crop of that ratio (Free leaves it as is).
+// Ratio is real w/h; the media's own aspect converts it to proportions.
+function applyCropShape() {
+    const ratio = cropAspectRatio();
+    const dims = getPreviewMediaDims(); if (!dims || !ratio) return;
+    const mediaAspect = dims.w / dims.h;
+    let fkw = 1, fkh = mediaAspect / ratio; // kept width/height as fractions
+    if (fkh > 1) { fkh = 1; fkw = ratio / mediaAspect; }
+    const fl = (1 - fkw) / 2, ft = (1 - fkh) / 2;
+    commitCropFrac({ ft, fb: ft, fl, fr: fl });
+}
+
+// Drag-to-crop: move the box, or resize from any of its 8 handles — all in the
+// on-screen media rect, then stored as PROPORTIONS. When a shape is chosen the box
+// stays locked to that ratio (resized about its centre). Scale is uniform, so the
+// display-space ratio equals the real ratio.
+function setupCropDrag() {
+    const keep = document.getElementById('cropKeep');
+    if (!keep || keep._wired) return; keep._wired = true;
+    const startDrag = (e, mode) => {
+        if (!_cropRect || !_cropRect.rw) return;
+        e.preventDefault(); e.stopPropagation();
+        const { ox, oy, rw, rh } = _cropRect;
+        const MIN = 0.02 * Math.min(rw, rh); // min box in display px
+        const fr0 = currentCropFrac();
+        let x0 = ox + fr0.fl * rw, y0 = oy + fr0.ft * rh;
+        let x1 = ox + (1 - fr0.fr) * rw, y1 = oy + (1 - fr0.fb) * rh;
+        const w0 = x1 - x0, h0 = y1 - y0, cxp = (x0 + x1) / 2, cyp = (y0 + y1) / 2;
+        const sx = e.clientX, sy = e.clientY;
+        const ratio = cropAspectRatio();
+        const commit = (bx0, by0, bx1, by1) => commitCropFrac({
+            ft: (by0 - oy) / rh, fb: (oy + rh - by1) / rh, fl: (bx0 - ox) / rw, fr: (ox + rw - bx1) / rw
+        });
+        const move = (ev) => {
+            const dx = ev.clientX - sx, dy = ev.clientY - sy;
+            if (mode === 'move') {
+                const nx = Math.max(ox, Math.min(ox + rw - w0, x0 + dx));
+                const ny = Math.max(oy, Math.min(oy + rh - h0, y0 + dy));
+                commit(nx, ny, nx + w0, ny + h0);
+                return;
+            }
+            if (ratio) {
+                let dW = 0;
+                if (mode.includes('e')) dW += dx; if (mode.includes('w')) dW -= dx;
+                if (mode.includes('s')) dW += dy * ratio; if (mode.includes('n')) dW -= dy * ratio;
+                let nw = Math.max(MIN, w0 + dW);
+                nw = Math.min(nw, 2 * Math.min(cxp - ox, ox + rw - cxp), 2 * Math.min(cyp - oy, oy + rh - cyp) * ratio);
+                const nh = nw / ratio;
+                commit(cxp - nw / 2, cyp - nh / 2, cxp + nw / 2, cyp + nh / 2);
+                return;
+            }
+            let nx0 = x0, ny0 = y0, nx1 = x1, ny1 = y1;
+            if (mode.includes('w')) nx0 = Math.min(x1 - MIN, Math.max(ox, x0 + dx));
+            if (mode.includes('e')) nx1 = Math.max(x0 + MIN, Math.min(ox + rw, x1 + dx));
+            if (mode.includes('n')) ny0 = Math.min(y1 - MIN, Math.max(oy, y0 + dy));
+            if (mode.includes('s')) ny1 = Math.max(y0 + MIN, Math.min(oy + rh, y1 + dy));
+            commit(nx0, ny0, nx1, ny1);
+        };
+        const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
+        document.addEventListener('pointermove', move);
+        document.addEventListener('pointerup', up);
+    };
+    keep.addEventListener('pointerdown', (e) => {
+        const h = e.target.closest('.cx-crop-h');
+        if (h) startDrag(e, h.dataset.h);
+        else if (e.target === keep) startDrag(e, 'move');
+    });
+}
+
+// The current crop box as PROPORTIONS (0..1) of the current file, derived from the
+// pixel inputs ÷ the file's true size. Used for per-file storage + export.
+const _clamp01 = (v) => Math.max(0, Math.min(0.98, parseFloat(v) || 0));
+
+// The crop in effect for the CURRENT file, as PROPORTIONS (source of truth):
+// this file's own crop if it has one, else the suggestion carried from earlier
+// files, else none. Never depends on pixel numbers or the async size probe.
+function currentCropFrac() {
+    const f = selectedFiles[currentPreviewIndex];
+    const fr = (f && f.cropFrac) || _defaultCropFrac || { ft: 0, fb: 0, fl: 0, fr: 0 };
+    return { ft: _clamp01(fr.ft), fb: _clamp01(fr.fb), fl: _clamp01(fr.fl), fr: _clamp01(fr.fr) };
+}
+
+// Commit a crop (proportions) as THIS file's own, remember it as the suggestion
+// for untouched files, then redraw the box.
+function commitCropFrac(fr) {
+    const c = { ft: _clamp01(fr.ft), fb: _clamp01(fr.fb), fl: _clamp01(fr.fl), fr: _clamp01(fr.fr) };
+    // Guard against an inverted box (keep ≥2%).
+    if (1 - c.fl - c.fr < 0.02) { if (c.fl >= c.fr) c.fl = Math.max(0, 1 - 0.02 - c.fr); else c.fr = Math.max(0, 1 - 0.02 - c.fl); }
+    if (1 - c.ft - c.fb < 0.02) { if (c.ft >= c.fb) c.ft = Math.max(0, 1 - 0.02 - c.fb); else c.fb = Math.max(0, 1 - 0.02 - c.ft); }
+    const f = selectedFiles[currentPreviewIndex];
+    if (f) f.cropFrac = c;
+    _defaultCropFrac = c;
+    updateCropOverlay();
 }
 
 // Full visual filter for the cover picker so the candidate frames + the embedded
@@ -1830,18 +1981,21 @@ function setupComposeUI() {
     const expandBtn = document.getElementById('prevExpandBtn');
     if (expandBtn) expandBtn.addEventListener('click', () => setPreviewExpanded(!previewExpanded));
 
-    // Crop card: wire the 4 inputs + preview-media load events to the live overlay.
+    // Crop card: the pixel fields are a fine-tune view. On commit (blur/enter),
+    // convert them to proportions for THIS file (using its true size if known).
+    const commitCropFromInputs = () => {
+        const dims = previewCropDims || getPreviewMediaDims(); if (!dims) return;
+        const gv = id => Math.max(0, parseInt((document.getElementById(id) || {}).value) || 0);
+        commitCropFrac({ ft: gv('cxCropTop') / dims.h, fb: gv('cxCropBottom') / dims.h, fl: gv('cxCropLeft') / dims.w, fr: gv('cxCropRight') / dims.w });
+    };
     ['cxCropTop', 'cxCropBottom', 'cxCropLeft', 'cxCropRight'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) {
-            // Live: updatePreviewSize re-crops the box instantly (edit mode) and
-            // updateCaptionOverlay keeps any caption inside it; updateCropOverlay
-            // handles the drag-band overlay in raw (non-edit) mode.
-            const liveCrop = () => { updateCropOverlay(); updatePreviewSize(); updateCaptionOverlay(); };
-            el.addEventListener('input', liveCrop);
-            el.addEventListener('change', () => { clampCropInputs(); liveCrop(); });
-        }
+        if (el) el.addEventListener('change', commitCropFromInputs);
     });
+    // Drag-to-crop box + shape/ratio presets (both commit the per-file crop).
+    setupCropDrag();
+    const cropAspectEl = document.getElementById('cxCropAspect');
+    if (cropAspectEl) cropAspectEl.addEventListener('change', applyCropShape);
     const vp = document.getElementById('video-preview');
     const ip = document.getElementById('image-preview');
     if (vp) vp.addEventListener('loadedmetadata', refreshPreviewGeometry);
@@ -2784,7 +2938,7 @@ async function addFiles(filePaths, mode) {
 
 function getFileType(extension) {
     const imageExts = [
-        '.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.gif', '.tiff', '.tif',
+        '.jpg', '.jpeg', '.png', '.heic', '.webp', '.bmp', '.tiff', '.tif',
         '.svg', '.ico', '.jfif', '.pjpeg', '.pjp', '.avif', '.jxl', '.raw', '.cr2',
         '.nef', '.arw', '.dng', '.orf', '.rw2', '.pef', '.srw', '.raf', '.mrw',
         '.kdc', '.dcr', '.x3f', '.mef', '.iiq', '.3fr', '.erf', '.mdc', '.mos',
@@ -2794,6 +2948,7 @@ function getFileType(extension) {
         '.rwz', '.srw', '.srf', '.sr2', '.x3f'
     ];
     const videoExts = [
+        '.gif', // animated GIF → treated as video so it exports as an MP4
         '.mp4', '.mov', '.avi', '.webm', '.ts', '.TS', '.mkv', '.flv', '.wmv',
         '.m4v', '.3gp', '.ogv', '.mts', '.m2ts', '.vob', '.asf', '.rm', '.rmvb',
         '.divx', '.xvid', '.mpg', '.mpeg', '.mpe', '.m1v', '.m2v', '.mpv', '.mpv2',
@@ -2876,7 +3031,7 @@ function updateFileList() {
 
     // Per-video caption inputs appear only while the "Text on screen" card is on,
     // so each video in the queue can carry its OWN caption (shared style).
-    const textOn = !!document.querySelector('.cx-c[data-card="text"].on');
+    const textOn = !!document.querySelector('.cx-c[data-card="text"].on'); // per-item caption rows (photos + videos)
 
     fileList.innerHTML = selectedFiles.map((file, index) => `
         <div class="file-item ${index === currentPreviewIndex ? 'active' : ''}" onclick="previewFileByClick(${index})" style="cursor: pointer;">
@@ -2902,9 +3057,9 @@ function updateFileList() {
                 </div>
                 <div class="progress-text" id="progress-text-${index}">${file.status || 'Ready'}</div>
             </div>
-            ${file.type === 'video' && textOn ? `
+            ${(file.type === 'video' || file.type === 'image') && textOn ? `
             <div class="file-caption" onclick="event.stopPropagation()">
-                <textarea id="caprow-${index}" class="file-caption-input" rows="1" placeholder="Caption for this video (optional)…" oninput="setFileCaption(${index}, this.value)">${escapeHtml(file.captionText || '')}</textarea>
+                <textarea id="caprow-${index}" class="file-caption-input" rows="1" placeholder="Caption for this ${file.type === 'image' ? 'photo' : 'video'} (optional)…" oninput="setFileCaption(${index}, this.value)">${escapeHtml(file.captionText || '')}</textarea>
             </div>` : ''}
         </div>
     `).join('');
@@ -3134,6 +3289,11 @@ async function startProcessing() {
         console.log('Status panel made visible');
     }
 
+    // SAFEGUARD: re-sync the compose UI into the legacy controls right now, so the
+    // engine always runs exactly what's selected on screen — a stale internal mode
+    // (e.g. still "convert" after you picked "Split into clips") can't slip through.
+    try { if (typeof syncComposeToLegacy === 'function') syncComposeToLegacy(); } catch (e) {}
+
     // In unified mode, get settings for both types and compute max duplicates
     const imageFiles = selectedFiles.filter(f => f.type === 'image');
     const videoFiles = selectedFiles.filter(f => f.type === 'video');
@@ -3315,10 +3475,16 @@ async function startProcessing() {
                         // Bulk per-video text: give THIS video its own caption
                         // (shared style from the card). A blank/untouched row = no
                         // caption on that video.
-                        if (file.type === 'video' && fileSettings.textOverlay && fileSettings.textOverlay.enabled) {
+                        if ((file.type === 'video' || file.type === 'image') && fileSettings.textOverlay && fileSettings.textOverlay.enabled) {
                             fileSettings = Object.assign({}, fileSettings, {
                                 textOverlay: Object.assign({}, fileSettings.textOverlay, { text: (file.captionText != null ? file.captionText : '') })
                             });
+                        }
+                        // Per-file crop: THIS file's own crop, else the shared suggestion
+                        // from files already cropped (proportions → any size). Blank = none.
+                        if (fileSettings.crop && fileSettings.crop.enabled) {
+                            const fr = file.cropFrac || _defaultCropFrac || { ft: 0, fb: 0, fl: 0, fr: 0 };
+                            fileSettings = Object.assign({}, fileSettings, { crop: Object.assign({ enabled: true }, fr) });
                         }
 
                         // AI skin smoothing (slow): beautify to a temp video first,
@@ -4385,6 +4551,14 @@ function resolutionFilter(settings) {
     return `scale='if(gt(iw,ih),min(iw\\,${long}),-2)':'if(gt(iw,ih),-2,min(ih\\,${long}))':flags=lanczos`;
 }
 
+// When shrinking, cap the frame rate at 30fps (never boost a lower rate). 60fps
+// iPhone/MOV clips carry ~2× the frames, so at a fixed quality they stay much
+// bigger than 24/30fps files; dropping them to 30 halves that and makes shrink
+// results consistent. `min(source_fps,30)` keeps 24→24, 30→30, 60→30.
+function fpsCapFilter(settings) {
+    return (settings && settings.compress) ? "fps=fps='min(source_fps\\,30)'" : '';
+}
+
 // Optional mirror/flip.
 function mirrorFilter(settings) {
     if (!settings) return '';
@@ -4474,25 +4648,21 @@ function loudnormFilter(settings) {
     return (e && e.enabled && e.loudnorm) ? 'loudnorm=I=-14:TP=-1.5:LRA=11' : '';
 }
 
-// Optional crop — trim pixels off each edge (like HandBrake). Changes the real
-// output dimensions (no padding/black bars). Coordinates are in the SOURCE's
-// displayed pixels, which is exactly what the live preview shows. trunc(...)*2
-// keeps width/height even for yuv420p; no commas so it drops into a filter chain.
+// Optional crop — trim each edge. Stored as PROPORTIONS (ft/fb/fl/fr, 0..1 of the
+// frame) so the SAME crop applies sensibly to any input size — essential for
+// per-photo crop carried across a mixed-size batch. Computed from iw/ih at run
+// time by ffmpeg, so no per-file dimensions are needed. trunc(...)*2 keeps dims
+// even (yuv420p); "\," escapes the comma inside max() so it stays one filter.
 function cropFilter(settings) {
     const c = settings && settings.crop;
     if (!c || !c.enabled) return '';
-    const t = Math.max(0, parseInt(c.top) || 0);
-    const b = Math.max(0, parseInt(c.bottom) || 0);
-    const l = Math.max(0, parseInt(c.left) || 0);
-    const r = Math.max(0, parseInt(c.right) || 0);
-    if (!(t || b || l || r)) return '';
-    // Crash-proof for ANY input size: width/height are floored at 2 and kept even
-    // (yuv420p); the x/y offsets are clamped with ow/oh so x+ow<=iw, y+oh<=ih even
-    // if a crop exceeds a particular file's dimensions in a mixed batch. The "\,"
-    // escapes the comma inside max()/min() so it stays one filter in the chain.
-    const w = `max(2\\,trunc((iw-${l}-${r})/2)*2)`;
-    const h = `max(2\\,trunc((ih-${t}-${b})/2)*2)`;
-    return `crop=${w}:${h}:min(${l}\\,iw-ow):min(${t}\\,ih-oh)`;
+    const cl = (v) => Math.max(0, Math.min(0.98, parseFloat(v) || 0));
+    const ft = cl(c.ft), fb = cl(c.fb), fl = cl(c.fl), fr = cl(c.fr);
+    if (!(ft || fb || fl || fr)) return '';
+    const kw = Math.max(0.02, 1 - fl - fr), kh = Math.max(0.02, 1 - ft - fb); // kept fractions
+    const w = `max(2\\,trunc(iw*${kw.toFixed(6)}/2)*2)`;
+    const h = `max(2\\,trunc(ih*${kh.toFixed(6)}/2)*2)`;
+    return `crop=${w}:${h}:trunc(iw*${fl.toFixed(6)}):trunc(ih*${ft.toFixed(6)})`;
 }
 
 // Optional speed change — video timestamps (setpts) and audio tempo (atempo).
@@ -4666,60 +4836,55 @@ function buildMasterFilter(settings, effects, originalDAR, isImage = false, hdr 
 
     // --- IMAGE PATH: preserve original dimensions, just apply spoof effects ---
     if (isImage) {
-        let filterComplex = '';
+        // Photo pipeline: keep the original dimensions, apply the user's edits, and
+        // (when spoofing) the make-unique "DNA". Order mirrors the video path so a
+        // photo and a video get the same look: normalize → crop → rotate → [DNA] →
+        // mirror → skin → enhance → text → grain → watermark.
+        const parts = ['scale=trunc(iw/2)*2:trunc(ih/2)*2'];
+
+        const crp = cropFilter(settings); if (crp) parts.push(crp);
+        const rot = rotateFilter(settings); if (rot) parts.push(rot);
 
         if (effects) {
             // Base spoof scale for DNA uniqueness
             let scaleVal = (effects.scale || 1.08);
-
-            // ROTATION-AWARE SCALE: mathematically guarantees zero black corners
-            // When a W×H rectangle is rotated by angle θ, the minimum scale to
-            // ensure no black in corners when cropping back to W×H from center is:
-            //   s = cos(|θ|) + max(W/H, H/W) · sin(|θ|)
-            // Since image dims are unknown at build time, we use R=1.78 (16:9 ratio)
-            // as a safe worst-case for standard photo formats.
+            // ROTATION-AWARE SCALE: guarantees zero black corners when a tilt is
+            // cropped back to the original size (R=1.78 = 16:9 worst case).
             if (effects.enableRotation && effects.rotation !== 0) {
                 const absRad = Math.abs(effects.rotation * Math.PI / 180);
-                const R = 1.78; // max standard aspect ratio (16:9)
-                const rotScale = Math.cos(absRad) + R * Math.sin(absRad);
-                scaleVal = Math.max(scaleVal, rotScale);
+                const R = 1.78;
+                scaleVal = Math.max(scaleVal, Math.cos(absRad) + R * Math.sin(absRad));
             }
-
-            // Use FFmpeg's iw/ih (input width/height) expressions
-            filterComplex = `scale=trunc(iw*${scaleVal.toFixed(6)}/2)*2:trunc(ih*${scaleVal.toFixed(6)}/2)*2`;
-
+            let dna = `scale=trunc(iw*${scaleVal.toFixed(6)}/2)*2:trunc(ih*${scaleVal.toFixed(6)}/2)*2`;
             if (effects.enableRotation && effects.rotation !== 0) {
                 const rotateRad = (effects.rotation * Math.PI / 180).toFixed(6);
-                // ow=iw:oh=ih keeps output canvas same size as scaled-up input.
-                // The rotation-aware scale guarantees the crop region is fully
-                // covered by the rotated content — no black corners.
-                filterComplex += `,rotate=${rotateRad}:ow=iw:oh=ih:fillcolor=black`;
+                dna += `,rotate=${rotateRad}:ow=iw:oh=ih:fillcolor=black`;
             }
-
-            // Crop back to original dimensions from center with DNA offset
             const offXPct = (Math.random() * 0.01 - 0.005).toFixed(6);
             const offYPct = (Math.random() * 0.01 - 0.005).toFixed(6);
-            filterComplex += `,crop=trunc(iw/${scaleVal.toFixed(6)}/2)*2:trunc(ih/${scaleVal.toFixed(6)}/2)*2:(iw-ow)/2+trunc(iw*${offXPct}):(ih-oh)/2+trunc(ih*${offYPct})`;
-
+            dna += `,crop=trunc(iw/${scaleVal.toFixed(6)}/2)*2:trunc(ih/${scaleVal.toFixed(6)}/2)*2:(iw-ow)/2+trunc(iw*${offXPct}):(ih-oh)/2+trunc(ih*${offYPct})`;
             const brightness = (effects.brightness / 100).toFixed(3);
             const contrast = (effects.contrast / 100).toFixed(3);
             const saturation = (effects.saturation / 100).toFixed(3);
             const hue = (effects.hue || 0).toFixed(3);
-            filterComplex += `,eq=brightness=${brightness}:contrast=${contrast}:saturation=${saturation},hue=h=${hue}`;
-        } else {
-            // Convert-only for images: no dimension change
-            filterComplex = `scale=trunc(iw/2)*2:trunc(ih/2)*2`;
+            dna += `,eq=brightness=${brightness}:contrast=${contrast}:saturation=${saturation},hue=h=${hue}`;
+            parts.push(dna);
         }
 
-        // Watermark + SAR fix (pixel format is set on the command via -pix_fmt so
-        // PNG output isn't forced into an incompatible yuv420p — see F8).
+        const mir = mirrorFilter(settings); if (mir) parts.push(mir);
+        const skin = skinSmoothFilter(settings); if (skin) parts.push(skin);
+        const enh = enhanceFilter(settings); if (enh) parts.push(enh);
+        // Text always shows on a photo (a still has no time, so timing is forced to whole).
+        const txt = textOverlayFilter(Object.assign({}, settings, {
+            textOverlay: settings.textOverlay ? Object.assign({}, settings.textOverlay, { timing: { mode: 'whole' } }) : undefined
+        }));
+        if (txt) parts.push(txt);
+        const grn = grainFilter(settings); if (grn) parts.push(grn);
+
         const watermarkFilter = generateWatermarkFilter(settings.watermark);
-        if (watermarkFilter) {
-            filterComplex += `,${watermarkFilter}`;
-        }
-        filterComplex += `,setsar=1:1`;
-
-        return filterComplex;
+        if (watermarkFilter) parts.push(watermarkFilter);
+        parts.push('setsar=1:1');
+        return parts.join(',');
     }
 
     // --- VIDEO PATH ---
@@ -4807,6 +4972,12 @@ function buildMasterFilter(settings, effects, originalDAR, isImage = false, hdr 
     // 5. Optional downscale (cap the long edge; never upscale).
     const res = resolutionFilter(settings);
     if (res) parts.push(res);
+
+    // 5-fps. When shrinking, cap the frame rate at 30 (drops 60fps → 30 for a big,
+    //        consistent size reduction). Placed here so downstream filters process
+    //        fewer frames too.
+    const fpsCap = fpsCapFilter(settings);
+    if (fpsCap) parts.push(fpsCap);
 
     // 5a. Skin smoothing / beauty (after any downscale so it works at the final
     //     size; before the watermark so text stays crisp).
@@ -4996,6 +5167,39 @@ async function processVideoSpoof(inputPath, outputPath, effects, settings, updat
 }
 
 
+// Stitch already-encoded segment files into ONE output, in order. Tries a fast
+// lossless stream-copy concat first (segments share identical encode params); if
+// that fails, falls back to a re-encoding concat filter for robustness.
+async function concatSegments(segPaths, outputPath, settings, hdr = false) {
+    const tempDir = await electronAPI.getTempDir();
+    const listPath = path.join(tempDir, `concat_${Date.now()}_${Math.floor(Math.random() * 1e5)}.txt`);
+    const listText = segPaths.map(p => `file '${String(p).replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n') + '\n';
+    await electronAPI.writeFile(listPath, listText);
+    const ext = (path.parse(outputPath).ext || '.mp4').toLowerCase();
+    let ok = false;
+    try {
+        const r = await spawnFFmpeg(['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', '-movflags', '+faststart', outputPath]);
+        ok = r && r.code === 0 && await electronAPI.exists(outputPath);
+    } catch (e) { ok = false; }
+    if (!ok) {
+        console.warn('Concat copy failed — re-encoding the join.');
+        const inputs = [];
+        segPaths.forEach(p => inputs.push('-i', p));
+        const hasAudio = !settings.removeAudio;
+        const labels = segPaths.map((_, i) => hasAudio ? `[${i}:v][${i}:a]` : `[${i}:v]`).join('');
+        const fc = hasAudio
+            ? `${labels}concat=n=${segPaths.length}:v=1:a=1[v][a]`
+            : `${labels}concat=n=${segPaths.length}:v=1:a=0[v]`;
+        const cmd = ['-y', ...inputs, '-filter_complex', fc, '-map', '[v]'];
+        if (hasAudio) cmd.push('-map', '[a]');
+        cmd.push(...videoEncodeArgs(ext, settings, hdr));
+        cmd.push(...(hasAudio ? audioEncodeArgs(ext, settings) : ['-an']));
+        cmd.push(outputPath);
+        await spawnFFmpeg(cmd);
+    }
+    try { await electronAPI.unlink(listPath); } catch (e) {}
+}
+
 async function processVideoSplit(file, outputDir, settings, applySpoof = false, updateProgress, fileIndex = 0) {
     const probe = await probeVideo(file.path); // single probe: duration, DAR, anamorphic
     if (!probe.ok) {
@@ -5035,8 +5239,10 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
     // thumbnails (F3).
     // Mirror, rotate, speed, downscale, or shrink/compress all require a re-encode too.
     const _needsFilter = mirrorFilter(settings) || rotateFilter(settings) || speedVideoFilter(settings) || resolutionFilter(settings) || cropFilter(settings) || skinSmoothFilter(settings) || enhanceFilter(settings) || grainFilter(settings) || textOverlayFilter(settings) || audioDenoiseFilter(settings) || loudnormFilter(settings) || settings.compress;
+    const _isGif = /\.gif$/i.test(file.path); // GIF → must re-encode to a real video, never stream-copy
     const useFastCopy = !applySpoof &&
         !manualCuts &&
+        !_isGif &&
         (!settings.watermark || !settings.watermark.enabled) &&
         (settings.orientation === 'auto') &&
         !probe.anamorphic &&
@@ -5057,6 +5263,7 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
         rotateFilter(settings) || null,
         mirrorFilter(settings) || null,
         resolutionFilter(settings) || null,
+        fpsCapFilter(settings) || null,
         skinSmoothFilter(settings) || null,
         enhanceFilter(settings) || null,
         speedVideoFilter(settings) || null,
@@ -5181,6 +5388,38 @@ async function processVideoSplit(file, outputDir, settings, applySpoof = false, 
         if (reencoded > 0) {
             console.log(`SplitOnly: ${clips.length - reencoded} clips via fast copy, ${reencoded} re-encoded (sparse keyframes)`);
         }
+    }
+
+    // JOIN MODE (manual cuts + "join into one video"): edit each cut to a temp
+    // segment, then stitch them in order into a SINGLE output. Lets the user keep
+    // only chosen sections (drop the rest) and export as one clip.
+    if (manualCuts && settings.joinCuts) {
+        const tempDir = await electronAPI.getTempDir();
+        const segPaths = [];
+        try {
+            for (let i = 0; i < clips.length; i++) {
+                updateProgress((i / clips.length) * 80 + 5);
+                const seg = path.join(tempDir, `seg_${Date.now()}_${i}_${Math.floor(Math.random() * 1e5)}.mp4`);
+                if (applySpoof) {
+                    const effects = generateSpoofEffects(settings.intensity, settings.enableRotation !== false);
+                    await processVideoClipWithEffects(file.path, seg, clips[i], effects, settings, originalDAR, null, probe.hdr);
+                } else {
+                    const filterOverride = reframe ? null : minimalSplitFilter;
+                    await processVideoClipWithEffects(file.path, seg, clips[i], null, settings, originalDAR, filterOverride, probe.hdr);
+                }
+                segPaths.push(seg);
+            }
+            updateProgress(90);
+            const outputPath = generateOutputPathForBatch(file, outputDir, settings, null, fileIndex); // one file (no clip number)
+            await concatSegments(segPaths, outputPath, settings, probe.hdr);
+            if (!(await electronAPI.exists(outputPath))) throw new Error('Joining the cuts failed — no output was produced.');
+            outputCount++;
+            addStatusMessage(`Joined ${clips.length} cut(s) into one video: ${path.parse(outputPath).base}`, 'success');
+        } finally {
+            for (const p of segPaths) { try { await electronAPI.unlink(p); } catch (e) {} }
+        }
+        updateProgress(100);
+        return;
     }
 
     // Process each clip
@@ -5336,14 +5575,9 @@ async function convertImage(inputPath, outputPath, settings) {
             ...metadataArgs(settings, outputExt)
         );
 
-        // Always normalize to even dimensions with square pixels (SAR_NORMALIZE
-        // fixes non-square-pixel sources; identity for normal images). Watermark
-        // is prepended when enabled.
-        const watermarkFilter = generateWatermarkFilter(settings.watermark);
-        const finalFilter = watermarkFilter
-            ? `${watermarkFilter},${SAR_NORMALIZE}`
-            : SAR_NORMALIZE;
-        command.push('-vf', finalFilter);
+        // Apply the full photo edit chain (crop/enhance/text/skin/mirror/rotate +
+        // watermark), preserving the original dimensions. effects=null → no spoof DNA.
+        command.push('-vf', buildMasterFilter(settings, null, null, true));
 
         // Add quality settings for image conversion
         const qualitySettings = getQualitySettings(settings.imageQuality || 'high');
@@ -5416,7 +5650,7 @@ async function convertVideo(inputPath, outputPath, settings) {
             const reframe = isForcedOrientation || (settings.watermark && settings.watermark.enabled);
             const filterComplex = reframe
                 ? buildMasterFilter(settings, null, probe.dar, false, probe.hdr)
-                : [probe.hdr ? HDR_TONEMAP : null, SAR_NORMALIZE, cropFilter(settings) || null, rotateFilter(settings) || null, mirrorFilter(settings) || null, resolutionFilter(settings) || null, skinSmoothFilter(settings) || null, enhanceFilter(settings) || null, speedVideoFilter(settings) || null, textOverlayFilter(settings) || null, grainFilter(settings) || null, 'format=yuv420p'].filter(Boolean).join(',');
+                : [probe.hdr ? HDR_TONEMAP : null, SAR_NORMALIZE, cropFilter(settings) || null, rotateFilter(settings) || null, mirrorFilter(settings) || null, resolutionFilter(settings) || null, fpsCapFilter(settings) || null, skinSmoothFilter(settings) || null, enhanceFilter(settings) || null, speedVideoFilter(settings) || null, textOverlayFilter(settings) || null, grainFilter(settings) || null, 'format=yuv420p'].filter(Boolean).join(',');
             command.push('-vf', filterComplex);
 
             // Quality-aware codec (F10) + non-conflicting audio (F26)
@@ -5531,6 +5765,45 @@ function getQualitySettings(quality) {
 // getProcessingSettings now accepts a fileType parameter ('image' or 'video')
 // to determine which settings panel to read from. In unified mode, each file
 // is processed with settings from its respective panel.
+// Reads the edit cards that apply to BOTH photos and videos (crop, mirror, rotate,
+// skin smoothing, enhance/beautify, on-screen text) into `settings`. Called from
+// both the image and video branches so a photo gets the same edits as a video.
+function readSharedEditCards(settings) {
+    const cropCard = document.querySelector('.cx-c[data-card="crop"]');
+    settings.crop = Object.assign({ enabled: !!(cropCard && cropCard.classList.contains('on')) }, currentCropFrac());
+    const mirrorEl = document.getElementById('videoMirror');
+    settings.mirror = mirrorEl ? mirrorEl.value : 'none';
+    const rotCard = document.querySelector('.cx-c[data-card="rotate"]');
+    settings.rotate = (rotCard && rotCard.classList.contains('on'))
+        ? ((document.getElementById('cxRotate') || {}).value || 'none') : 'none';
+    const skinCard = document.querySelector('.cx-c[data-card="skin"]');
+    settings.skinSmooth = {
+        enabled: !!(skinCard && skinCard.classList.contains('on')),
+        strength: (document.getElementById('cxSkin') || {}).value || 'medium'
+    };
+    const enhCard = document.querySelector('.cx-c[data-card="enhance"]');
+    const ev = (id, d) => { const e = document.getElementById(id); return e ? e.value : d; };
+    settings.enhance = {
+        enabled: !!(enhCard && enhCard.classList.contains('on')),
+        brightness: ev('cxEnhBright', '0'), contrast: ev('cxEnhContrast', '0'),
+        saturation: ev('cxEnhSat', '0'), warmth: ev('cxEnhWarm', '0'),
+        sharpen: ev('cxEnhSharpen', '0'), glow: ev('cxEnhGlow', '0'),
+        vignette: ev('cxEnhVignette', '0'), grain: ev('cxEnhGrain', '0'),
+        loudnorm: !!(document.getElementById('cxEnhLoud') && document.getElementById('cxEnhLoud').checked)
+    };
+    const textCard = document.querySelector('.cx-c[data-card="text"]');
+    const tv = (id, d) => { const e = document.getElementById(id); return e ? e.value : d; };
+    const tc = (id, d) => { const e = document.getElementById(id); return e ? e.checked : d; };
+    settings.textOverlay = {
+        enabled: !!(textCard && textCard.classList.contains('on')),
+        text: tv('cxText', ''), font: tv('cxTextFont', 'Montserrat'), size: tv('cxTextSize', 'medium'),
+        color: tv('cxTextColor', '#ffffff'), pos: tv('cxTextPos', 'bottom'), align: tv('cxTextAlign', 'center'),
+        uppercase: tc('cxTextUpper', false), outline: tc('cxTextOutline', true), box: tc('cxTextBox', false),
+        boxColor: tv('cxTextBoxColor', '#000000'),
+        timing: { mode: tv('cxTextTiming', 'whole'), seconds: tv('cxTextSeconds', '4'), start: tv('cxTextStart', ''), end: tv('cxTextEnd', '') }
+    };
+}
+
 function getProcessingSettings(fileType) {
     const settings = {
         mode: null,
@@ -5573,6 +5846,9 @@ function getProcessingSettings(fileType) {
         const imageMetaSelect = document.getElementById('imageMetadataMode');
         settings.metadataMode = imageMetaSelect ? imageMetaSelect.value : 'strip';
         settings.metaProfile = settings.metadataMode === 'spoof' ? pickDeviceProfile() : null;
+
+        // Photos now get the same crop / enhance / text / skin / mirror / rotate edits.
+        readSharedEditCards(settings);
     } else if (useVideoSettings) {
         settings.mode = document.getElementById('videoProcessingMode').value;
         settings.intensity = document.getElementById('videoIntensity').value;
@@ -5587,6 +5863,8 @@ function getProcessingSettings(fileType) {
         // output video, all with the same edits. Null unless that mode is chosen.
         const clipLenEl = document.getElementById('cxClipLen');
         settings.manualCuts = (clipLenEl && clipLenEl.value === 'manual') ? readManualCuts() : null;
+        // "Join all cuts into one video" — stitch the manual cuts into a single file.
+        settings.joinCuts = !!(settings.manualCuts && document.getElementById('cxJoinCuts') && document.getElementById('cxJoinCuts').checked);
 
         // Rotation setting for videos (only relevant for spoof modes)
         const videoRotationCheckbox = document.getElementById('videoRotationEnabled');
@@ -5686,15 +5964,9 @@ function getProcessingSettings(fileType) {
             rumble: !(document.getElementById('cxDenoiseRumble') && document.getElementById('cxDenoiseRumble').checked === false)
         };
 
-        // Crop — trim pixels off each edge (HandBrake-style; changes output dims)
+        // Crop — stored as proportions (see cropFilter) so it maps across sizes.
         const cropCard = document.querySelector('.cx-c[data-card="crop"]');
-        settings.crop = {
-            enabled: !!(cropCard && cropCard.classList.contains('on')),
-            top: parseInt((document.getElementById('cxCropTop') || {}).value) || 0,
-            bottom: parseInt((document.getElementById('cxCropBottom') || {}).value) || 0,
-            left: parseInt((document.getElementById('cxCropLeft') || {}).value) || 0,
-            right: parseInt((document.getElementById('cxCropRight') || {}).value) || 0
-        };
+        settings.crop = Object.assign({ enabled: !!(cropCard && cropCard.classList.contains('on')) }, currentCropFrac());
 
         // Trim + Loop (one-file output)
         const trimCard = document.querySelector('.cx-c[data-card="trim"]');
@@ -6084,7 +6356,7 @@ function previewFileByClick(index) {
 function syncCaptionFieldToCurrentFile() {
     const cx = document.getElementById('cxText');
     const f = selectedFiles[currentPreviewIndex];
-    if (!cx || !f || f.type !== 'video') return;
+    if (!cx || !f || (f.type !== 'video' && f.type !== 'image')) return;
     cx.value = (f.captionText != null ? f.captionText : '');
     if (typeof updateCaptionOverlay === 'function') updateCaptionOverlay();
 }
@@ -6204,6 +6476,9 @@ function generateOutputPathForBatch(file, outputDir, settings, clipNumber = null
         }
         // Last-resort guard: an empty/whitespace/".out" ext is unwritable.
         if (!outputFormat || outputFormat === '.' || /^\.out$/i.test(outputFormat)) outputFormat = defaultExt;
+        // A GIF input is treated as video → it must come out as a real video
+        // container, never ".gif" (our H.264 encoder can't write an animated GIF).
+        if (fileMode === 'video' && /^\.gif$/i.test(outputFormat)) outputFormat = '.mp4';
     } catch (e) {
         baseName = 'file';
         outputFormat = defaultExt;
