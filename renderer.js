@@ -3986,7 +3986,10 @@ async function processSplitOnly(file, outputDir, settings, updateProgress, fileI
     if (file.type === 'video') {
         const duration = await getVideoDuration(file.path);
 
-        if (duration > 10) {
+        // Manual cuts define explicit ranges, so ALWAYS split (even a short clip).
+        // Auto-split keeps the "too short to bother" shortcut for videos ≤ 10s.
+        const hasManualCuts = Array.isArray(settings.manualCuts) && settings.manualCuts.length > 0;
+        if (duration > 10 || hasManualCuts) {
             // Split video into clips
             await processVideoSplit(file, outputDir, settings, false, updateProgress, fileIndex);
         } else {
